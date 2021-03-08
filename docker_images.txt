@@ -1,1 +1,1 @@
-docker.pkg.github.com/hubmap/spatial-transcriptomics-pipeline/main	docker/Dockerfile
+docker.pkg.github.com/hubmap/spatial-transcriptomics-pipeline/main docker/Dockerfile base_directory_build
