@@ -3,7 +3,7 @@ cwlVersion: v1.1
 class: CommandLineTool
 requirements:
   DockerRequirement:
-    dockerPull: docker.pkg.github.com/hubmap/spatial-transcriptomics-pipeline/main:latest
+    dockerPull: docker.pkg.github.com/hubmapconsortium/spatial-transcriptomics-pipeline/main:latest
 
 inputs:
   data_dir: Directory
