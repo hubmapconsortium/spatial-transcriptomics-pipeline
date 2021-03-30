@@ -6,11 +6,14 @@ inputs:
   data_dir:
     type: Directory
 
-outputs: {}
+outputs: 
+  example:
+    type: File
+    outputSource: starfish/example_out
 
 steps:
   starfish:
     run: steps/starfish.cwl
     in:
       data_dir: data_dir
-    out: []
+    out: [example_out]

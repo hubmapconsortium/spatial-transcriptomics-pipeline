@@ -6,6 +6,7 @@ import starfish
 
 
 def main(data_dir: Path):
+    print("hello world")
     pass
 
 

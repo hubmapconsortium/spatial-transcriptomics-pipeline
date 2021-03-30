@@ -1,0 +1,3 @@
+data_dir:
+    class: Directory
+    path: steps

@@ -6,8 +6,13 @@ requirements:
     dockerPull: docker.pkg.github.com/hubmapconsortium/spatial-transcriptomics-pipeline/main:latest
 
 inputs:
-  data_dir: Directory
+  data_dir: 
+    type: Directory
+    inputBinding:
+      position: 1
 
-outputs: {}
+outputs: 
+  example_out:
+    type: stdout
 
 baseCommand: /opt/main.py
