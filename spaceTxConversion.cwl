@@ -1,17 +1,12 @@
-#!/usr/bin/env cwl-runner
+#!/usr/bin/env python3
 
 class: CommandLineTool
 cwlVersion: v1.1
-baseCommand: [python, opt/spaceTxConverter.py]
+baseCommand: /opt/spaceTxConverter.py
 
 requirements:
   DockerRequirement:
     dockerPull: docker.pkg.github.com/hubmapconsortium/spatial-transcriptomics-pipeline/main:latest
-  InitialWorkDirRequirement:
-    listing:
-      - entryname: bin/spaceTxConverter.py
-        entry: |-
-          print("script loaded")
 
 inputs:
   tiffs:
