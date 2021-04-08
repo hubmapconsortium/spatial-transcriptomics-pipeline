@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env cwl-runner
 
 class: CommandLineTool
 cwlVersion: v1.1
@@ -50,6 +50,20 @@ inputs:
       position: 6
       prefix: --fov-count
     doc: The number of FOVs that are included in this experiment
+
+  round_offset:
+    type: int?
+    inputBinding:
+      position: 7
+      prefix: --round_offset
+    doc: The index of the first round.
+
+  fov_offset:
+    type: int?
+    inputBinding:
+      position: 8
+      prefix: --fov_offset
+    doc: The index of the first FOV.
 
 outputs:
   spaceTx_converted:

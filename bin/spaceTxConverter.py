@@ -1,6 +1,10 @@
+#!/usr/bin/env python
+
 from argparse import ArgumentParser
 import functools
 from typing import Mapping, Union
+from pathlib import Path
+import os
 
 import click
 import numpy as np
@@ -258,7 +262,7 @@ def cli(input_dir: str, output_dir: str, counts: dict, codebook_csv: str) -> int
 
     return 0
 
-if __name__ = "__main__":
+if __name__ == "__main__":
     p = ArgumentParser()
     p.add_argument("--input-dir", type=Path)
     p.add_argument("--codebook-csv", type=Path)
@@ -266,11 +270,15 @@ if __name__ = "__main__":
     p.add_argument("--zplane-count", type=int)
     p.add_argument("--channel-count", type=int)
     p.add_argument("--fov-count", type=int)
+    p.add_argument("--round_offset", type=int, default=0)
+    p.add_argument("--fov_offset", type=int, default=0)
 
     args = p.parse_args()
 
     counts = {"rounds":     args.round_count,
              "channels":    args.channel_count,
              "zplanes":     args.zplane_count,
-             "fovs":        args.fov_count}
+             "fovs":        args.fov_count,
+             "round_offset":args.round_offset,
+             "fov_offset":  args.fov_offset}
     cli(args.input_dir, ".", counts, args.codebook_csv)
