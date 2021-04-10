@@ -69,5 +69,5 @@ outputs:
   spaceTx_converted:
     type: Directory
     outputBinding:
-      glob: "output/"
+      glob: "tx_converted/"
 

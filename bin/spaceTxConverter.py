@@ -226,7 +226,9 @@ def cli(input_dir: str, output_dir: str, counts: dict, codebook_csv: str) -> int
     int :
         Returns 0 if successful
     """
-    
+
+    os.makedirs(output_dir, exist_ok=True)
+
     image_dimensions: Mapping[Union[str, Axes], int] = {
         Axes.ROUND: counts["rounds"],
         Axes.CH: counts["channels"],
@@ -281,4 +283,4 @@ if __name__ == "__main__":
              "fovs":        args.fov_count,
              "round_offset":args.round_offset,
              "fov_offset":  args.fov_offset}
-    cli(args.input_dir, ".", counts, args.codebook_csv)
+    cli(args.input_dir, "tx_converted/", counts, args.codebook_csv)
