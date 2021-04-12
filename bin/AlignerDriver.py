@@ -188,8 +188,6 @@ def cli(dir_data_raw, dir_output, dir_output_aligned,
 if __name__ == "__main__":
     p = ArgumentParser()
     p.add_argument("--raw-dir", type=Path)
-    p.add_argument("--output-dir", type=Path)
-    p.add_argument("--output-dir-aligned", type=Path)
     p.add_argument("--fov-count",type=int)
     p.add_argument("--round-list", nargs='+')
     p.add_argument("--sigma", type=int)
@@ -202,6 +200,6 @@ if __name__ == "__main__":
 
     args = p.parse_args()
 
-    cli(args.raw_dir, args.output_dir, args.output_dir_aligned,
+    cli(args.raw_dir, "/1_Projected", "/2_Registered",
             args.fov_count, args.round_list, args.sigma,
             args.cycle_ref_ind, args.channel_dic_reference, args.channel_dic, args.cycle_other, args.channel_dic_other)

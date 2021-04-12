@@ -1,6 +1,8 @@
+#!/usr/bin/env cwl-runner
+
 class: CommandLineTool
 cwlVersion: v1.1
-baseCommand: /opt/spaceTxConverter.py
+baseCommand: /opt/AlignerDriver.py
 
 requirements:
   DockerRequirement:
@@ -12,18 +14,6 @@ inputs:
     inputBinding:
       prefix: --raw-dir
     doc: Directory with image files
-
-  output_dir:
-    type: string
-    inputBinding:
-      prefix: --output-dir
-    doc: Directory for initial output images
-
-  output_dir_aligned:
-    type: string
-    inputBinding:
-      prefix: --output-dir-aligned
-    doc: Directory for aligned output images
 
   fov_count:
     type: int
@@ -67,7 +57,7 @@ inputs:
       prefix: --cycle-other
     doc: if there are other data-containing folders which need to be aligned but are not named "CycleXX"
 
-  channel-dic-other:
+  channel_DIC_other:
     type: string[]
     inputBinding:
       prefix: --channel-dic-other
@@ -75,4 +65,12 @@ inputs:
 
 
 outputs:
-# look up how to re-stage output based on input strings/paths? later
+  projected:
+    type: Directory
+    outputBinding:
+      glob: "1_Projected/*"
+
+  registered:
+    type: Directory
+    outputBinding:
+      glob: "2_Registered/*"
