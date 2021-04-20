@@ -44,7 +44,7 @@ class ImageTransformer:
 
           
         
-        self.elastixImageFilter = sitk.ElastixImageFilter() # The basic object to do the transformation
+        self.elastixImageFilter = sitk.SimpleElastix() # The basic object to do the transformation
 		
         """ Setting the transformation parameters"""        
         parameterMap = self.elastixImageFilter.GetDefaultParameterMap(self.transform) # getting the dafault parameter map for our transformation of interest

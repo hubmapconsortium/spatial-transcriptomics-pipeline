@@ -7,12 +7,16 @@ baseCommand: /opt/AlignerDriver.py
 requirements:
   DockerRequirement:
     dockerPull: docker.pkg.github.com/hubmapconsortium/spatial-transcriptomics-pipeline/main:latest
+  InitialWorkDirRequirement:
+    listing:
+      - $(inputs.raw_dir)
 
 inputs:
   raw_dir:
     type: Directory
     inputBinding:
       prefix: --raw-dir
+      valueFrom: $(self.basename)
     doc: Directory with image files
 
   fov_count:
@@ -68,9 +72,9 @@ outputs:
   projected:
     type: Directory
     outputBinding:
-      glob: "1_Projected/*"
+      glob: "1_Projected/"
 
   registered:
     type: Directory
     outputBinding:
-      glob: "2_Registered/*"
+      glob: "2_Registered/"
