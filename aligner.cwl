@@ -6,7 +6,7 @@ baseCommand: /opt/AlignerDriver.py
 
 requirements:
   DockerRequirement:
-    dockerPull: docker.pkg.github.com/hubmapconsortium/spatial-transcriptomics-pipeline/alignment/main:latest
+    dockerPull: docker.pkg.github.com/hubmapconsortium/spatial-transcriptomics-pipeline/alignment:latest
   InitialWorkDirRequirement:
     listing:
       - $(inputs.raw_dir)

@@ -32,16 +32,24 @@ class SeqFISHTile(FetchedTile):
     def __init__(
             self,
             file_path: str,
-            coordinates: Mapping[Union[str, Coordinates], CoordinateValue],
             zplane: int,
             ch: int,
             is_aux: bool,
+            locs: Mapping[Axes, float] = None,
+            voxel: Mapping[Axes, float] = None,
+            shape: Mapping[Axes, int] = None
     ):
         self._file_path = file_path
         self._zplane = ch
         self._ch = zplane
-        self._coordinates = coordinates
         self.is_aux = is_aux
+        if locs:
+            self.locs = locs
+        if voxel:
+            self.voxel = voxel
+        if shape: 
+            self.shape = shape
+        self.coord_def = (locs and voxel and shape)
         #print("zpl {};ch {}".format(zplane,ch))
 
     @property
@@ -59,8 +67,21 @@ class SeqFISHTile(FetchedTile):
 
     @property
     def coordinates(self) -> Mapping[Union[str, Coordinates], CoordinateValue]:
-        """Stores coordinate information passed from the TileFetcher"""
-        return self._coordinates
+        """Returns coordinate values based on values passed at initialization"""
+        if self.coord_def:
+            # return value based on passed parameters
+            return {
+                    Coordinates.X: (self.locs[Axes.X]*self.voxel[Axes.X], (self.locs[Axes.X]+self.shape[Axes.X])*self.voxel[Axes.X]),
+                    Coordinates.Y: (self.locs[Axes.Y]*self.voxel[Axes.Y], (self.locs[Axes.Y]+self.shape[Axes.Y])*self.voxel[Axes.Y]),
+                    Coordinates.Z: (self.locs[Axes.Z]*self.voxel[Axes.Z], (self.locs[Axes.Z]+self.shape[Axes.Z])*self.voxel[Axes.Z])
+                }
+        else:
+            # no defined location, retrun dummy
+            return {
+                    Coordinates.X: (0., 1.),
+                    Coordinates.Y: (0., 1.),
+                    Coordinates.Z: (0., 0.1)
+                }
 
     @property
     def format(self) -> ImageFormat:
@@ -81,21 +102,14 @@ class SeqFISHTile(FetchedTile):
             
 class SeqFISHTileFetcher(TileFetcher):
 
-    def __init__(self, input_dir: str, fov_offset=0, round_offset=0) -> None:
+    def __init__(self, input_dir: str, file_format="", file_vars="", fov_offset=0, round_offset=0) -> None:
         """Implement a TileFetcher for a single SeqFISH Field of View."""
+        self.file_format = file_format
+        self.file_vars = file_vars
         self.input_dir = input_dir
         self.fov_offset = fov_offset
         self.round_offset = round_offset
         
-
-    @property
-    def coordinates(self) -> Mapping[Union[str, Coordinates], CoordinateValue]:
-        """Returns dummy coordinates because these pics don't overlap"""
-        return {
-            Coordinates.X: (0., 1.),
-            Coordinates.Y: (0., 1.),
-            Coordinates.Z: (0., 0.1),
-        }
 
     def get_tile(
             self, fov_id: int, round_label: int, ch_label: int, zplane_label: int) -> SeqFISHTile:
@@ -118,29 +132,28 @@ class SeqFISHTileFetcher(TileFetcher):
             SeqFISH subclass of FetchedTile
         """
         #print("fov: {} round: {} channel: {} zplane: {}".format(fov_id, round_label, ch_label, zplane_label))
-        file_path = os.path.join(self.input_dir, 
-                                           f"HybCycle_{round_label + self.round_offset}/MMStack_Pos{fov_id + self.fov_offset}.ome.tif")
-        return SeqFISHTile(file_path, self.coordinates, zplane_label, ch_label, False)
+        varTable = {
+                "round": round_label,
+                "offset_round": round_label + self.round_offset,
+                "fov": fov_id,
+                "offset_fov": fov_id + self.fov_offset,
+                "zplane": zplane_label
+        }
+        file_path = os.path.join(self.input_dir, self.file_format.format(*[varTable[arg] for arg in self.file_vars]))
+        return SeqFISHTile(file_path, zplane_label, ch_label, False)
     
 class SeqFISHAuxTileFetcher(TileFetcher):
     # we define this separately to manually override parameters
     # this is used for the dapi images for registration
     # so only one channel and round are used.
 
-    def __init__(self, input_dir: str, fov_offset=0, round_offset=0) -> None:
+    def __init__(self, input_dir: str, file_format="", file_vars = "", fov_offset=0, round_offset=0) -> None:
         """Implement a TileFetcher for a single SeqFISH Field of View."""
+        self.file_format = file_format
+        self.file_vars = file_vars
         self.input_dir = input_dir
         self.fov_offset = fov_offset
         self.round_offset = round_offset
-
-    @property
-    def coordinates(self) -> Mapping[Union[str, Coordinates], CoordinateValue]:
-        """Returns dummy coordinates because these pics don't overlap"""
-        return {
-            Coordinates.X: (0., 1.),
-            Coordinates.Y: (0., 1.),
-            Coordinates.Z: (0., 0.1),
-        }
 
     def get_tile(
             self, fov_id: int, round_label: int, ch_label: int, zplane_label: int) -> SeqFISHTile:
@@ -162,10 +175,16 @@ class SeqFISHAuxTileFetcher(TileFetcher):
         SeqFISHTile :
             SeqFISH subclass of FetchedTile
         """
-        file_path = os.path.join(self.input_dir, 
-                                 f"HybCycle_{round_label + self.round_offset}/MMStack_Pos{fov_id + self.fov_offset}.ome.tif")
+        varTable = {
+                "round": round_label,
+                "offset_round": round_label + self.round_offset,
+                "fov": fov_id,
+                "offset_fov": fov_id + self.fov_offset,
+                "zplane": zplane_label
+        }
+        file_path = os.path.join(self.input_dir, self.file_format.format(*[varTable[arg] for arg in self.file_vars]))
         #print(file_path)
-        return SeqFISHTile(file_path, self.coordinates, zplane_label, 3, True) # CHANNEL ID IS FIXED
+        return SeqFISHTile(file_path, zplane_label, 3, True) # CHANNEL ID IS FIXED
 
 
 def parse_codebook(codebook_csv: str) -> Codebook:
@@ -199,7 +218,7 @@ def parse_codebook(codebook_csv: str) -> Codebook:
 
     return Codebook.from_code_array(mappings)
 
-def cli(input_dir: str, output_dir: str, counts: dict, codebook_csv: str) -> int:
+def cli(input_dir: str, output_dir: str, file_format: str, file_vars: list, counts: dict, codebook_csv: str) -> int:
     """CLI entrypoint for spaceTx format construction for SeqFISH data
 
     Parameters
@@ -241,8 +260,11 @@ def cli(input_dir: str, output_dir: str, counts: dict, codebook_csv: str) -> int
         Axes.ZPLANE: counts["zplanes"],
     }
     
-    primary_tile_fetcher = SeqFISHTileFetcher(os.path.expanduser(input_dir), counts["fov_offset"], counts["round_offset"])
-    aux_tile_fetcher = {"DAPI": SeqFISHAuxTileFetcher(os.path.expanduser(input_dir), counts["fov_offset"], counts["round_offset"])}
+    #file_format = "HybCycle_{}/MMStack_Pos{}.ome.tif"
+    #file_vars = ["offset_round", "offset_fov"]
+
+    primary_tile_fetcher = SeqFISHTileFetcher(os.path.expanduser(input_dir), file_format, file_vars, counts["fov_offset"], counts["round_offset"])
+    aux_tile_fetcher = {"DAPI": SeqFISHAuxTileFetcher(os.path.expanduser(input_dir), file_format, file_vars, counts["fov_offset"], counts["round_offset"])}
     aux_name_to_dimensions = {"DAPI": aux_image_dimensions}
     
 
@@ -272,8 +294,11 @@ if __name__ == "__main__":
     p.add_argument("--zplane-count", type=int)
     p.add_argument("--channel-count", type=int)
     p.add_argument("--fov-count", type=int)
-    p.add_argument("--round_offset", type=int, default=0)
-    p.add_argument("--fov_offset", type=int, default=0)
+    p.add_argument("--round-offset", type=int, default=0)
+    p.add_argument("--fov-offset", type=int, default=0)
+    p.add_argument("--file-format", type=str)
+    p.add_argument("--file-vars", nargs = '+')
+
 
     args = p.parse_args()
 
@@ -283,4 +308,4 @@ if __name__ == "__main__":
              "fovs":        args.fov_count,
              "round_offset":args.round_offset,
              "fov_offset":  args.fov_offset}
-    cli(args.input_dir, "tx_converted/", counts, args.codebook_csv)
+    cli(args.input_dir, "tx_converted/", args.file_format, args.file_vars, counts, args.codebook_csv)
