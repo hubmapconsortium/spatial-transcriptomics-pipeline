@@ -28,12 +28,13 @@ def cached_read_fn(file_path) -> np.ndarray:
     return skimage.io.imread(file_path)
 
 
-class SeqFISHTile(FetchedTile):
+class FISHTile(FetchedTile):
     def __init__(
             self,
             file_path: str,
             zplane: int,
             ch: int,
+            rnd: int,
             is_aux: bool,
             locs: Mapping[Axes, float] = None,
             voxel: Mapping[Axes, float] = None,
@@ -42,6 +43,7 @@ class SeqFISHTile(FetchedTile):
         self._file_path = file_path
         self._zplane = ch
         self._ch = zplane
+        self._rnd = rnd
         self.is_aux = is_aux
         if locs:
             self.locs = locs
@@ -92,15 +94,15 @@ class SeqFISHTile(FetchedTile):
         """vary z the slowest, then channel -- each round has its own TIFF"""
         #print(cached_read_fn(self._file_path).shape)
         try:
-            if self.is_aux: # aux tiles are always the 4th channel
-                return cached_read_fn(self._file_path)[3,:,:,self._zplane]
+            if self.is_aux: # aux tiles are always a fixed channel
+                return cached_read_fn(self._file_path)[self.is_aux,:,:,self._zplane]
             else:
                 return cached_read_fn(self._file_path)[self._ch,:,:,self._zplane]
         except IndexError as e:
             print("\t{} zpl: {} ch: {} with error {}".format(self._file_path, self._zplane, self._ch, e))
             return np.zeros((2048,2048))
             
-class SeqFISHTileFetcher(TileFetcher):
+class PrimaryTileFetcher(TileFetcher):
 
     def __init__(self, input_dir: str, file_format="", file_vars="", fov_offset=0, round_offset=0) -> None:
         """Implement a TileFetcher for a single SeqFISH Field of View."""
@@ -112,7 +114,7 @@ class SeqFISHTileFetcher(TileFetcher):
         
 
     def get_tile(
-            self, fov_id: int, round_label: int, ch_label: int, zplane_label: int) -> SeqFISHTile:
+            self, fov_id: int, round_label: int, ch_label: int, zplane_label: int) -> FISHTile:
         """Extracts 2-d data from a multi-page TIFF containing all Tiles for an imaging round
 
         Parameters
@@ -128,11 +130,12 @@ class SeqFISHTileFetcher(TileFetcher):
 
         Returns
         -------
-        SeqFISHTile :
+        FISHTile :
             SeqFISH subclass of FetchedTile
         """
         #print("fov: {} round: {} channel: {} zplane: {}".format(fov_id, round_label, ch_label, zplane_label))
         varTable = {
+                "channel": ch_label,
                 "round": round_label,
                 "offset_round": round_label + self.round_offset,
                 "fov": fov_id,
@@ -140,23 +143,24 @@ class SeqFISHTileFetcher(TileFetcher):
                 "zplane": zplane_label
         }
         file_path = os.path.join(self.input_dir, self.file_format.format(*[varTable[arg] for arg in self.file_vars]))
-        return SeqFISHTile(file_path, zplane_label, ch_label, False)
+        return FISHTile(file_path, zplane_label, ch_label, round_label, False)
     
-class SeqFISHAuxTileFetcher(TileFetcher):
+class AuxTileFetcher(TileFetcher):
     # we define this separately to manually override parameters
     # this is used for the dapi images for registration
     # so only one channel and round are used.
 
-    def __init__(self, input_dir: str, file_format="", file_vars = "", fov_offset=0, round_offset=0) -> None:
+    def __init__(self, input_dir: str, file_format="", file_vars = "", fov_offset=0, round_offset=0, fixed_round=0) -> None:
         """Implement a TileFetcher for a single SeqFISH Field of View."""
         self.file_format = file_format
-        self.file_vars = file_vars
+        self.file_vars = file_vars.split(";")
         self.input_dir = input_dir
         self.fov_offset = fov_offset
         self.round_offset = round_offset
+        self.fixed_round = fixed_round
 
     def get_tile(
-            self, fov_id: int, round_label: int, ch_label: int, zplane_label: int) -> SeqFISHTile:
+            self, fov_id: int, round_label: int, ch_label: int, zplane_label: int) -> FISHTile:
         """Extracts 2-d data from a multi-page TIFF containing all Tiles for an imaging round
 
         Parameters
@@ -172,10 +176,11 @@ class SeqFISHAuxTileFetcher(TileFetcher):
 
         Returns
         -------
-        SeqFISHTile :
+        FISHTile :
             SeqFISH subclass of FetchedTile
         """
         varTable = {
+                "channel": ch_label,
                 "round": round_label,
                 "offset_round": round_label + self.round_offset,
                 "fov": fov_id,
@@ -184,7 +189,7 @@ class SeqFISHAuxTileFetcher(TileFetcher):
         }
         file_path = os.path.join(self.input_dir, self.file_format.format(*[varTable[arg] for arg in self.file_vars]))
         #print(file_path)
-        return SeqFISHTile(file_path, zplane_label, 3, True) # CHANNEL ID IS FIXED
+        return FISHTile(file_path, zplane_label, self.fixed_round, round_label, self.fixed_round) # CHANNEL ID IS FIXED
 
 
 def parse_codebook(codebook_csv: str) -> Codebook:
@@ -218,7 +223,7 @@ def parse_codebook(codebook_csv: str) -> Codebook:
 
     return Codebook.from_code_array(mappings)
 
-def cli(input_dir: str, output_dir: str, file_format: str, file_vars: list, counts: dict, codebook_csv: str) -> int:
+def cli(input_dir: str, output_dir: str, file_format: str, file_vars: list, counts: dict, codebook_csv: str, aux_names: list = [], aux_file_formats: list = [], aux_file_vars: list = [], aux_fixed_channel: list = []) -> int:
     """CLI entrypoint for spaceTx format construction for SeqFISH data
 
     Parameters
@@ -263,9 +268,15 @@ def cli(input_dir: str, output_dir: str, file_format: str, file_vars: list, coun
     #file_format = "HybCycle_{}/MMStack_Pos{}.ome.tif"
     #file_vars = ["offset_round", "offset_fov"]
 
-    primary_tile_fetcher = SeqFISHTileFetcher(os.path.expanduser(input_dir), file_format, file_vars, counts["fov_offset"], counts["round_offset"])
-    aux_tile_fetcher = {"DAPI": SeqFISHAuxTileFetcher(os.path.expanduser(input_dir), file_format, file_vars, counts["fov_offset"], counts["round_offset"])}
-    aux_name_to_dimensions = {"DAPI": aux_image_dimensions}
+    primary_tile_fetcher = PrimaryTileFetcher(os.path.expanduser(input_dir), file_format, file_vars, counts["fov_offset"], counts["round_offset"])
+    aux_name_to_dimensions = {}
+    aux_tile_fetcher = {}
+    for i in range(len(aux_names)):
+        name = aux_names[i]
+        aux_name_to_dimensions[name] = aux_image_dimensions
+        aux_tile_fetcher[name] = AuxTileFetcher(os.path.expanduser(input_dir), aux_file_formats[i], aux_file_vars[i], counts["fov_offset"], counts["round_offset"],aux_fixed_channel[i])
+    #aux_tile_fetcher = {"DAPI": AuxTileFetcher(os.path.expanduser(input_dir), file_format, file_vars, counts["fov_offset"], counts["round_offset"],3)}
+    #aux_name_to_dimensions = {"DAPI": aux_image_dimensions}
     
 
     write_experiment_json(
@@ -298,9 +309,15 @@ if __name__ == "__main__":
     p.add_argument("--fov-offset", type=int, default=0)
     p.add_argument("--file-format", type=str)
     p.add_argument("--file-vars", nargs = '+')
-
+    p.add_argument("--aux-names", nargs = "+")
+    p.add_argument("--aux-file-formats", nargs = "+")
+    p.add_argument("--aux-file-vars", nargs = "+")
+    p.add_argument("--aux-fixed-channel", type=int, nargs = "+")
 
     args = p.parse_args()
+    
+    if len({len(args.aux_names),len(args.aux_file_formats), len(args.aux_file_vars), len(args.aux_fixed_channel)}) > 1:
+        raise Exception("Dimensions of all aux parameters must match.")
 
     counts = {"rounds":     args.round_count,
              "channels":    args.channel_count,
@@ -308,4 +325,5 @@ if __name__ == "__main__":
              "fovs":        args.fov_count,
              "round_offset":args.round_offset,
              "fov_offset":  args.fov_offset}
-    cli(args.input_dir, "tx_converted/", args.file_format, args.file_vars, counts, args.codebook_csv)
+    cli(args.input_dir, "tx_converted/", args.file_format, args.file_vars, counts, args.codebook_csv,
+            args.aux_names, args.aux_file_formats, args.aux_file_vars, args.aux_fixed_channel)

@@ -55,15 +55,57 @@ inputs:
     type: int?
     inputBinding:
       position: 7
-      prefix: --round_offset
+      prefix: --round-offset
     doc: The index of the first round.
 
   fov_offset:
     type: int?
     inputBinding:
       position: 8
-      prefix: --fov_offset
+      prefix: --fov-offset
     doc: The index of the first FOV.
+
+  file_format:
+    type: string
+    inputBinding:
+      position: 9
+      prefix: --file-format
+    doc: String with layout for .tiff files
+
+  file_vars:
+    type: string[]
+    inputBinding:
+      position: 10
+      prefix: --file-vars
+    doc: Variables to get substituted into the file_format string.
+
+  aux_names:
+    type: string[]?
+    inputBinding:
+      position: 11
+      prefix: --aux-names
+    doc: Names of the Auxillary tiles.
+
+  aux_file_formats:
+    type: string[]?
+    inputBinding:
+      position: 12
+      prefix: --aux-file-formats
+    doc: String layout for .tiff files of aux views.
+
+  aux_file_vars:
+    type: string[]?
+    inputBinding:
+      position: 13
+      prefix: --aux-file-vars
+    doc: Variables to be substituted into aux_file_formats. One entry per aux_name, with semicolon-delimited vars.
+
+  aux_fixed_channel:
+    type: int[]?
+    inputBinding:
+      position: 14
+      prefix: --aux-fixed-channel
+    doc: Which channel to refer to in aux images.
 
 outputs:
   spaceTx_converted:
