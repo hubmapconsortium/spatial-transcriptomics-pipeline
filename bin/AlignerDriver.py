@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 # Based on code provided by UCSD in their dartFISH data submission to HuBMAP.
 
