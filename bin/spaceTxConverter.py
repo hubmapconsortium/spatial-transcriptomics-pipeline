@@ -41,6 +41,41 @@ class FISHTile(FetchedTile):
             voxel: Mapping[Axes, float] = None,
             shape: Mapping[Axes, int] = None
     ):
+        """
+        Tile class generalized for most FISH experiments.
+        Assumes that image format is .tiff
+        
+        Parameters
+        ----------
+        file_path: str
+            Relative path to location of image file.
+        zplane: int
+            The number of the zplane layer.
+        ch: int
+            The number of the channel layer.
+        rnd: int
+            The number of the imaging round.
+        is_aux: bool
+            if false: The tile in question is primary.
+            else: Is an aux image, var is an int with the number of the channel.
+        cache_read_order: list
+            Description of the order of the axes of the images. Each item in the list is one dimension in the image.
+            The following strings will be converted to Axes objects and will be parsed based on the instance variables of the tile:
+                -Z -> Axes.ZPLANE
+                -CH -> Axes.CH
+            All ofther values will be treated as an axis where the full contents will be read for each individual tile. (in pratice, this should only be Axes.X and Axes.Y)
+        
+        The following parameters are optional, and are only used if .coordinates() is called.
+        This is not necessary if the fovs do not overlap.
+        For further details, see FISHTile.coordinates()
+
+        locs: Mapping[Axes, float]
+            The start location of the image, mapped to the corresponding Axes object (X, Y, or ZPLANE)
+        voxel: Mapping[Axes, float]
+            The size of each image, mapped to the corresponding Axes object (X, Y, ZPLANE)
+        shape: Mapping[Axes, float]
+            The offset for the size of the image, mapped to the corresponding Axes object (X, Y, ZPLANE)
+        """
         self._file_path = file_path
         self._zplane = ch
         self._ch = zplane
@@ -70,13 +105,17 @@ class FISHTile(FetchedTile):
 
     @property
     def coordinates(self) -> Mapping[Union[str, Coordinates], CoordinateValue]:
-        """Returns coordinate values based on values passed at initialization"""
+        """
+        Returns coordinate values based on values passed at initialization.
+        
+        Each cooridinate tuple is calculated by (locs*voxel, (locs+shape)*voxel), with values selected per axis.
+        """
         if self.coord_def:
             # return value based on passed parameters
             return {
                     Coordinates.X: (self.locs[Axes.X]*self.voxel[Axes.X], (self.locs[Axes.X]+self.shape[Axes.X])*self.voxel[Axes.X]),
                     Coordinates.Y: (self.locs[Axes.Y]*self.voxel[Axes.Y], (self.locs[Axes.Y]+self.shape[Axes.Y])*self.voxel[Axes.Y]),
-                    Coordinates.Z: (self.locs[Axes.Z]*self.voxel[Axes.Z], (self.locs[Axes.Z]+self.shape[Axes.Z])*self.voxel[Axes.Z])
+                    Coordinates.Z: (self.locs[Axes.ZPLANE]*self.voxel[Axes.ZPLANE], (self.locs[Axes.ZPLANE]+self.shape[Axes.ZPLANE])*self.voxel[Axes.ZPLANE])
                 }
         else:
             # no defined location, retrun dummy
@@ -92,7 +131,14 @@ class FISHTile(FetchedTile):
         return ImageFormat.TIFF
 
     def tile_data(self) -> np.ndarray:
-        """squeeze dims of img based on pre-defined cache read order"""
+        """
+        Squeeze dims of img based on pre-defined cache read order and internal channel and zplane values.
+        
+        Returns
+        -------
+        np.ndarray
+            Image with number of dimensions equal to number of 'other' values specified in self.cache_read_order.
+        """
         #print(cached_read_fn(self._file_path).shape)
         try:
             img = cached_read_fn(self._file_path)
@@ -120,9 +166,43 @@ class FISHTile(FetchedTile):
             return np.zeros((2048,2048))
             
 class PrimaryTileFetcher(TileFetcher):
+"""
+    Generic TileFetcher implementation for FISH experiments.
+"""
 
     def __init__(self, input_dir: str, file_format: str="", file_vars: str="", cache_read_order: list=[], fov_offset: int=0, round_offset: int=0, channel_offset: int=0) -> None:
-        """Implement a TileFetcher for a single SeqFISH Field of View."""
+        """
+        Implement a TileFetcher for a single Field of View.
+        
+        Parameters
+        ----------
+        input_dir: str
+            Relative root location of image files.
+        file_format: str
+            String format for individual image files.  Appended to input_dir.
+            Each "{}" within this string will be replaced the tile-specific values, as specified in the order of "file_vars"
+        file_vars: str
+            Variables to insert in file_format.  The following values are accepted:
+                - channel
+                - offset_channel (channel + channel_offset)
+                - round
+                - offset_round (round + round_offset)
+                - fov
+                - offset_fov (fov + fov_offset)
+                - zplane
+        cache_read_order: list
+            Description of the order of the axes of the images. Each item in the list is one dimension in the image.
+            The following strings will be converted to Axes objects and will be parsed based on the instance variables of the tile:
+                -Z -> Axes.ZPLANE
+                -CH -> Axes.CH
+            All ofther values will be treated as an axis where the full contents will be read for each individual tile. (in pratice, this should only be Axes.X and Axes.Y)
+        fov_offset: int
+            Integer to be added to fov names when looking for external file names, equal to the number of the first index.
+        round_offset: int
+            Integer to be added to the round count when looking for external file names, equal to the number of the first index.
+        channel_offset: int
+            Integer to be added to channels when looking for external file names, equal to the number of the first index.
+        """
         self.file_format = file_format
         self.file_vars = file_vars
         self.input_dir = input_dir
@@ -134,23 +214,25 @@ class PrimaryTileFetcher(TileFetcher):
 
     def get_tile(
             self, fov_id: int, round_label: int, ch_label: int, zplane_label: int) -> FISHTile:
-        """Extracts 2-d data from a multi-page TIFF containing all Tiles for an imaging round
+        """
+        Extracts 2-d data from a multi-page TIFF containing images as defined by parameters passed at initialization. file_format, file_vars, input_dir, and cache_read_order are combined with tile-specific indicies to determine file name.
+        Note: indecies with offsets can be specified by self.file_vars, but the index used when loading the tiff will always be the 0-indexed.
 
         Parameters
         ----------
-        fov : int
-            Number of the fov, offset but fov_offset
-        r : int
-            Imaging round. Selects the TIFF file to examine
+        fov_id : int
+            Number of the fov, before addition by fov_offset
+        round_label : int
+            Selects the imaging round from within the loaded TIFF file.
         ch : int
-            Selects the channel from within the loaded TIFF file
+            Selects the channel from within the loaded TIFF file.
         zplane : int
-            Selects the z-plane from within the loaded TIFF file
+            Selects the z-plane from within the loaded TIFF file.
 
         Returns
         -------
         FISHTile :
-            SeqFISH subclass of FetchedTile
+            FISH subclass of FetchedTile
         """
         #print("fov: {} round: {} channel: {} zplane: {}".format(fov_id, round_label, ch_label, zplane_label))
         varTable = {
@@ -166,12 +248,46 @@ class PrimaryTileFetcher(TileFetcher):
         return FISHTile(file_path, zplane_label, ch_label, round_label, False, self.cache_read_order)
     
 class AuxTileFetcher(TileFetcher):
-    # we define this separately to manually override parameters
-    # this is used for the dapi images for registration
-    # so only one channel and round are used.
+"""
+    Alternate version of PrimaryTileFetcher for non-primary images.
+    Primary difference relative to FISHTileFetcher: expects a single imaging channel.
+"""
 
-    def __init__(self, input_dir: str, file_format: str="", file_vars: str= "", cache_read_order: list=[], fov_offset: int=0, round_offset: int=0, channel_offset: int=0, fixed_round: int=0) -> None:
-        """Implement a TileFetcher for a single SeqFISH Field of View."""
+    def __init__(self, input_dir: str, file_format: str="", file_vars: str= "", cache_read_order: list=[], fov_offset: int=0, round_offset: int=0, channel_offset: int=0, fixed_channel: int=0) -> None:
+        """
+        Implement a TileFetcher for a single Field of View with a single channel.
+        
+        Parameters
+        ----------
+        input_dir: str
+            Relative root location of image files.
+        file_format: str
+            String format for individual image files.  Appended to input_dir.
+            Each "{}" within this string will be replaced the tile-specific values, as specified in the order of "file_vars"
+        file_vars: str
+            Variables to insert in file_format.  The following values are accepted:
+                - channel
+                - offset_channel (channel + channel_offset)
+                - round
+                - offset_round (round + round_offset)
+                - fov
+                - offset_fov (fov + fov_offset)
+                - zplane
+        cache_read_order: list
+            Description of the order of the axes of the images. Each item in the list is one dimension in the image.
+            The following strings will be converted to Axes objects and will be parsed based on the instance variables of the tile:
+                -Z -> Axes.ZPLANE
+                -CH -> Axes.CH
+            All ofther values will be treated as an axis where the full contents will be read for each individual tile. (in pratice, this should only be Axes.X and Axes.Y)
+        fov_offset: int
+            Integer to be added to fov names when looking for external file names, equal to the number of the first index.
+        round_offset: int
+            Integer to be added to the round count when looking for external file names, equal to the number of the first index.
+        channel_offset: int
+            Integer to be added to channels when looking for external file names, equal to the number of the first index.
+        fixed_channel: int
+            The single channel to look at for this tile.
+        """
         self.file_format = file_format
         self.file_vars = file_vars.split(";")
         self.input_dir = input_dir
@@ -179,27 +295,29 @@ class AuxTileFetcher(TileFetcher):
         self.fov_offset = fov_offset
         self.round_offset = round_offset
         self.channel_offset = channel_offset
-        self.fixed_round = fixed_round
+        self.fixed_channel = fixed_channel
 
     def get_tile(
             self, fov_id: int, round_label: int, ch_label: int, zplane_label: int) -> FISHTile:
-        """Extracts 2-d data from a multi-page TIFF containing all Tiles for an imaging round
+        """
+        Extracts 2-d data from a multi-page TIFF containing images as defined by parameters passed at initialization. file_format, file_vars, input_dir, and cache_read_order are combined with tile-specific indicies to determine file name.
+        Note: indecies with offsets can be specified by self.file_vars, but the index used when loading the tiff will always be the 0-indexed.
 
         Parameters
         ----------
-        fov : int
-            Number of the fov, offset but fov_offset
-        r : int
-            Imaging round. Selects the TIFF file to examine
+        fov_id : int
+            Number of the fov, before addition by fov_offset
+        round_label : int
+            Selects the imaging round from within the loaded TIFF file.
         ch : int
-            Selects the channel from within the loaded TIFF file
+            Selects the channel from within the loaded TIFF file.
         zplane : int
-            Selects the z-plane from within the loaded TIFF file
+            Selects the z-plane from within the loaded TIFF file.
 
         Returns
         -------
         FISHTile :
-            SeqFISH subclass of FetchedTile
+            FISH subclass of FetchedTile
         """
         varTable = {
                 "channel": ch_label,
@@ -212,7 +330,7 @@ class AuxTileFetcher(TileFetcher):
         }
         file_path = os.path.join(self.input_dir, self.file_format.format(*[varTable[arg] for arg in self.file_vars]))
         #print(file_path)
-        return FISHTile(file_path, zplane_label, self.fixed_round, round_label, self.fixed_round, self.cache_read_order) # CHANNEL ID IS FIXED
+        return FISHTile(file_path, zplane_label, self.fixed_channel, round_label, self.fixed_channel, self.cache_read_order) # CHANNEL ID IS FIXED
 
 
 def parse_codebook(codebook_csv: str) -> Codebook:
@@ -252,21 +370,38 @@ def cli(input_dir: str, output_dir: str, file_format: str, file_vars: list, cach
     Parameters
     ----------
     input_dir : str
-        directory containing folders for fovs
+        Directory containing folders for fovs.
     output_dir : str
-        directory containing output files. Will be created if it does not exist.
+        Directory containing output files. Will be created if it does not exist.
+    file_format: str
+        String format for individual image files of primary view.  Appended to input_dir.
+        Each "{}" within this string will be replaced the tile-specific values, as specified in the order of "file_vars"
+    file_vars: list
+        Variables to insert in file_format.  The following values are accepted:
+            - channel
+            - offset_channel (channel + channel_offset)
+            - round
+            - offset_round (round + round_offset)
+            - fov
+            - offset_fov (fov + fov_offset)
+            - zplane
+    cache_read_order: list
+        Description of the order of the axes of the images. Each item in the list is one dimension in the image.
     counts: dict
-        dict with the counts for each dimension of the data. Expects values that correspond
+        Dict with the counts for each dimension of the data. Expects values that correspond
         to keys of ["rounds","channels","zplanes","fovs"]
     codebook_csv : str
-        name of the codebook csv file containing barcode information for this field of view.
-
-    Notes
-    -----
-    - each round is organized as [z, ch, [x|y], [x|y]] -- the order of x and y are not known, but
-      since this script uses dummy coordinates, this distinction is not important.
-    - The spatial organization of the field of view is not known to the starfish developers,
-      so they are filled by dummy coordinates
+        Name of the codebook csv file containing barcode information for this field of view.
+    aux_names: list
+        A list containing the names of any auxilliary tile views.
+    aux_file_formats: list
+        The same as file_format, but for each individual aux view. Items within each list entry are semicolon (;) delimited.
+    aux_file_vars: list
+        The same as file_vars, but for each individual aux view. Items within each list entry are semicolon (;) delimited.
+    aux_cache_read_order: list
+        The same as cache_read_order, but for each individual aux view. Items within each list entry are semicolon (;) delimited.
+    aux_fixed_channel: list
+        The channel for each aux view to look at in their respective image files.
 
     Returns
     -------

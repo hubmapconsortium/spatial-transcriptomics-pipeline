@@ -19,7 +19,7 @@ inputs:
     type: File
     inputBinding:
       prefix: --codebook-csv
-    doc: The codebook for this experiment in .csv format, as described [PLACE]
+    doc: The codebook for this experiment in .csv format, where the rows are barcodes and the columns are imaging rounds. Column IDs are expected to be sequential, and round identifiers are expected to be integers (not roman numerals).
 
   round_count:
     type: int

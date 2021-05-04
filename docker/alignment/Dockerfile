@@ -1,7 +1,6 @@
 FROM ubuntu:18.04 
 
-COPY requirements_aligner.txt /opt
-
+# installing SimpleElastix
 RUN apt-get update
 RUN apt-get install -y tzdata
 RUN echo "America/Los_Angeles" > /etc/timezone
@@ -15,6 +14,9 @@ RUN python3 -V
 RUN cd /build;cmake -D PYTHON_EXECUTABLE=`which python3` ../SimpleElastix/SuperBuild
 RUN cd /build;make -j `nproc`
 RUN cd /build/SimpleITK-build/Wrapping/Python;python3 Packaging/setup.py install
+
+# Pipeline specific reqs
+COPY requirements_aligner.txt /opt
 
 RUN cd /
 RUN apt-get install -y python3-pip
