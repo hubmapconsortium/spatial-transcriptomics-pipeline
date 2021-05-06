@@ -2,7 +2,7 @@
 
 class: CommandLineTool
 cwlVersion: v1.1
-baseCommand: /opt/AlignerDriver.py
+baseCommand: /opt/alignerDriver.py
 
 requirements:
   DockerRequirement:
