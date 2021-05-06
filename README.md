@@ -4,6 +4,15 @@
 # HuBMAP Spatial Transcriptomics Pipeline
 A [CWL](https://www.commonwl.org/) pipeline for processing spatial transcriptomics data.
 
+## Steps
+
+Folder         | Input to              | Output from
+--------------------------------------------------------------
+0_Raw          | aligner.cwl           | 
+1_Projected    |                       | aligner.cwl
+2_Registered   | spaceTxConversion.cwl | aligner.cwl
+3_tx_converted |                       | spaceTxConversion.cwl
+
 ## Development
 Code in this repository is formatted with [black](https://github.com/psf/black) and
 [isort](https://pypi.org/project/isort/), and this is checked via Travis CI.
