@@ -7,7 +7,7 @@ A [CWL](https://www.commonwl.org/) pipeline for processing spatial transcriptomi
 ## Steps
 
 Folder         | Input to              | Output from
---------------------------------------------------------------
+---------------|-----------------------|----------------------
 0_Raw          | aligner.cwl           | 
 1_Projected    |                       | aligner.cwl
 2_Registered   | spaceTxConversion.cwl | aligner.cwl
