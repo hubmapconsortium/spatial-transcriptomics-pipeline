@@ -588,7 +588,7 @@ if __name__ == "__main__":
              "round_offset":    args.round_offset,
              "fov_offset":      args.fov_offset,
              "channel_offset":  args.channel_offset}
-    cli(args.input_dir, "tx_converted/", 
+    cli(args.input_dir, "3_tx_converted/", 
             args.file_format, args.file_vars, args.cache_read_order, counts, args.codebook_csv,
             args.aux_names, args.aux_file_formats, args.aux_file_vars, args.aux_cache_read_order, args.aux_fixed_channel,
             locs, shape, voxel)

@@ -165,5 +165,5 @@ outputs:
   spaceTx_converted:
     type: Directory
     outputBinding:
-      glob: "tx_converted/"
+      glob: "3_tx_converted/"
 
