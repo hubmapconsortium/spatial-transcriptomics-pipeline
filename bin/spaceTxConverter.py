@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 from argparse import ArgumentParser
+from typing import List
 import functools
 from typing import Mapping, Union
 from pathlib import Path
@@ -65,15 +66,14 @@ class FISHTile(FetchedTile):
                 -CH -> Axes.CH
             All ofther values will be treated as an axis where the full contents will be read for each individual tile. (in pratice, this should only be Axes.X and Axes.Y)
         
-        The following parameters are optional, and are only used if .coordinates() is called.
-        This is not necessary if the fovs do not overlap.
+        The following parameters are optional, and are only used if .coordinates() is called.  They may be used further downstream in analysis, in particular if there are multiple FOVs.
         For further details, see FISHTile.coordinates()
 
         locs: Mapping[Axes, float]
             The start location of the image, mapped to the corresponding Axes object (X, Y, or ZPLANE)
         voxel: Mapping[Axes, float]
             The size of each image, mapped to the corresponding Axes object (X, Y, ZPLANE)
-        shape: Mapping[Axes, float]
+        shape: Mapping[Axes, int]
             The offset for the size of the image, mapped to the corresponding Axes object (X, Y, ZPLANE)
         """
         self._file_path = file_path
@@ -87,7 +87,7 @@ class FISHTile(FetchedTile):
         if voxel:
             self.voxel = voxel
         if shape: 
-            self.shape = shape
+            self.img_shape = shape
         self.coord_def = (locs and voxel and shape)
         #print("zpl {};ch {}".format(zplane,ch))
 
@@ -113,9 +113,9 @@ class FISHTile(FetchedTile):
         if self.coord_def:
             # return value based on passed parameters
             return {
-                    Coordinates.X: (self.locs[Axes.X]*self.voxel[Axes.X], (self.locs[Axes.X]+self.shape[Axes.X])*self.voxel[Axes.X]),
-                    Coordinates.Y: (self.locs[Axes.Y]*self.voxel[Axes.Y], (self.locs[Axes.Y]+self.shape[Axes.Y])*self.voxel[Axes.Y]),
-                    Coordinates.Z: (self.locs[Axes.ZPLANE]*self.voxel[Axes.ZPLANE], (self.locs[Axes.ZPLANE]+self.shape[Axes.ZPLANE])*self.voxel[Axes.ZPLANE])
+                    Coordinates.X: (self.locs[Axes.X]*self.voxel[Axes.X], (self.locs[Axes.X]+self.img_shape[Axes.X])*self.voxel[Axes.X]),
+                    Coordinates.Y: (self.locs[Axes.Y]*self.voxel[Axes.Y], (self.locs[Axes.Y]+self.img_shape[Axes.Y])*self.voxel[Axes.Y]),
+                    Coordinates.Z: (self.locs[Axes.ZPLANE]*self.voxel[Axes.ZPLANE], (self.locs[Axes.ZPLANE]+self.img_shape[Axes.ZPLANE])*self.voxel[Axes.ZPLANE])
                 }
         else:
             # no defined location, retrun dummy
@@ -166,11 +166,11 @@ class FISHTile(FetchedTile):
             return np.zeros((2048,2048))
             
 class PrimaryTileFetcher(TileFetcher):
-"""
+    """
     Generic TileFetcher implementation for FISH experiments.
-"""
+    """
 
-    def __init__(self, input_dir: str, file_format: str="", file_vars: str="", cache_read_order: list=[], fov_offset: int=0, round_offset: int=0, channel_offset: int=0) -> None:
+    def __init__(self, input_dir: str, file_format: str="", file_vars: str="", cache_read_order: list=[], fov_offset: int=0, round_offset: int=0, channel_offset: int=0, locs: List[Mapping[Axes, float]] = None, voxel: Mapping[Axes, float] = None, shape: Mapping[Axes, int] = None) -> None:
         """
         Implement a TileFetcher for a single Field of View.
         
@@ -202,6 +202,16 @@ class PrimaryTileFetcher(TileFetcher):
             Integer to be added to the round count when looking for external file names, equal to the number of the first index.
         channel_offset: int
             Integer to be added to channels when looking for external file names, equal to the number of the first index.
+
+            The following parameters are optional, and are only used if .coordinates() is called.  They may be used further downstream in analysis, in particular if there are multiple FOVs.
+        For further details, see FISHTile.coordinates()
+
+        locs: List[Mapping[Axes, float]]
+            Each list item refers to the corresponding indexed fov. The start location of the image, mapped to the corresponding Axes object (X, Y, or ZPLANE).
+        voxel: Mapping[Axes, float]
+            The size of each image, mapped to the corresponding Axes object (X, Y, ZPLANE)
+        shape: Mapping[Axes, int]
+            The offset for the size of the image, mapped to the corresponding Axes object (X, Y, ZPLANE)
         """
         self.file_format = file_format
         self.file_vars = file_vars
@@ -210,7 +220,9 @@ class PrimaryTileFetcher(TileFetcher):
         self.fov_offset = fov_offset
         self.round_offset = round_offset
         self.channel_offset = channel_offset
-        
+        self.locs = locs
+        self.voxel = voxel
+        self.img_shape = shape
 
     def get_tile(
             self, fov_id: int, round_label: int, ch_label: int, zplane_label: int) -> FISHTile:
@@ -245,15 +257,15 @@ class PrimaryTileFetcher(TileFetcher):
                 "zplane": zplane_label
         }
         file_path = os.path.join(self.input_dir, self.file_format.format(*[varTable[arg] for arg in self.file_vars]))
-        return FISHTile(file_path, zplane_label, ch_label, round_label, False, self.cache_read_order)
+        return FISHTile(file_path, zplane_label, ch_label, round_label, False, self.cache_read_order, self.locs[fov_id], self.voxel, self.img_shape)
     
 class AuxTileFetcher(TileFetcher):
-"""
+    """
     Alternate version of PrimaryTileFetcher for non-primary images.
     Primary difference relative to FISHTileFetcher: expects a single imaging channel.
-"""
+    """
 
-    def __init__(self, input_dir: str, file_format: str="", file_vars: str= "", cache_read_order: list=[], fov_offset: int=0, round_offset: int=0, channel_offset: int=0, fixed_channel: int=0) -> None:
+    def __init__(self, input_dir: str, file_format: str="", file_vars: str= "", cache_read_order: list=[], fov_offset: int=0, round_offset: int=0, channel_offset: int=0, fixed_channel: int=0, locs: List[Mapping[Axes, float]] = None, voxel: Mapping[Axes, float] = None, shape: Mapping[Axes, int] = None) -> None:
         """
         Implement a TileFetcher for a single Field of View with a single channel.
         
@@ -287,6 +299,16 @@ class AuxTileFetcher(TileFetcher):
             Integer to be added to channels when looking for external file names, equal to the number of the first index.
         fixed_channel: int
             The single channel to look at for this tile.
+
+            The following parameters are optional, and are only used if .coordinates() is called.  They may be used further downstream in analysis, in particular if there are multiple FOVs.
+        For further details, see FISHTile.coordinates()
+
+        locs: List[Mapping[Axes, float]]
+            Each list item refers to the fov of the same index. The start location of the image, mapped to the corresponding Axes object (X, Y, or ZPLANE)
+        voxel: Mapping[Axes, float]
+            The size of each image, mapped to the corresponding Axes object (X, Y, ZPLANE)
+        shape: Mapping[Axes, float]
+            The offset for the size of the image, mapped to the corresponding Axes object (X, Y, ZPLANE)
         """
         self.file_format = file_format
         self.file_vars = file_vars.split(";")
@@ -296,6 +318,9 @@ class AuxTileFetcher(TileFetcher):
         self.round_offset = round_offset
         self.channel_offset = channel_offset
         self.fixed_channel = fixed_channel
+        self.locs = locs
+        self.voxel = voxel
+        self.img_shape = shape
 
     def get_tile(
             self, fov_id: int, round_label: int, ch_label: int, zplane_label: int) -> FISHTile:
@@ -330,7 +355,7 @@ class AuxTileFetcher(TileFetcher):
         }
         file_path = os.path.join(self.input_dir, self.file_format.format(*[varTable[arg] for arg in self.file_vars]))
         #print(file_path)
-        return FISHTile(file_path, zplane_label, self.fixed_channel, round_label, self.fixed_channel, self.cache_read_order) # CHANNEL ID IS FIXED
+        return FISHTile(file_path, zplane_label, self.fixed_channel, round_label, self.fixed_channel, self.cache_read_order, self.locs[fov_id], self.voxel, self.img_shape) # CHANNEL ID IS FIXED
 
 
 def parse_codebook(codebook_csv: str) -> Codebook:
@@ -364,7 +389,7 @@ def parse_codebook(codebook_csv: str) -> Codebook:
 
     return Codebook.from_code_array(mappings)
 
-def cli(input_dir: str, output_dir: str, file_format: str, file_vars: list, cache_read_order:list, counts: dict, codebook_csv: str, aux_names: list = [], aux_file_formats: list = [], aux_file_vars: list = [], aux_cache_read_order: list = [], aux_fixed_channel: list = []) -> int:
+def cli(input_dir: str, output_dir: str, file_format: str, file_vars: list, cache_read_order:list, counts: dict, codebook_csv: str, aux_names: list = [], aux_file_formats: list = [], aux_file_vars: list = [], aux_cache_read_order: list = [], aux_fixed_channel: list = [], locs: List[Mapping[Axes, float]] = None, shape: Mapping[Axes, int] = None, voxel: Mapping[Axes, float] = None) -> int:
     """CLI entrypoint for spaceTx format construction for SeqFISH data
 
     Parameters
@@ -402,6 +427,12 @@ def cli(input_dir: str, output_dir: str, file_format: str, file_vars: list, cach
         The same as cache_read_order, but for each individual aux view. Items within each list entry are semicolon (;) delimited.
     aux_fixed_channel: list
         The channel for each aux view to look at in their respective image files.
+    locs: List[Mapping[Axes, float]]
+        Each list item refers to the fov of the same index. The start location of the image, mapped to the corresponding Axes object (X, Y, or ZPLANE)
+    shape: Mapping[Axes, int]
+        The offset for the size of the image, mapped to the corresponding Axes object (X, Y, ZPLANE)
+    voxel: Mapping[Axes, float]
+        The size of each image, mapped to the corresponding Axes object (X, Y, ZPLANE)
 
     Returns
     -------
@@ -432,7 +463,7 @@ def cli(input_dir: str, output_dir: str, file_format: str, file_vars: list, cach
         elif item == "CH": cache_read_order_formatted.append(Axes.CH)
         else: cache_read_order_formatted.append("other")
    
-    primary_tile_fetcher = PrimaryTileFetcher(os.path.expanduser(input_dir), file_format, file_vars, cache_read_order_formatted, counts["fov_offset"], counts["round_offset"], counts["channel_offset"])
+    primary_tile_fetcher = PrimaryTileFetcher(os.path.expanduser(input_dir), file_format, file_vars, cache_read_order_formatted, counts["fov_offset"], counts["round_offset"], counts["channel_offset"], locs, shape, voxel)
     
     aux_name_to_dimensions = {}
     aux_tile_fetcher = {}
@@ -447,7 +478,7 @@ def cli(input_dir: str, output_dir: str, file_format: str, file_vars: list, cach
                 elif item == "CH": aux_cache_read_order_formatted.append(Axes.CH)
                 else: aux_cache_read_order_formatted.append("other")
             
-            aux_tile_fetcher[name] = AuxTileFetcher(os.path.expanduser(input_dir), aux_file_formats[i], aux_file_vars[i], aux_cache_read_order_formatted, counts["fov_offset"], counts["round_offset"], counts["channel_offset"], aux_fixed_channel[i])
+            aux_tile_fetcher[name] = AuxTileFetcher(os.path.expanduser(input_dir), aux_file_formats[i], aux_file_vars[i], aux_cache_read_order_formatted, counts["fov_offset"], counts["round_offset"], counts["channel_offset"], aux_fixed_channel[i], locs, shape, voxel)
     #aux_tile_fetcher = {"DAPI": AuxTileFetcher(os.path.expanduser(input_dir), file_format, file_vars, counts["fov_offset"], counts["round_offset"],3)}
     #aux_name_to_dimensions = {"DAPI": aux_image_dimensions}
     
@@ -489,7 +520,16 @@ if __name__ == "__main__":
     p.add_argument("--aux-file-vars", nargs = "+")
     p.add_argument("--aux-fixed-channel", type=int, nargs = "+")
     p.add_argument("--aux-cache-read-order", nargs ='+')
-
+    p.add_argument("--x-pos-locs", type=str, nargs ="?")
+    p.add_argument("--x-pos-shape", type=int, nargs = "?")
+    p.add_argument("--x-pos-voxel", type=float, nargs ="?")
+    p.add_argument("--y-pos-locs", type=str, nargs ="?")
+    p.add_argument("--y-pos-shape", type=int, nargs = "?")
+    p.add_argument("--y-pos-voxel", type=float, nargs ="?")
+    p.add_argument("--z-pos-locs", type=str, nargs ="?")
+    p.add_argument("--z-pos-shape", type=int, nargs = "?")
+    p.add_argument("--z-pos-voxel", type=float, nargs ="?")
+    
     args = p.parse_args()
 
     if len({len(args.aux_names) if args.aux_names else 0,
@@ -499,6 +539,47 @@ if __name__ == "__main__":
             len(args.aux_cache_read_order) if args.aux_cache_read_order else 0}) > 1:
         print(args.aux_names, args.aux_file_formats, args.aux_file_vars, args.aux_fixed_channel, args.aux_cache_read_order)
         raise Exception("Dimensions of all aux parameters must match.")
+    
+    # parse loc info
+    locs = []
+
+    #todo: clean all this up if we're going to assume that x,y,z must be passed together'
+
+    # sanity check that length matches number of fovs:
+    axis = [Axes.X, Axes.Y, Axes.ZPLANE]
+    pos_locs = {}
+    pos_locs[Axes.X] = args.x_pos_locs
+    pos_locs[Axes.Y] = args.y_pos_locs
+    pos_locs[Axes.ZPLANE] = args.z_pos_locs
+
+    for ax in axis:
+        if pos_locs[ax]:
+            pos_locs[ax] = pos_locs[ax].split(",")
+            if len(pos_locs[ax]) != args.fov_count:
+                raise Exception("Specified FOV locations must match fov_count.")
+
+    for i in range(args.fov_count):
+        this_loc = {}
+        for ax in axis:
+            if pos_locs[ax]:
+                this_loc[ax] = float(pos_locs[ax][i])
+        locs.append(this_loc)
+
+    shape = {}
+    if args.x_pos_shape:
+        shape[Axes.X] = args.x_pos_shape
+    if args.y_pos_shape:
+        shape[Axes.Y] = args.y_pos_shape
+    if args.z_pos_shape:
+        shape[Axes.ZPLANE] = args.z_pos_shape
+
+    voxel = {}
+    if args.x_pos_voxel:
+        voxel[Axes.X] = args.x_pos_voxel
+    if args.y_pos_voxel:
+        voxel[Axes.Y] = args.y_pos_voxel
+    if args.z_pos_voxel:
+        voxel[Axes.ZPLANE] = args.z_pos_voxel
 
     counts = {"rounds":         args.round_count,
              "channels":        args.channel_count,
@@ -509,4 +590,5 @@ if __name__ == "__main__":
              "channel_offset":  args.channel_offset}
     cli(args.input_dir, "tx_converted/", 
             args.file_format, args.file_vars, args.cache_read_order, counts, args.codebook_csv,
-            args.aux_names, args.aux_file_formats, args.aux_file_vars, args.aux_cache_read_order, args.aux_fixed_channel)
+            args.aux_names, args.aux_file_formats, args.aux_file_vars, args.aux_cache_read_order, args.aux_fixed_channel,
+            locs, shape, voxel)

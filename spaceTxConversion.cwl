@@ -111,6 +111,56 @@ inputs:
       prefix: --aux-fixed-channel
     doc: Which channel to refer to in aux images.
 
+  fov_positioning:
+    - 'null'
+    - type: record
+      fields:
+        - name: x-locs
+          type: string
+          inputBinding:
+            prefix: --x-pos-locs
+          doc: list of x-axis start locations per fov index
+        - name: x-shape
+          type: int
+          inputBinding:
+            prefix: --x-pos-shape
+          doc: shape of each fov item in the x-axis
+        - name: x-voxel
+          type: float
+          inputBinding:
+            prefix: --x-pos-voxel
+          doc: size of voxels in the x-axis
+        - name: y-locs 
+          type: string
+          inputBinding:
+            prefix: --y-pos-locs
+          doc: list of y-axis start locations per fov index
+        - name: y-shape
+          type: int
+          inputBinding:
+            prefix: --y-pos-shape
+          doc: shape of each fov item in the y-axis
+        - name: y-voxel
+          type: float
+          inputBinding:
+            prefix: --y-pos-voxel
+          doc: size of voxels in the y-axis
+        - name: z-locs
+          type: string
+          inputBinding:
+            prefix: --z-pos-locs
+          doc: list of z-axis start locations per fov index
+        - name: z-shape
+          type: int
+          inputBinding:
+            prefix: --z-pos-shape
+          doc: shape of each fov item in the z-axis
+        - name: z-voxel
+          type: float
+          inputBinding:
+            prefix: --z-pos-voxel
+          doc: size of voxels in the z-axis
+
 outputs:
   spaceTx_converted:
     type: Directory
