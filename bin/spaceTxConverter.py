@@ -544,7 +544,7 @@ if __name__ == "__main__":
     voxel = {}
 
     # cwl spec says that if one of these dims is defined, they all must be.
-    if locs:
+    if args.x_pos_locs:
         # sanity check that length matches number of fovs:
         axis = [Axes.X, Axes.Y, Axes.ZPLANE]
         pos_locs = {}
