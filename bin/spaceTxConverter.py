@@ -258,8 +258,12 @@ class PrimaryTileFetcher(TileFetcher):
                 "zplane": zplane_label
         }
         file_path = os.path.join(self.input_dir, self.file_format.format(*[varTable[arg] for arg in self.file_vars]))
-        return FISHTile(file_path, zplane_label, ch_label, round_label, False, self.cache_read_order, self.locs[fov_id], self.voxel, self.img_shape)
-    
+        if self.locs: 
+            return FISHTile(file_path, zplane_label, ch_label, round_label, False, self.cache_read_order, self.locs[fov_id], self.voxel, self.img_shape)
+        else:
+            return FISHTile(file_path, zplane_label, ch_label, round_label, False, self.cache_read_order)
+
+
 class AuxTileFetcher(TileFetcher):
     """
     Alternate version of PrimaryTileFetcher for non-primary images.
@@ -355,8 +359,10 @@ class AuxTileFetcher(TileFetcher):
                 "zplane": zplane_label
         }
         file_path = os.path.join(self.input_dir, self.file_format.format(*[varTable[arg] for arg in self.file_vars]))
-        #print(file_path)
-        return FISHTile(file_path, zplane_label, self.fixed_channel, round_label, self.fixed_channel, self.cache_read_order, self.locs[fov_id], self.voxel, self.img_shape) # CHANNEL ID IS FIXED
+        if self.locs:
+            return FISHTile(file_path, zplane_label, self.fixed_channel, round_label, self.fixed_channel, self.cache_read_order, self.locs[fov_id], self.voxel, self.img_shape) # CHANNEL ID IS FIXED
+        else:
+            return FISHTile(file_path, zplane_label, self.fixed_channel, round_label, self.fixed_channel, self.cache_read_order) # CHANNEL ID IS FIXED
 
 
 def parse_codebook(codebook_csv: str) -> Codebook:
