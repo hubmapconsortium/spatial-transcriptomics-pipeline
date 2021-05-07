@@ -537,7 +537,9 @@ if __name__ == "__main__":
             len(args.aux_cache_read_order) if args.aux_cache_read_order else 0}) > 1:
         print(args.aux_names, args.aux_file_formats, args.aux_file_vars, args.aux_fixed_channel, args.aux_cache_read_order)
         raise Exception("Dimensions of all aux parameters must match.")
-    
+   
+    output_dir = "3_tx_converted/"
+
     # parse loc info
     locs = []
     shape = {}
@@ -580,7 +582,7 @@ if __name__ == "__main__":
              "round_offset":    args.round_offset,
              "fov_offset":      args.fov_offset,
              "channel_offset":  args.channel_offset}
-    cli(args.input_dir, "3_tx_converted/", 
+    cli(args.input_dir, output_dir, 
             args.file_format, args.file_vars, args.cache_read_order, counts,
             args.aux_names, args.aux_file_formats, args.aux_file_vars, args.aux_cache_read_order, args.aux_fixed_channel,
             locs, shape, voxel)
