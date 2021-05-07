@@ -15,11 +15,24 @@ inputs:
       prefix: --input-dir
     doc: The directory containing all .tiff files
 
-  codebook_csv:
-    type: File
-    inputBinding:
-      prefix: --codebook-csv
-    doc: The codebook for this experiment in .csv format, where the rows are barcodes and the columns are imaging rounds. Column IDs are expected to be sequential, and round identifiers are expected to be integers (not roman numerals).
+  codebook:
+    type:
+      - type: record
+        name: csv
+        fields:
+          csv:
+            type: File
+            inputBinding:
+              prefix: --codebook-csv
+            doc: The codebook for this experiment in .csv format, where the rows are barcodes and the columns are imaging rounds. Column IDs are expected to be sequential, and round identifiers are expected to be integers (not roman numerals).
+      - type: record
+        name: json
+        fields:
+          json:
+            type: File
+            inputBinding:
+              prefix: --codebook-json
+            doc: The codebook for this experiment, already formatted in the spaceTx defined .json format.
 
   round_count:
     type: int

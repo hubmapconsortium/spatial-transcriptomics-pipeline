@@ -6,6 +6,7 @@ import functools
 from typing import Mapping, Union
 from pathlib import Path
 import os
+from shutil import copyfile
 
 import click
 import numpy as np
@@ -389,7 +390,7 @@ def parse_codebook(codebook_csv: str) -> Codebook:
 
     return Codebook.from_code_array(mappings)
 
-def cli(input_dir: str, output_dir: str, file_format: str, file_vars: list, cache_read_order:list, counts: dict, codebook_csv: str, aux_names: list = [], aux_file_formats: list = [], aux_file_vars: list = [], aux_cache_read_order: list = [], aux_fixed_channel: list = [], locs: List[Mapping[Axes, float]] = None, shape: Mapping[Axes, int] = None, voxel: Mapping[Axes, float] = None) -> int:
+def cli(input_dir: str, output_dir: str, file_format: str, file_vars: list, cache_read_order:list, counts: dict,  aux_names: list = [], aux_file_formats: list = [], aux_file_vars: list = [], aux_cache_read_order: list = [], aux_fixed_channel: list = [], locs: List[Mapping[Axes, float]] = None, shape: Mapping[Axes, int] = None, voxel: Mapping[Axes, float] = None) -> int:
     """CLI entrypoint for spaceTx format construction for SeqFISH data
 
     Parameters
@@ -415,8 +416,6 @@ def cli(input_dir: str, output_dir: str, file_format: str, file_vars: list, cach
     counts: dict
         Dict with the counts for each dimension of the data. Expects values that correspond
         to keys of ["rounds","channels","zplanes","fovs"]
-    codebook_csv : str
-        Name of the codebook csv file containing barcode information for this field of view.
     aux_names: list
         A list containing the names of any auxilliary tile views.
     aux_file_formats: list
@@ -494,10 +493,8 @@ def cli(input_dir: str, output_dir: str, file_format: str, file_vars: list, cach
         dimension_order=(Axes.ROUND, Axes.CH, Axes.ZPLANE)
     )
 
-    # Note: this must trigger AFTER write_experiment_json, as it will clobber the codebook with
-    # a placeholder.
-    codebook = parse_codebook(codebook_csv)
-    codebook.to_json("codebook.json") # should this be renamed to include the output dir?
+    os.remove(output_dir + "/codebook.json")
+
 
     return 0
 
@@ -505,6 +502,7 @@ if __name__ == "__main__":
     p = ArgumentParser()
     p.add_argument("--input-dir", type=Path)
     p.add_argument("--codebook-csv", type=Path)
+    p.add_argument("--codebook-json", type=Path)
     p.add_argument("--round-count", type=int)
     p.add_argument("--zplane-count", type=int)
     p.add_argument("--channel-count", type=int)
@@ -542,43 +540,37 @@ if __name__ == "__main__":
     
     # parse loc info
     locs = []
+    shape = {}
+    voxel = {}
 
-    #todo: clean all this up if we're going to assume that x,y,z must be passed together'
+    # cwl spec says that if one of these dims is defined, they all must be.
+    if locs:
+        # sanity check that length matches number of fovs:
+        axis = [Axes.X, Axes.Y, Axes.ZPLANE]
+        pos_locs = {}
+        pos_locs[Axes.X] = args.x_pos_locs
+        pos_locs[Axes.Y] = args.y_pos_locs
+        pos_locs[Axes.ZPLANE] = args.z_pos_locs
 
-    # sanity check that length matches number of fovs:
-    axis = [Axes.X, Axes.Y, Axes.ZPLANE]
-    pos_locs = {}
-    pos_locs[Axes.X] = args.x_pos_locs
-    pos_locs[Axes.Y] = args.y_pos_locs
-    pos_locs[Axes.ZPLANE] = args.z_pos_locs
-
-    for ax in axis:
-        if pos_locs[ax]:
-            pos_locs[ax] = pos_locs[ax].split(",")
-            if len(pos_locs[ax]) != args.fov_count:
-                raise Exception("Specified FOV locations must match fov_count.")
-
-    for i in range(args.fov_count):
-        this_loc = {}
         for ax in axis:
             if pos_locs[ax]:
-                this_loc[ax] = float(pos_locs[ax][i])
-        locs.append(this_loc)
+                pos_locs[ax] = pos_locs[ax].split(",")
+                if len(pos_locs[ax]) != args.fov_count:
+                    raise Exception("Specified FOV locations must match fov_count.")
 
-    shape = {}
-    if args.x_pos_shape:
+        for i in range(args.fov_count):
+            this_loc = {}
+            for ax in axis:
+                if pos_locs[ax]:
+                    this_loc[ax] = float(pos_locs[ax][i])
+            locs.append(this_loc)
+
         shape[Axes.X] = args.x_pos_shape
-    if args.y_pos_shape:
         shape[Axes.Y] = args.y_pos_shape
-    if args.z_pos_shape:
         shape[Axes.ZPLANE] = args.z_pos_shape
 
-    voxel = {}
-    if args.x_pos_voxel:
         voxel[Axes.X] = args.x_pos_voxel
-    if args.y_pos_voxel:
         voxel[Axes.Y] = args.y_pos_voxel
-    if args.z_pos_voxel:
         voxel[Axes.ZPLANE] = args.z_pos_voxel
 
     counts = {"rounds":         args.round_count,
@@ -589,6 +581,15 @@ if __name__ == "__main__":
              "fov_offset":      args.fov_offset,
              "channel_offset":  args.channel_offset}
     cli(args.input_dir, "3_tx_converted/", 
-            args.file_format, args.file_vars, args.cache_read_order, counts, args.codebook_csv,
+            args.file_format, args.file_vars, args.cache_read_order, counts,
             args.aux_names, args.aux_file_formats, args.aux_file_vars, args.aux_cache_read_order, args.aux_fixed_channel,
             locs, shape, voxel)
+
+    # Note: this must trigger AFTER write_experiment_json, as it will clobber the codebook with
+    # a placeholder.
+    if args.codebook_csv:
+        codebook = parse_codebook(args.codebook_csv)
+        codebook.to_json(output_dir + "codebook.json") 
+    if args.codebook_json:
+        copyfile(args.codebook_json, output_dir + "codebook.json")
+
