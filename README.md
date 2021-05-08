@@ -6,12 +6,13 @@ A [CWL](https://www.commonwl.org/) pipeline for processing spatial transcriptomi
 
 ## Steps
 
-Folder         | Input to              | Output from
+Folder         | Output from           | Input to
 ---------------|-----------------------|----------------------
-0_Raw          | aligner.cwl           | 
-1_Projected    |                       | aligner.cwl
-2_Registered   | spaceTxConversion.cwl | aligner.cwl
-3_tx_converted |                       | spaceTxConversion.cwl
+0_Raw          |                       | aligner.cwl
+1_Projected    | aligner.cwl           |
+2_Registered   | aligner.cwl           | spaceTxConversion.cwl
+3_tx_converted | spaceTxConversion.cwl | starfishRunner.cwl
+4_Decoded      | starfishRunner.cwl    |                       
 
 ## Development
 Code in this repository is formatted with [black](https://github.com/psf/black) and
