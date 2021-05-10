@@ -24,7 +24,7 @@ def blobRunner(img, ref_img=None,
         results = bd.run(image_stack=img)
     return results
 
-def decodeRunner(spots, codebook, decoderKwargs=decoderKwargs,
+def decodeRunner(spots, codebook, decoderKwargs,
         callableDecoder=starfish.spots.DecodeSpots.PerRoundMaxChannel, 
         filtered_results=True):
     decoder = callableDecoder(codebook=codebook, **decoderKwargs)
@@ -63,7 +63,7 @@ if __name__ == "__main__":
     p = ArgumentParser()
 
     # inputs
-    p.add_argument("--exp-json", type=Path)
+    p.add_argument("--exp-loc", type=Path)
 
     # image processing args
     # TODO LATER
@@ -96,7 +96,9 @@ if __name__ == "__main__":
 
     args = p.parse_args()
 
-    experiment = starfish.core.experiment.experiment.Experiment.from_json(args.exp_json)
+    exploc = args.exp_loc / "experiment.json" 
+    print(exploc)
+    experiment = starfish.core.experiment.experiment.Experiment.from_json(str(exploc))
 
     blobRunnerKwargs = {}
     addKwarg(args, blobRunnerKwargs, "min_sigma")
@@ -113,7 +115,7 @@ if __name__ == "__main__":
     elif method == "SimpleLookupDecoder":
         method = starfish.spots.DecodeSpots.SimpleLookupDecoder
     else:
-        raise Exception("DecodeSpots method "+method+" is not a valid method.")
+        raise Exception("DecodeSpots method "+str(method)+" is not a valid method.")
 
     trace_strat = args.trace_building_strategy
     if method != starfish.spots.DecodeSpots.SimpleLookupDecoder:
@@ -121,10 +123,10 @@ if __name__ == "__main__":
             trace_strat = TraceBuildingStrategies.SEQUENTIAL
         elif trace_strat == "EXACT_MATCH":
             trace_strat = TraceBuildingStrategies.EXACT_MATCH
-        elif trace_strat == "NEAREST_NEIGHBOR"
+        elif trace_strat == "NEAREST_NEIGHBOR":
             trace_strat = TraceBuildingStrategies.NEAREST_NEIGHBOR
         else:
-            raise Exception("TraceBuildingStrategies "+trace_strat+" is not valid.")
+            raise Exception("TraceBuildingStrategies "+str(trace_strat)+" is not valid.")
 
     decodeKwargs = {}
     addKwarg(args, decodeKwargs, "max_distance")

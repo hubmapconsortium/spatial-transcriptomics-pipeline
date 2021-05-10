@@ -9,12 +9,11 @@ requirements:
     dockerPull: docker.pkg.github.com/hubmapconsortium/spatial-transcriptomics-pipeline/starfish:latest
 
 inputs:
-  exp_json:
-    type: File
+  exp_loc:
+    type: Directory
     inputBinding:
-      prefix: --exp-json
-    doc: Location of starfish experiment.json file
-
+      prefix: --exp-loc
+    doc: Location of directory containing starfish experiment.json file
   decoding:
     type:
       - type: record
