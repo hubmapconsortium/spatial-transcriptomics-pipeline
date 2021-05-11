@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 from argparse import ArgumentParser
+from datetime import datetime
 from typing import List
 import functools
 from typing import Mapping, Union
@@ -444,6 +445,8 @@ def cli(input_dir: str, output_dir: str, file_format: str, file_vars: list, cach
     int :
         Returns 0 if successful
     """
+    reportFile = path.join(output_dir,datetime.now().strftime("/../%Y-%d-%m_%H:%M_TXconversion.log"))
+    sys.stdout = open(reportFile,'w')
 
     os.makedirs(output_dir, exist_ok=True)
 
@@ -501,7 +504,7 @@ def cli(input_dir: str, output_dir: str, file_format: str, file_vars: list, cach
 
     os.remove(output_dir + "/codebook.json")
 
-
+    sys.stdout = sys.__stdout__
     return 0
 
 if __name__ == "__main__":

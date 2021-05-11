@@ -2,9 +2,10 @@
 
 import starfish
 import starfish.data
+from datetime import datetime
 from starfish.spots import AssignTargets
 from starfish import Codebook
-from starfish.types import Axes, Coordinates, CoordinateValue, Features
+from starfish.types import Axes, Coordinates, CoordinateValue, Features, TraceBuildingStrategies
 
 import numpy as np
 import pandas as pd
@@ -44,11 +45,16 @@ def blobDriver(exp, blobRunnerKwargs, decodeRunnerKwargs):
     return decoded
 
 def run(output_dir, experiment, blobRunnerKwargs, decodeRunnerKwargs):
+    reportFile = path.join(output_dir,datetime.now().strftime("/../%Y-%d-%m_%H:%M_starfish_runner.log"))
+    sys.stdout = open(reportFile,'w')
+    
     # TODO add image processing options
     decoded = blobDriver(experiment, blobRunnerKwargs, decodeRunnerKwargs)
     # TODO add pixel based driver
     for fov in decoded.keys():
         decoded[fov].to_decoded_dataframe().to_csv(output_dir+fov+"_decoded.csv")
+    
+    sys.stdout = sys.__stdout__
     return 0
 
 def addKwarg(parser, kwargdict, var):
@@ -96,8 +102,10 @@ if __name__ == "__main__":
 
     args = p.parse_args()
 
+    for item in vars(args):
+        print(item, ':', vars(args)[item])
+
     exploc = args.exp_loc / "experiment.json" 
-    print(exploc)
     experiment = starfish.core.experiment.experiment.Experiment.from_json(str(exploc))
 
     blobRunnerKwargs = {}
@@ -142,5 +150,5 @@ if __name__ == "__main__":
     decodeRunnerKwargs = {"decodeKwargs": decodeKwargs, "callableDecoder": method}
     addKwarg(args, decodeRunnerKwargs, "return_original_intensities")
 
-    run(output_dir, exp, blobRunnerKwargs, decodeRunnerKwargs)
+    run(output_dir, experiment, blobRunnerKwargs, decodeRunnerKwargs)
 
