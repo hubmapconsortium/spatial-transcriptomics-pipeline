@@ -11,6 +11,11 @@ import numpy as np
 import pandas as pd
 from argparse import ArgumentParser
 from pathlib import Path
+from os import path, makedirs
+import sys
+
+from tqdm import tqdm
+from functools import partialmethod
 
 # TODO parameter specifications, docstrings
 
@@ -19,6 +24,7 @@ def blobRunner(img, ref_img=None,
         threshold=0.1, overlap=0.5):
     bd = starfish.spots.FindSpots.BlobDetector(min_sigma, max_sigma, num_sigma, threshold, is_volume=False, overlap=overlap)
     results = None
+    print(img)
     if ref_img:
         results = bd.run(image_stack=img, reference_image=ref_img)
     else:
@@ -44,10 +50,26 @@ def blobDriver(exp, blobRunnerKwargs, decodeRunnerKwargs):
         decoded[fov] = decodeRunner(blobs, exp.codebook, **decodeRunnerKwargs)
     return decoded
 
-def run(output_dir, experiment, blobRunnerKwargs, decodeRunnerKwargs):
-    reportFile = path.join(output_dir,datetime.now().strftime("/../%Y-%d-%m_%H:%M_starfish_runner.log"))
-    sys.stdout = open(reportFile,'w')
+def pixelDriver(exp, pixelRunnerKwargs):
+    fovs = exp.keys()
+    pixelRunner = starfish.spots.DetectPixels.PixelSpotDecoder(codebook=exp.codebook, **pixelRunnerKwargs)
+    decoded = {}
+    for fov in fovs:
+        img = exp[fov].get_image("primary")
+        decoded[fov] = pixelRunner(img)
+    return decoded
+
+def run(output_dir, experiment, blobRunnerKwargs, decodeRunnerKwargs, pixelRunnerKwargs):
+    if not path.isdir(output_dir):
+        makedirs(output_dir)
     
+    reporter = open(path.join(output_dir,datetime.now().strftime("%Y-%d-%m_%H:%M_starfish_runner.log")),'w')
+    sys.stdout = reporter
+    sys.stderr = reporter
+
+    #disabling tdqm for pipeline runs
+    tqdm.__init__ = partialmethod(tqdm.__init__, disable=True)
+
     # TODO add image processing options
     decoded = blobDriver(experiment, blobRunnerKwargs, decodeRunnerKwargs)
     # TODO add pixel based driver
@@ -90,7 +112,7 @@ if __name__ == "__main__":
     ## MetricDistance
     p.add_argument("--max-distance", type=float, nargs="?")
     p.add_argument("--min-intensity", type=float, nargs="?")
-    p.add_argument("--metric", type=str, nargs="?")
+    p.add_argument("--metric", type=str, nargs="?") #NOTE also used in pixelRunner
     p.add_argument("--norm-order", type=int, nargs="?")
     p.add_argument("--anchor-round", type=int, nargs="?") # also used in PerRoundMaxChannel
     p.add_argument("--search-radius", type=int, nargs="?") # also used in PerRoundMaxChannel
@@ -98,12 +120,16 @@ if __name__ == "__main__":
     p.add_argument("--filtered_results", type=bool, nargs="?") # defined by us
 
     # pixelRunner kwargs
-    # TODO LATER
+    p.add_argument("--distance-threshold", type=float, nargs="?")
+    p.add_argument("--magnitude-threshold", type=int, nargs="?")
+    p.add_argument("--min-area", type=int, nargs="?")
+    p.add_argument("--max-area", type=int, nargs="?")
+    p.add_argument("--norm-order", type=int, nargs="?")
 
     args = p.parse_args()
 
-    for item in vars(args):
-        print(item, ':', vars(args)[item])
+    #for item in vars(args):
+    #    print(item, ':', vars(args)[item])
 
     exploc = args.exp_loc / "experiment.json" 
     experiment = starfish.core.experiment.experiment.Experiment.from_json(str(exploc))
@@ -114,6 +140,14 @@ if __name__ == "__main__":
     addKwarg(args, blobRunnerKwargs, "num_sigma")
     addKwarg(args, blobRunnerKwargs, "threshold")
     addKwarg(args, blobRunnerKwargs, "overlap")
+
+    pixelRunnerKwargs = {}
+    addKwarg(args, pixelRunnerKwargs, "metric")
+    addKwarg(args, pixelRunnerKwargs, "distance_threshold")
+    addKwarg(args, pixelRunnerKwargs, "magnitude_threshold")
+    addKwarg(args, pixelRunnerKwargs, "min_area")
+    addKwarg(args, pixelRunnerKwargs, "max_area")
+    addKwarg(args, pixelRunnerKwargs, "norm_order")
 
     method = args.decode_spots_method
     if method == "PerRoundMaxChannel":
@@ -150,5 +184,5 @@ if __name__ == "__main__":
     decodeRunnerKwargs = {"decodeKwargs": decodeKwargs, "callableDecoder": method}
     addKwarg(args, decodeRunnerKwargs, "return_original_intensities")
 
-    run(output_dir, experiment, blobRunnerKwargs, decodeRunnerKwargs)
+    run(output_dir, experiment, blobRunnerKwargs, decodeRunnerKwargs, pixelRunnerKwargs)
 

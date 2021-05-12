@@ -129,8 +129,3 @@ outputs:
     type: Directory
     outputBinding:
       glob: "4_Decoded/"
-
-  starfish_log:
-    type: File
-    outputBinding:
-      glob: "*_starfish_runner.log"
