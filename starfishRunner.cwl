@@ -14,6 +14,25 @@ inputs:
     inputBinding:
       prefix: --exp-loc
     doc: Location of directory containing starfish experiment.json file
+
+  flatten_axes:
+    type: string[]?
+    inputBinding: 
+      prefix: --flatten-axes
+    doc: Which axes, if any, to compress in the image preprocessing steps.
+
+  clip_img:
+    type: boolean?
+    inputBinding:
+      prefix: --clip-img
+    doc: Whether to rescale and clip images across rounds.
+
+  use_ref_img:
+    type: boolean?
+    inputBinding:
+      prefix: --use-ref-img
+    doc: Whether to generate a reference image and use it alongside spot detection.
+
   decoding:
     type:
       - type: record
@@ -121,8 +140,31 @@ inputs:
       - type: record
         name: pixel
         fields:
-          dummy:
-            type: string?
+          metric:
+            type: string
+            inputBinding: 
+              prefix: --metric
+            doc: The sklearn metric string to pass to NearestNeighbors
+          distance_threshold:
+            type: float
+            inputBinding:
+              prefix: --distance-threshold
+            doc: Spots whose codewords are more than this metric distance from an expected code are filtered
+          min_area:
+            type: int
+            inputBinding:
+              prefix: --min-area
+            doc: Spots with total area less than this value are filtered
+          max_area:
+            type: int
+            inputBinding:
+              prefix: --max-area
+            doc: Spots with total area greater than this value are filtered
+          norm_order:
+            type: int?
+            inputBinding:
+              prefix: --norm-order
+            doc: Order of L_p norm to apply to intensities and codes when using metric_decode to pair each intensities to its closest target (default = 2)
 
 outputs:
   decoded:

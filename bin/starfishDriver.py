@@ -4,8 +4,8 @@ import starfish
 import starfish.data
 from datetime import datetime
 from starfish.spots import AssignTargets
-from starfish import Codebook
-from starfish.types import Axes, Coordinates, CoordinateValue, Features, TraceBuildingStrategies
+from starfish import Codebook, ImageStack
+from starfish.types import Axes, Coordinates, CoordinateValue, Features, TraceBuildingStrategies, Levels
 
 import numpy as np
 import pandas as pd
@@ -13,18 +13,35 @@ from argparse import ArgumentParser
 from pathlib import Path
 from os import path, makedirs
 import sys
+from typing import Set
 
 from tqdm import tqdm
 from functools import partialmethod
 
 # TODO parameter specifications, docstrings
 
+def imagePrePro(imgs, flatten_axes: Set[Axes], clip: bool, ref: bool):
+    ret_imgs = {}
+    ret_ref = {}
+    for fov in imgs.keys():
+        img = imgs[fov]
+        if flatten_axes:
+            img = img.reduce(flatten_axes, func="max")
+        clip = starfish.image.Filter.Clip(p_max=99.9, is_volume=True, level_method=Levels.SCALE_BY_CHUNK)
+        if clip:
+            clip.run(img, in_place=True)
+        ref_img = None
+        if ref:
+            ref_img = img.reduce({Axes.CH, Axes.ROUND, Axes.ZPLANE}, func="max")
+        ret_imgs[fov] = img
+        ret_ref[fov] = ref_img
+    return ret_imgs, ret_ref
+
 def blobRunner(img, ref_img=None,
         min_sigma=(0.5,0.5,0.5), max_sigma=(8,8,8), num_sigma=10,
         threshold=0.1, overlap=0.5):
     bd = starfish.spots.FindSpots.BlobDetector(min_sigma, max_sigma, num_sigma, threshold, is_volume=False, overlap=overlap)
     results = None
-    print(img)
     if ref_img:
         results = bd.run(image_stack=img, reference_image=ref_img)
     else:
@@ -41,25 +58,23 @@ def decodeRunner(spots, codebook, decoderKwargs,
         results = results[results.target != 'nan']
     return results
 
-def blobDriver(exp, blobRunnerKwargs, decodeRunnerKwargs):
-    fovs = exp.keys()
+def blobDriver(imgs, ref_img, codebook, blobRunnerKwargs, decodeRunnerKwargs):
+    fovs = imgs.keys()
     decoded = {}
     for fov in fovs:
-        img = exp[fov].get_image("primary")
-        blobs = blobRunner(img, **blobRunnerKwargs)
-        decoded[fov] = decodeRunner(blobs, exp.codebook, **decodeRunnerKwargs)
+        blobs = blobRunner(imgs[fov], ref_img=ref_img[fov] if ref_img else None, **blobRunnerKwargs)
+        decoded[fov] = decodeRunner(blobs, codebook, **decodeRunnerKwargs)
     return decoded
 
-def pixelDriver(exp, pixelRunnerKwargs):
-    fovs = exp.keys()
-    pixelRunner = starfish.spots.DetectPixels.PixelSpotDecoder(codebook=exp.codebook, **pixelRunnerKwargs)
+def pixelDriver(imgs, codebook, pixelRunnerKwargs):
+    fovs = imgs.keys()
+    pixelRunner = starfish.spots.DetectPixels.PixelSpotDecoder(codebook=codebook, **pixelRunnerKwargs)
     decoded = {}
     for fov in fovs:
-        img = exp[fov].get_image("primary")
-        decoded[fov] = pixelRunner(img)
+        decoded[fov] = pixelRunner(imgs[fov])
     return decoded
 
-def run(output_dir, experiment, blobRunnerKwargs, decodeRunnerKwargs, pixelRunnerKwargs):
+def run(output_dir, experiment, blob_based, imagePreProKwargs, blobRunnerKwargs, decodeRunnerKwargs, pixelRunnerKwargs):
     if not path.isdir(output_dir):
         makedirs(output_dir)
     
@@ -67,12 +82,24 @@ def run(output_dir, experiment, blobRunnerKwargs, decodeRunnerKwargs, pixelRunne
     sys.stdout = reporter
     sys.stderr = reporter
 
+    print("output_dir: {}\nexp: {}\nblob_based: {}\nprepro: {}\nblobrunner: {}\ndecoderunner: {}\npixelrunner: {}\n".format(output_dir, experiment, blob_based, imagePreProKwargs, blobRunnerKwargs, decodeRunnerKwargs, pixelRunnerKwargs))
+
     #disabling tdqm for pipeline runs
     tqdm.__init__ = partialmethod(tqdm.__init__, disable=True)
 
-    # TODO add image processing options
-    decoded = blobDriver(experiment, blobRunnerKwargs, decodeRunnerKwargs)
-    # TODO add pixel based driver
+    imgs = {}
+    for fov in experiment.keys():
+        imgs[fov] = experiment[fov].get_image("primary")
+
+    imgs, ref_imgs = imagePrePro(imgs, **imagePreProKwargs)
+    
+    decoded = {}
+    if blob_based:
+        decoded = blobDriver(imgs, ref_imgs, experiment.codebook, blobRunnerKwargs, decodeRunnerKwargs)
+    else:
+        decoded = pixelDriver(imgs, experiment.codebook, pixelRunnerKwargs)
+    
+    #saving 
     for fov in decoded.keys():
         decoded[fov].to_decoded_dataframe().to_csv(output_dir+fov+"_decoded.csv")
     
@@ -94,8 +121,10 @@ if __name__ == "__main__":
     p.add_argument("--exp-loc", type=Path)
 
     # image processing args
-    # TODO LATER
-    
+    p.add_argument("--flatten-axes", type=str, nargs="*")
+    p.add_argument("--clip-img", type=bool, nargs="?")
+    p.add_argument("--use-ref-img", type=bool, nargs="?")
+
     # blobRunner kwargs
     p.add_argument("--min-sigma", type=float, nargs="*")
     p.add_argument("--max-sigma", type=float, nargs="*")
@@ -113,7 +142,7 @@ if __name__ == "__main__":
     p.add_argument("--max-distance", type=float, nargs="?")
     p.add_argument("--min-intensity", type=float, nargs="?")
     p.add_argument("--metric", type=str, nargs="?") #NOTE also used in pixelRunner
-    p.add_argument("--norm-order", type=int, nargs="?")
+    p.add_argument("--norm-order", type=int, nargs="?") #NOTE also used in pixelRunner
     p.add_argument("--anchor-round", type=int, nargs="?") # also used in PerRoundMaxChannel
     p.add_argument("--search-radius", type=int, nargs="?") # also used in PerRoundMaxChannel
     p.add_argument("--return-original-intensities", type=bool, nargs="?")
@@ -124,7 +153,6 @@ if __name__ == "__main__":
     p.add_argument("--magnitude-threshold", type=int, nargs="?")
     p.add_argument("--min-area", type=int, nargs="?")
     p.add_argument("--max-area", type=int, nargs="?")
-    p.add_argument("--norm-order", type=int, nargs="?")
 
     args = p.parse_args()
 
@@ -134,9 +162,29 @@ if __name__ == "__main__":
     exploc = args.exp_loc / "experiment.json" 
     experiment = starfish.core.experiment.experiment.Experiment.from_json(str(exploc))
 
+    imagePreProKwargs = {}
+    imagePreProKwargs["clip"] = args.clip_img
+    imagePreProKwargs["ref"] = args.use_ref_img
+    if args.flatten_axes:
+        ax_set = set()
+        for ax in args.flatten_axes:
+            if ax == "ZPLANE":
+                ax_set.add(Axes.ZPLANE)
+            elif ax == "CH":
+                ax_set.add(Axes.CH)
+            elif ax == "ROUND":
+                ax_set.add(Axes.ROUND)
+        imagePreProKwargs["flatten_axes"] = ax_set
+    else:
+        imagePreProKwargs["flatten_axes"] = False
+
     blobRunnerKwargs = {}
-    addKwarg(args, blobRunnerKwargs, "min_sigma")
-    addKwarg(args, blobRunnerKwargs, "max_sigma")
+    #addKwarg(args, blobRunnerKwargs, "min_sigma")
+    #addKwarg(args, blobRunnerKwargs, "max_sigma")
+    if args.min_sigma:
+        blobRunnerKwargs["min_sigma"] = tuple(args.min_sigma)
+    if args.max_sigma:
+        blobRunnerKwargs["max_sigma"] = tuple(args.max_sigma)
     addKwarg(args, blobRunnerKwargs, "num_sigma")
     addKwarg(args, blobRunnerKwargs, "threshold")
     addKwarg(args, blobRunnerKwargs, "overlap")
@@ -150,25 +198,27 @@ if __name__ == "__main__":
     addKwarg(args, pixelRunnerKwargs, "norm_order")
 
     method = args.decode_spots_method
-    if method == "PerRoundMaxChannel":
-        method = starfish.spots.DecodeSpots.PerRoundMaxChannel
-    elif method == "MetricDistance":
-        method = starfish.spots.DecodeSpots.MetricDistance
-    elif method == "SimpleLookupDecoder":
-        method = starfish.spots.DecodeSpots.SimpleLookupDecoder
-    else:
-        raise Exception("DecodeSpots method "+str(method)+" is not a valid method.")
-
-    trace_strat = args.trace_building_strategy
-    if method != starfish.spots.DecodeSpots.SimpleLookupDecoder:
-        if trace_strat == "SEQUENTIAL":
-            trace_strat = TraceBuildingStrategies.SEQUENTIAL
-        elif trace_strat == "EXACT_MATCH":
-            trace_strat = TraceBuildingStrategies.EXACT_MATCH
-        elif trace_strat == "NEAREST_NEIGHBOR":
-            trace_strat = TraceBuildingStrategies.NEAREST_NEIGHBOR
+    blob_based = args.distance_threshold not in locals()
+    if blob_based:
+        if method == "PerRoundMaxChannel":
+            method = starfish.spots.DecodeSpots.PerRoundMaxChannel
+        elif method == "MetricDistance":
+            method = starfish.spots.DecodeSpots.MetricDistance
+        elif method == "SimpleLookupDecoder":
+            method = starfish.spots.DecodeSpots.SimpleLookupDecoder
         else:
-            raise Exception("TraceBuildingStrategies "+str(trace_strat)+" is not valid.")
+            raise Exception("DecodeSpots method "+str(method)+" is not a valid method.")
+
+        trace_strat = args.trace_building_strategy
+        if method != starfish.spots.DecodeSpots.SimpleLookupDecoder:
+            if trace_strat == "SEQUENTIAL":
+                trace_strat = TraceBuildingStrategies.SEQUENTIAL
+            elif trace_strat == "EXACT_MATCH":
+                trace_strat = TraceBuildingStrategies.EXACT_MATCH
+            elif trace_strat == "NEAREST_NEIGHBOR":
+                trace_strat = TraceBuildingStrategies.NEAREST_NEIGHBOR
+            else:
+                raise Exception("TraceBuildingStrategies "+str(trace_strat)+" is not valid.")
 
     decodeKwargs = {}
     addKwarg(args, decodeKwargs, "max_distance")
@@ -184,5 +234,5 @@ if __name__ == "__main__":
     decodeRunnerKwargs = {"decodeKwargs": decodeKwargs, "callableDecoder": method}
     addKwarg(args, decodeRunnerKwargs, "return_original_intensities")
 
-    run(output_dir, experiment, blobRunnerKwargs, decodeRunnerKwargs, pixelRunnerKwargs)
+    run(output_dir, experiment, blob_based, imagePreProKwargs, blobRunnerKwargs, decodeRunnerKwargs, pixelRunnerKwargs)
 
