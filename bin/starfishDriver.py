@@ -42,6 +42,8 @@ def blobRunner(img, ref_img=None,
         threshold=0.1, overlap=0.5):
     bd = starfish.spots.FindSpots.BlobDetector(min_sigma, max_sigma, num_sigma, threshold, is_volume=False, overlap=overlap)
     results = None
+    print(vars(bd))
+    print(vars(img))
     if ref_img:
         results = bd.run(image_stack=img, reference_image=ref_img)
     else:
@@ -101,7 +103,7 @@ def run(output_dir, experiment, blob_based, imagePreProKwargs, blobRunnerKwargs,
     
     #saving 
     for fov in decoded.keys():
-        decoded[fov].to_decoded_dataframe().to_csv(output_dir+fov+"_decoded.csv")
+        decoded[fov].to_decoded_dataframe().to_csv(output_dir+fov+"_decoded.csv") #TODO fix this, it doesn't work
     
     sys.stdout = sys.__stdout__
     return 0
@@ -122,8 +124,10 @@ if __name__ == "__main__":
 
     # image processing args
     p.add_argument("--flatten-axes", type=str, nargs="*")
-    p.add_argument("--clip-img", type=bool, nargs="?")
-    p.add_argument("--use-ref-img", type=bool, nargs="?")
+    p.add_argument("--clip-img", dest='clip_img', action='store_true')
+    p.add_argument("--use-ref-img", dest='use_ref_img', action='store_true')
+    p.set_defaults(clip_img=False)
+    p.set_defaults(use_ref_img=False)
 
     # blobRunner kwargs
     p.add_argument("--min-sigma", type=float, nargs="*")
@@ -146,7 +150,8 @@ if __name__ == "__main__":
     p.add_argument("--anchor-round", type=int, nargs="?") # also used in PerRoundMaxChannel
     p.add_argument("--search-radius", type=int, nargs="?") # also used in PerRoundMaxChannel
     p.add_argument("--return-original-intensities", type=bool, nargs="?")
-    p.add_argument("--filtered_results", type=bool, nargs="?") # defined by us
+    p.add_argument("--filtered_results", dest='filtered_results', action='store_true') # defined by us
+    p.set_defaults(filtered_results=False)
 
     # pixelRunner kwargs
     p.add_argument("--distance-threshold", type=float, nargs="?")
@@ -231,7 +236,7 @@ if __name__ == "__main__":
     if trace_strat:
         decodeKwargs["trace_building_strategy"] = trace_strat
     
-    decodeRunnerKwargs = {"decodeKwargs": decodeKwargs, "callableDecoder": method}
+    decodeRunnerKwargs = {"decoderKwargs": decodeKwargs, "callableDecoder": method}
     addKwarg(args, decodeRunnerKwargs, "return_original_intensities")
 
     run(output_dir, experiment, blob_based, imagePreProKwargs, blobRunnerKwargs, decodeRunnerKwargs, pixelRunnerKwargs)
