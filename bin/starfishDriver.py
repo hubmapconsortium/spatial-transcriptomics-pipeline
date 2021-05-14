@@ -103,7 +103,7 @@ def run(output_dir, experiment, blob_based, imagePreProKwargs, blobRunnerKwargs,
     
     #saving 
     for fov in decoded.keys():
-        decoded[fov].to_decoded_dataframe().to_csv(output_dir+fov+"_decoded.csv") #TODO fix this, it doesn't work
+        decoded[fov].to_decoded_dataframe().save_csv(output_dir+fov+"_decoded.csv") #TODO fix this, it doesn't work
     
     sys.stdout = sys.__stdout__
     return 0
