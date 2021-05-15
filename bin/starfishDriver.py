@@ -20,16 +20,27 @@ from functools import partialmethod
 
 # TODO parameter specifications, docstrings
 
-def imagePrePro(imgs, flatten_axes: Set[Axes], clip: bool, ref: bool):
+def imagePrePro(imgs, 
+        flatten_axes: Set[Axes] = None, 
+        gaussian_lowpass: float = None, 
+        clip: bool = True, 
+        zero_by_magnitude: float = None, 
+        ref: bool= False):
     ret_imgs = {}
     ret_ref = {}
     for fov in imgs.keys():
         img = imgs[fov]
         if flatten_axes:
             img = img.reduce(flatten_axes, func="max")
-        clip = starfish.image.Filter.Clip(p_max=99.9, is_volume=True, level_method=Levels.SCALE_BY_CHUNK)
         if clip:
+            clip = starfish.image.Filter.Clip(p_max=99.9, is_volume=True, level_method=Levels.SCALE_BY_CHUNK)
             clip.run(img, in_place=True)
+        if gaussian_lowpass:
+            gaus = starfish.image.Filter.GaussianLowPass(gaussian_lowpass)
+            gaus.run(img, in_place=True)
+        if zero_below_mag:
+            z_filt = starfish.image.Filter.ZeroByChannelMagnitude(thresh=zero_below_mag)
+            z_filt.run(img, in_place=True)
         ref_img = None
         if ref:
             ref_img = img.reduce({Axes.CH, Axes.ROUND, Axes.ZPLANE}, func="max")
@@ -124,7 +135,9 @@ if __name__ == "__main__":
 
     # image processing args
     p.add_argument("--flatten-axes", type=str, nargs="*")
+    p.add_argument("--gaussian-lowpass", type=float, nargs="?")
     p.add_argument("--clip-img", dest='clip_img', action='store_true')
+    p.add_argument("--zero-by-magnitude", type=float, nargs="?")
     p.add_argument("--use-ref-img", dest='use_ref_img', action='store_true')
     p.set_defaults(clip_img=False)
     p.set_defaults(use_ref_img=False)
@@ -168,6 +181,8 @@ if __name__ == "__main__":
     experiment = starfish.core.experiment.experiment.Experiment.from_json(str(exploc))
 
     imagePreProKwargs = {}
+    addKwarg(args, imagePreProKwargs, "gaussian_lowpass")
+    addKwarg(args, imagePreProKwargs,"zero_by_magnitude")
     imagePreProKwargs["clip"] = args.clip_img
     imagePreProKwargs["ref"] = args.use_ref_img
     if args.flatten_axes:
