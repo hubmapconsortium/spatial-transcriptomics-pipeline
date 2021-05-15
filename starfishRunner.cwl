@@ -162,6 +162,11 @@ inputs:
             inputBinding:
               prefix: --distance-threshold
             doc: Spots whose codewords are more than this metric distance from an expected code are filtered
+          magnitude_threshold:
+            type: float
+            inputBinding:
+              prefix: --magnitude-threshold
+            doc: spots with intensity less than this value are filtered.
           min_area:
             type: int
             inputBinding:

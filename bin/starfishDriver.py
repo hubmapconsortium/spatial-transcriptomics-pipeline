@@ -38,8 +38,8 @@ def imagePrePro(imgs,
         if gaussian_lowpass:
             gaus = starfish.image.Filter.GaussianLowPass(gaussian_lowpass)
             gaus.run(img, in_place=True)
-        if zero_below_mag:
-            z_filt = starfish.image.Filter.ZeroByChannelMagnitude(thresh=zero_below_mag)
+        if zero_by_magnitude:
+            z_filt = starfish.image.Filter.ZeroByChannelMagnitude(thresh=zero_by_magnitude, normalize=False)
             z_filt.run(img, in_place=True)
         ref_img = None
         if ref:
@@ -84,7 +84,7 @@ def pixelDriver(imgs, codebook, pixelRunnerKwargs):
     pixelRunner = starfish.spots.DetectPixels.PixelSpotDecoder(codebook=codebook, **pixelRunnerKwargs)
     decoded = {}
     for fov in fovs:
-        decoded[fov] = pixelRunner(imgs[fov])
+        decoded[fov] = pixelRunner.run(imgs[fov])
     return decoded
 
 def run(output_dir, experiment, blob_based, imagePreProKwargs, blobRunnerKwargs, decodeRunnerKwargs, pixelRunnerKwargs):
@@ -168,7 +168,7 @@ if __name__ == "__main__":
 
     # pixelRunner kwargs
     p.add_argument("--distance-threshold", type=float, nargs="?")
-    p.add_argument("--magnitude-threshold", type=int, nargs="?")
+    p.add_argument("--magnitude-threshold", type=float, nargs="?")
     p.add_argument("--min-area", type=int, nargs="?")
     p.add_argument("--max-area", type=int, nargs="?")
 
@@ -217,8 +217,10 @@ if __name__ == "__main__":
     addKwarg(args, pixelRunnerKwargs, "max_area")
     addKwarg(args, pixelRunnerKwargs, "norm_order")
 
+    decodeKwargs = {}
+    
     method = args.decode_spots_method
-    blob_based = args.distance_threshold not in locals()
+    blob_based = args.distance_threshold is None
     if blob_based:
         if method == "PerRoundMaxChannel":
             method = starfish.spots.DecodeSpots.PerRoundMaxChannel
@@ -239,17 +241,14 @@ if __name__ == "__main__":
                 trace_strat = TraceBuildingStrategies.NEAREST_NEIGHBOR
             else:
                 raise Exception("TraceBuildingStrategies "+str(trace_strat)+" is not valid.")
+            decodeKwargs["trace_building_strategy"] = trace_strat
 
-    decodeKwargs = {}
     addKwarg(args, decodeKwargs, "max_distance")
     addKwarg(args, decodeKwargs, "min_intensity")
     addKwarg(args, decodeKwargs, "metric")
     addKwarg(args, decodeKwargs, "norm_order")
     addKwarg(args, decodeKwargs, "anchor_round")
     addKwarg(args, decodeKwargs, "search_radius")
-    
-    if trace_strat:
-        decodeKwargs["trace_building_strategy"] = trace_strat
     
     decodeRunnerKwargs = {"decoderKwargs": decodeKwargs, "callableDecoder": method}
     addKwarg(args, decodeRunnerKwargs, "return_original_intensities")
