@@ -84,7 +84,7 @@ def pixelDriver(imgs, codebook, pixelRunnerKwargs):
     pixelRunner = starfish.spots.DetectPixels.PixelSpotDecoder(codebook=codebook, **pixelRunnerKwargs)
     decoded = {}
     for fov in fovs:
-        decoded[fov] = pixelRunner.run(imgs[fov])
+        decoded[fov] = pixelRunner.run(imgs[fov])[0]
     return decoded
 
 def run(output_dir, experiment, blob_based, imagePreProKwargs, blobRunnerKwargs, decodeRunnerKwargs, pixelRunnerKwargs):
@@ -114,7 +114,7 @@ def run(output_dir, experiment, blob_based, imagePreProKwargs, blobRunnerKwargs,
     
     #saving 
     for fov in decoded.keys():
-        decoded[fov].to_decoded_dataframe().save_csv(output_dir+fov+"_decoded.csv") #TODO fix this, it doesn't work
+        decoded[fov].to_decoded_dataframe().save_csv(output_dir+fov+"_decoded.csv") 
     
     sys.stdout = sys.__stdout__
     return 0

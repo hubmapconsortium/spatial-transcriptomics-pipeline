@@ -94,35 +94,36 @@ inputs:
       prefix: --cache-read-order
     doc: Order of non x,y dimensions within each image.
 
-  aux_names:
-    type: string[]?
-    inputBinding:
-      prefix: --aux-names
-    doc: Names of the Auxillary tiles.
-
-  aux_file_formats:
-    type: string[]?
-    inputBinding:
-      prefix: --aux-file-formats
-    doc: String layout for .tiff files of aux views.
-
-  aux_file_vars:
-    type: string[]?
-    inputBinding:
-      prefix: --aux-file-vars
-    doc: Variables to be substituted into aux_file_formats. One entry per aux_name, with semicolon-delimited vars.
-
-  aux_cache_read_order:
-    type: string[]?
-    inputBinding:
-      prefix: --aux-cache-read-order
-    doc: Order of non x,y dimensions within each image. One entry per aux_name, with semicolon-delimited vars.
-
-  aux_fixed_channel:
-    type: int[]?
-    inputBinding:
-      prefix: --aux-fixed-channel
-    doc: Which channel to refer to in aux images.
+  aux_tilesets:
+    type:
+      type: record
+      name: aux_tilesets
+      fields:
+        aux_names:
+          type: string[]?
+          inputBinding:
+            prefix: --aux-names
+          doc: Names of the Auxillary tiles.
+        aux_file_formats:
+          type: string[]?
+          inputBinding:
+            prefix: --aux-file-formats
+          doc: String layout for .tiff files of aux views.
+        aux_file_vars:
+          type: string[]?
+          inputBinding:
+            prefix: --aux-file-vars
+          doc: Variables to be substituted into aux_file_formats. One entry per aux_name, with semicolon-delimited vars.
+        aux_cache_read_order:
+          type: string[]?
+          inputBinding:
+            prefix: --aux-cache-read-order
+          doc: Order of non x,y dimensions within each image. One entry per aux_name, with semicolon-delimited vars.
+        aux_fixed_channel:
+          type: int[]?
+          inputBinding:
+            prefix: --aux-fixed-channel
+          doc: Which channel to refer to in aux images.
 
   fov_positioning:
     - 'null'

@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/python3
 
 # Based on code provided by UCSD in their dartFISH data submission to HuBMAP.
 
@@ -87,44 +87,20 @@ def mip_gauss_tiled(rnd, fov, dir_root, dir_output='./MIP_gauss',
 def cli(dir_data_raw, dir_output, dir_output_aligned,
 	rnd_list, n_fovs, sigma,
 	cycle_reference_index, channel_DIC_reference, channel_DIC, cycle_other, channel_DIC_other_vals):
-	# sample_date = "200316"
-	# sample_name = "K2000063_1-A-63x-ROI2"	
 
-	# name_full = sample_date + '-' + sample_name
 
-	#Raw Data Folder
-	#dir_data_raw = "../0_Raw/"
-
-	#Processed data output folder
-	# dir_data = "/media/Scratch_SSD{}/rque/DART-FISH/".format(server_selector)
-
-	#Where MIPs are written to
-	#dir_output = "../1_Projected"
 	if not path.isdir(dir_output):
 		makedirs(dir_output)
 
-	#Where Aligned MIPs are written to
-	#dir_output_aligned = "../2_Registered"
 	if not path.isdir(dir_output_aligned):
 		makedirs(dir_output_aligned)
 
-	#rounds
-	#rnd_list = ["0_anchor","1_dc0","2_dc1","3_dc2","4_dc3","5_dc4","6_dc5","7_DRAQ5"]
-
-
-	#Number of FOVs
-	#n_fovs = 80
-
-	#sigma for gaussian blur
-	#sigma = 0.7
+	currentTime = datetime.now() 
+	reportFile = path.join(dir_output_aligned, currentTime.strftime("%Y-%d-%m_%H:%M_SITKAlignment.log"))
+	sys.stdout = open(reportFile, 'w') # redirecting the stdout to the log file
 
 	#Which cycle to align to
-	#cycle_reference = rnd_list[round(len(rnd_list)/2)] # 4_dc3
 	cycle_reference = rnd_list[cycle_reference_index]
-	#channel_DIC_reference = 'ch03' # DIC channel for reference cycle
-	#channel_DIC = 'ch03' # DIC channel for (non-reference) decoding cycles (the channel we use for finding alignment parameters)
-	#cycle_other = ['0_anchor','7_DRAQ5'] # if there are other data-containing folders which need to be aligned but are not names "CycleXX"
-	#channel_DIC_other = {'0_anchor':'ch01','7_DRAQ5' : 'ch01'} # DIC channel for otPher data-containing folders
 	channel_DIC_other = {}
 	for i in range(len(channel_DIC_other_vals)):
 		channel_DIC_other[cycle_other[i]] = channel_DIC_other_vals[i]
@@ -148,9 +124,6 @@ def cli(dir_data_raw, dir_output, dir_output_aligned,
 
 	position_list = listdirectories(path.join(dir_output))
 	#Align
-	currentTime = datetime.now() 
-	reportFile = path.join(dir_output_aligned, currentTime.strftime("%Y-%d-%m_%H:%M_SITKAlignment.log"))
-	sys.stdout = open(reportFile, 'w') # redirecting the stdout to the log file
 	for position in position_list:
 		#	position = 'Position{:03d}'.format(posi)
 		#	cycle_list = ["dc3","dc4","DRAQ5"]
@@ -172,10 +145,10 @@ def cli(dir_data_raw, dir_output, dir_output_aligned,
 			shutil.move(src = file, dst = path.join(dir_output_aligned, position, "MetaData"))
                             
 	t2 = time()
-	sys.stdout = sys.__stdout__ # restoring the stdout pipe to normal
 	print('Elapsed time ', t2 - t1)
 
 	print('Total elapsed time ',  t2 - t0)
+	sys.stdout = sys.__stdout__ # restoring the stdout pipe to normal
 
 if __name__ == "__main__":
 	p = ArgumentParser()

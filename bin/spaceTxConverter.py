@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 
+from time import time
 from argparse import ArgumentParser
 from datetime import datetime
 from typing import List
@@ -7,6 +8,7 @@ import functools
 from typing import Mapping, Union
 from pathlib import Path
 import os
+import sys
 from shutil import copyfile
 
 import click
@@ -248,7 +250,7 @@ class PrimaryTileFetcher(TileFetcher):
         FISHTile :
             FISH subclass of FetchedTile
         """
-        #print("fov: {} round: {} channel: {} zplane: {}".format(fov_id, round_label, ch_label, zplane_label))
+        print("fov: {} round: {} channel: {} zplane: {}".format(fov_id, round_label, ch_label, zplane_label))
         varTable = {
                 "channel": ch_label,
                 "offset_channel": ch_label + self.channel_offset,
@@ -445,10 +447,13 @@ def cli(input_dir: str, output_dir: str, file_format: str, file_vars: list, cach
     int :
         Returns 0 if successful
     """
-    reportFile = path.join(output_dir,datetime.now().strftime("/../%Y-%d-%m_%H:%M_TXconversion.log"))
-    sys.stdout = open(reportFile,'w')
 
+    t0 = time()
+    
     os.makedirs(output_dir, exist_ok=True)
+
+    reportFile = os.path.join(output_dir,datetime.now().strftime("%Y-%d-%m_%H:%M_TXconversion.log"))
+    sys.stdout = open(reportFile,'w')
 
     image_dimensions: Mapping[Union[str, Axes], int] = {
         Axes.ROUND: counts["rounds"],
@@ -490,6 +495,8 @@ def cli(input_dir: str, output_dir: str, file_format: str, file_vars: list, cach
     #aux_tile_fetcher = {"DAPI": AuxTileFetcher(os.path.expanduser(input_dir), file_format, file_vars, counts["fov_offset"], counts["round_offset"],3)}
     #aux_name_to_dimensions = {"DAPI": aux_image_dimensions}
     
+    t1 = time()
+    print("Elapsed time to make experiment", t1 - t0)
 
     write_experiment_json(
         path=output_dir,
@@ -503,6 +510,10 @@ def cli(input_dir: str, output_dir: str, file_format: str, file_vars: list, cach
     )
 
     os.remove(output_dir + "/codebook.json")
+
+    t2 = time()
+    print("Elapsed time for .json manipulation", t2 - t1)
+    print("Operation complete, total elapsed time", t2 - t0)
 
     sys.stdout = sys.__stdout__
     return 0
