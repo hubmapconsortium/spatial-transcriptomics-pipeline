@@ -79,7 +79,3 @@ outputs:
     outputBinding:
       glob: "2_Registered/"
 
-  alignment_log:
-    type: File
-    outputBinding:
-      glob: "*_SITKAlignment.log"

@@ -181,7 +181,3 @@ outputs:
     outputBinding:
       glob: "3_tx_converted/"
 
-  spacetx_log:
-    type: File
-    outputBinding:
-      glob: "*_TXconversion.log"
