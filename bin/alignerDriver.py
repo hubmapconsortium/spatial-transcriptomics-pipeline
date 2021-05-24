@@ -14,6 +14,7 @@ import scipy.ndimage as ndimage
 from code_lib import tifffile as tiff # <http://www.lfd.uci.edu/~gohlke/code/tifffile.py> # Kian: added 201011
 from argparse import ArgumentParser
 from pathlib import Path
+from contextlib import redirect_stdout
 
 # server = "voyager"
 
@@ -86,7 +87,8 @@ def mip_gauss_tiled(rnd, fov, dir_root, dir_output='./MIP_gauss',
 
 def cli(dir_data_raw, dir_output, dir_output_aligned,
 	rnd_list, n_fovs, sigma,
-	cycle_reference_index, channel_DIC_reference, channel_DIC, cycle_other, channel_DIC_other_vals):
+	cycle_reference_index, channel_DIC_reference, channel_DIC, cycle_other, channel_DIC_other_vals,
+        skip_projection, skip_align):
 
 
 	if not path.isdir(dir_output):
@@ -97,7 +99,8 @@ def cli(dir_data_raw, dir_output, dir_output_aligned,
 
 	currentTime = datetime.now() 
 	reportFile = path.join(dir_output_aligned, currentTime.strftime("%Y-%d-%m_%H:%M_SITKAlignment.log"))
-	sys.stdout = open(reportFile, 'w') # redirecting the stdout to the log file
+	#sys.stdout = open(reportFile, 'w') # redirecting the stdout to the log file
+	redirect_stdout(open(reportFile, 'w'))
 
 	#Which cycle to align to
 	cycle_reference = rnd_list[cycle_reference_index]
@@ -106,16 +109,20 @@ def cli(dir_data_raw, dir_output, dir_output_aligned,
 		channel_DIC_other[cycle_other[i]] = channel_DIC_other_vals[i]
 	t0 = time()
 	#MIP
-	for rnd in rnd_list:
-		if ("DRAQ5" in rnd or "anchor" in rnd):
-			channel_list = [0, 1]
-		else:
-			channel_list = [0, 1, 2, 3]
-		for channel in channel_list:
-			print('Generating MIPs for ' + rnd + ' channel {0} ...'.format(channel))
-			for fov in range(n_fovs):
-				mip_gauss_tiled(rnd, fov, dir_data_raw, dir_output, sigma = sigma, channel_int="ch0{0}".format(channel))
-			print('Done\n')
+	if skip_projection:
+		dir_output = dir_data_raw
+		print("skipping image projection")
+	else:
+		for rnd in rnd_list:
+			if ("DRAQ5" in rnd or "anchor" in rnd):
+				channel_list = [0, 1]
+			else:
+				channel_list = [0, 1, 2, 3]
+			for channel in channel_list:
+				print('Generating MIPs for ' + rnd + ' channel {0} ...'.format(channel))
+				for fov in range(n_fovs):
+					mip_gauss_tiled(rnd, fov, dir_data_raw, dir_output, sigma = sigma, channel_int="ch0{0}".format(channel))
+				print('Done\n')
             
 	t1 = time()
 
@@ -123,26 +130,32 @@ def cli(dir_data_raw, dir_output, dir_output_aligned,
 
 
 	position_list = listdirectories(path.join(dir_output))
+	if skip_align:
+		print("skipping alignment")
+		for file_name in os.listdir(dir_output):
+			shutil.move(os.path.join(dir_output, file_name), dir_output_aligned)
+		# TODO what do we need here?
+	else:
 	#Align
-	for position in position_list:
-		#	position = 'Position{:03d}'.format(posi)
-		#	cycle_list = ["dc3","dc4","DRAQ5"]
-		for rnd in rnd_list:
-			print(datetime.now().strftime("%Y-%d-%m_%H:%M:%S: " + str(position) + ', cycle '+ rnd + ' started to align'))
-			aligner = myAligner.TwoDimensionalAligner(
-			destinationImagesFolder = path.join(dir_output, position), 
-			originImagesFolder = path.join(dir_output, position),
-			originMatchingChannel = channel_DIC if rnd not in cycle_other else channel_DIC_other[rnd],
-				destinationMatchingChannel = channel_DIC_reference, 
-				imagesPosition = position, 
-				destinationCycle = cycle_reference,
-				originCycle = rnd,
-				resultDirectory = path.join(dir_output_aligned, position),
-				MaximumNumberOfIterations = 400)
-		for file in [file for file in listdir() if file.startswith('IterationInfo.0')]:
-			if path.isfile(path.join(dir_output_aligned, position, "MetaData", file)): # removing a file with the same name already exists, remove it.
-				remove(path.join(dir_output_aligned, position, "MetaData", file))
-			shutil.move(src = file, dst = path.join(dir_output_aligned, position, "MetaData"))
+		for position in position_list:
+			#	position = 'Position{:03d}'.format(posi)
+			#	cycle_list = ["dc3","dc4","DRAQ5"]
+			for rnd in rnd_list:
+				print(datetime.now().strftime("%Y-%d-%m_%H:%M:%S: " + str(position) + ', cycle '+ rnd + ' started to align'))
+				aligner = myAligner.TwoDimensionalAligner(
+				destinationImagesFolder = path.join(dir_output, position), 
+				originImagesFolder = path.join(dir_output, position),
+				originMatchingChannel = channel_DIC if rnd not in cycle_other else channel_DIC_other[rnd],
+					destinationMatchingChannel = channel_DIC_reference, 
+					imagesPosition = position, 
+					destinationCycle = cycle_reference,
+					originCycle = rnd,
+					resultDirectory = path.join(dir_output_aligned, position),
+					MaximumNumberOfIterations = 400)
+			for file in [file for file in listdir() if file.startswith('IterationInfo.0')]:
+				if path.isfile(path.join(dir_output_aligned, position, "MetaData", file)): # removing a file with the same name already exists, remove it.
+					remove(path.join(dir_output_aligned, position, "MetaData", file))
+				shutil.move(src = file, dst = path.join(dir_output_aligned, position, "MetaData"))
                             
 	t2 = time()
 	print('Elapsed time ', t2 - t1)
@@ -162,9 +175,12 @@ if __name__ == "__main__":
 	p.add_argument("--channel-dic", type=str)
 	p.add_argument("--cycle-other", nargs='+')
 	p.add_argument("--channel-dic-other", nargs='+')
+	p.add_argument("--skip-projection", dest='skip_projection', action='store_true')
+	p.add_argument("--skip-align", dest='skip_align', action='store_true')
 
 	args = p.parse_args()
 
 	cli(args.raw_dir, "1_Projected", "2_Registered",
 		args.round_list, args.fov_count,  args.sigma,
-		args.cycle_ref_ind, args.channel_dic_reference, args.channel_dic, args.cycle_other, args.channel_dic_other)
+		args.cycle_ref_ind, args.channel_dic_reference, args.channel_dic, args.cycle_other, args.channel_dic_other,
+		args.skip_projection, args.skip_align)

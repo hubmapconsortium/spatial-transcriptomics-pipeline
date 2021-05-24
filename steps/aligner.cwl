@@ -67,6 +67,17 @@ inputs:
       prefix: --channel-dic-other
     doc: DIC channel for other data-containing folders
 
+  skip_projection:
+    type: boolean?
+    inputBinding:
+      prefix: --skip-projection
+    doc: If true, will skip z-axis projection before alignment step.
+
+  skip_align:
+    type: boolean?
+    inputBinding:
+      prefix: --skip-align
+    doc: If true, will skip alignment of images across rounds prior to spacetx conversion
 
 outputs:
   projected:
