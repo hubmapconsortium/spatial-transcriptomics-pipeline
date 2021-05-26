@@ -4,7 +4,7 @@ cwlVersion: v1.1
 
 inputs:
 # step 1 - align
-raw_dir:
+  raw_dir:
     type: Directory
     inputBinding:
       prefix: --raw-dir
@@ -59,6 +59,18 @@ raw_dir:
       prefix: --channel-dic-other
     doc: DIC channel for other data-containing folders
 
+  skip_projection:
+    type: boolean?
+    inputBinding:
+      prefix: --skip-projection
+    doc: If true, will skip z-axis projection before alignment step.
+
+  skip_align:
+    type: boolean?
+    inputBinding:
+      prefix: --skip-align
+    doc: If true, will skip alignment of images across rounds prior to spacetx conversion
+
 #step 2 - spaceTxConversion
 
   tiffs:
@@ -103,12 +115,6 @@ raw_dir:
     inputBinding:
       prefix: --channel-count
     doc: The number of total channels per imaging round
-
-  fov_count:
-    type: int
-    inputBinding:
-      prefix: --fov-count
-    doc: The number of FOVs that are included in this experiment
 
   round_offset:
     type: int?
@@ -430,6 +436,8 @@ steps:
       channel_DIC: channel_DIC
       cycle_other: cycle_other
       channel_DIC_other: channel_DIC_other
+      skip_projection: skip_projection
+      skip_align: skip_align
     out: [projected_dir, registered_dir]
 
   spaceTxConversion:
@@ -465,7 +473,7 @@ steps:
         z-locs: z-locs
         z-shape: z-shape
         z-voxel: z-voxel
-    out:[tx_converted_dir]
+    out: [tx_converted_dir]
 
   starfishRunner:
     run: steps/starfishRunner.cwl
@@ -494,12 +502,9 @@ steps:
           anchor_round: anchor_round
           search_radius: search_radius
           return_original_intensities: return_original_intensities
-          trace_building_strategy: trace_building_strategy
-          anchor_round: anchor_round
-          search_radius: search_radius
         metric: metric
         distance_threshold: distance_threshold
-        magnitude_threshold: magnitude: threshold
+        magnitude_threshold: magnitude_threshold
         min_area: min_area_pixel
         max_area: max_area_pixel
         norm_order: norm_order
