@@ -443,7 +443,7 @@ steps:
   spaceTxConversion:
     run: steps/spaceTxConversion.cwl
     in:
-      tiffs: registered_dir 
+      tiffs: align/registered_dir 
       codebook:
         csv: codebook_csv
         json: codebook_json
@@ -478,7 +478,7 @@ steps:
   starfishRunner:
     run: steps/starfishRunner.cwl
     in:
-      exp_loc: tx_converted_dir
+      exp_loc: spaceTxConversion/tx_converted_dir
       flatten_axes: flatten_axes
       clip_img: clip_img
       use_ref_img: use_ref_img

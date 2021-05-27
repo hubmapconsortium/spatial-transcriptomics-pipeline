@@ -7,6 +7,7 @@ import re, shutil, warnings, sys	# Kian: added 201011
 from time import time
 from datetime import datetime
 from code_lib import TwoDimensionalAligner_2 as myAligner # Kian: added 201011
+#from OutputGrabber import OutputGrabber
 from os import chdir, listdir, getcwd, path, makedirs, remove,  walk
 import numpy as np
 import matplotlib.pyplot as plt
@@ -14,7 +15,6 @@ import scipy.ndimage as ndimage
 from code_lib import tifffile as tiff # <http://www.lfd.uci.edu/~gohlke/code/tifffile.py> # Kian: added 201011
 from argparse import ArgumentParser
 from pathlib import Path
-from contextlib import redirect_stdout
 
 # server = "voyager"
 
@@ -99,8 +99,11 @@ def cli(dir_data_raw, dir_output, dir_output_aligned,
 
 	currentTime = datetime.now() 
 	reportFile = path.join(dir_output_aligned, currentTime.strftime("%Y-%d-%m_%H:%M_SITKAlignment.log"))
-	#sys.stdout = open(reportFile, 'w') # redirecting the stdout to the log file
-	redirect_stdout(open(reportFile, 'w'))
+	sys.stdout = open(reportFile, 'w') # redirecting the stdout to the log file
+	sys.stderr = open(reportFile, 'w')
+        #redirect_stdout(open(reportFile, 'w'))
+
+
 
 	#Which cycle to align to
 	cycle_reference = rnd_list[cycle_reference_index]
@@ -162,6 +165,8 @@ def cli(dir_data_raw, dir_output, dir_output_aligned,
 
 	print('Total elapsed time ',  t2 - t0)
 	sys.stdout = sys.__stdout__ # restoring the stdout pipe to normal
+	sys.stderr = sys.__stderr__ # restoring the stdout pipe to normal
+
 
 if __name__ == "__main__":
 	p = ArgumentParser()
@@ -180,7 +185,10 @@ if __name__ == "__main__":
 
 	args = p.parse_args()
 
+	#out = OutputGrabber()
+	#out.start()
 	cli(args.raw_dir, "1_Projected", "2_Registered",
 		args.round_list, args.fov_count,  args.sigma,
 		args.cycle_ref_ind, args.channel_dic_reference, args.channel_dic, args.cycle_other, args.channel_dic_other,
 		args.skip_projection, args.skip_align)
+	#out.end()
