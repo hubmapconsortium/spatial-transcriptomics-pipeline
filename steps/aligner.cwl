@@ -90,3 +90,7 @@ outputs:
     outputBinding:
       glob: "2_Registered/"
 
+  tool_out:
+    type: stdout
+
+stdout: SITK_stdout.log
