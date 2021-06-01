@@ -50,8 +50,8 @@ def imagePrePro(imgs,
 
 def blobRunner(img, ref_img=None,
         min_sigma=(0.5,0.5,0.5), max_sigma=(8,8,8), num_sigma=10,
-        threshold=0.1, overlap=0.5):
-    bd = starfish.spots.FindSpots.BlobDetector(min_sigma, max_sigma, num_sigma, threshold, is_volume=False, overlap=overlap)
+        threshold=0.1, is_volume=False, overlap=0.5):
+    bd = starfish.spots.FindSpots.BlobDetector(min_sigma, max_sigma, num_sigma, threshold, is_volume, overlap=overlap)
     results = None
     print(vars(bd))
     print(vars(img))
@@ -148,6 +148,7 @@ if __name__ == "__main__":
     p.add_argument("--num-sigma", type=int, nargs="?")
     p.add_argument("--threshold", type=float, nargs="?")
     p.add_argument("--overlap", type=float, nargs="?")
+    p.add_argument("is-volume", dest="is_volume", action='store_true')
 
     ### aside, are we going to want to include the ability to run a sweep?
 
@@ -208,6 +209,7 @@ if __name__ == "__main__":
     addKwarg(args, blobRunnerKwargs, "num_sigma")
     addKwarg(args, blobRunnerKwargs, "threshold")
     addKwarg(args, blobRunnerKwargs, "overlap")
+    addKwarg(args, blobRunnerKwargs, "is_volume")
 
     pixelRunnerKwargs = {}
     addKwarg(args, pixelRunnerKwargs, "metric")

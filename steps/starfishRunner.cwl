@@ -70,6 +70,11 @@ inputs:
             inputBinding:
               prefix: --threshold
             doc: Threshold of blob detection
+          is_volume:
+            type: boolean?
+            inputBinding:
+              prefix: --is-volume
+            doc: If True, passes 3d volumes to func, else pass 2d tiles to func.
           overlap:
             type: float?
             inputBinding:

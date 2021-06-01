@@ -201,6 +201,9 @@ inputs:
           threshold:
             type: float?
             doc: Threshold of blob detection
+          is_volume:
+            type: boolean?
+            doc: If true, pass 3d tiles to func, else pass 2d tiles to func.
           overlap:
             type: float?
             doc: Amount of overlap allowed between blobs, passed to blob detector
@@ -303,7 +306,7 @@ steps:
       channel_DIC_other: channel_DIC_other
       skip_projection: skip_projection
       skip_align: skip_align
-    out: [projected_dir, registered_dir]
+    out: [projected_dir, registered_dir, sitk_stdout]
 
   spaceTxConversion:
     run: steps/spaceTxConversion.cwl
@@ -354,6 +357,7 @@ steps:
         max_sigma: max_sigma_blob
         num_sigma: num_sigma_blob
         threshold: threshold
+        is_volume: is_volume
         overlap: overlap
         decode_method: decode_method
         filtered_results: filtered_results
