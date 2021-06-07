@@ -280,16 +280,19 @@ inputs:
 outputs: 
   1_Projected:
     type: Directory
-    outputSource: align/projected_dir
+    outputSource: align/projected
   2_Registered:
     type: Directory
-    outputSource: align/registered_dir
+    outputSource: align/registered
+  2_Registered_log:
+    type: File
+    outputSource: align/tool_out
   3_tx_converted:
     type: Directory
-    outputSource: spaceTxConversion/tx_converted_dir
+    outputSource: spaceTxConversion/spaceTx_converted
   4_Decoded:
     type: Directory
-    outputSource: starfishRunner/decoded_dir
+    outputSource: starfishRunner/decoded
 
 steps:
   align:
@@ -306,15 +309,15 @@ steps:
       channel_DIC_other: channel_DIC_other
       skip_projection: skip_projection
       skip_align: skip_align
-    out: [projected_dir, registered_dir, sitk_stdout]
+    out: [projected, registered, tool_out]
 
   spaceTxConversion:
     run: steps/spaceTxConversion.cwl
     in:
-      tiffs: align/registered_dir 
-      codebook:
-        csv: codebook_csv
-        json: codebook_json
+      tiffs: align/registered 
+      codebook: codebook
+#        csv: codebook_csv
+#        json: codebook_json
       round_count: round_count
       zplane_count: zplane_count
       channel_count: channel_count
@@ -325,57 +328,57 @@ steps:
       file_format: file_format
       file_vars: file_vars
       cache_read_order: cache_read_order
-      aux_tilesets:
-        aux_names: aux_names
-        aux_file_formats: aux_file_formats
-        aux_file_vars: aux_file_vars
-        aux_cache_read_order: aux_cache_read_order
-        aux_fixed_channel: aux_fixed_channel
-      fov_positioning:
-        x-locs: x-locs
-        x-shape: x-shape
-        x-voxel: x-voxel
-        y-locs: y-locs
-        y-shape: y-shape
-        y-voxel: y-voxel
-        z-locs: z-locs
-        z-shape: z-shape
-        z-voxel: z-voxel
-    out: [tx_converted_dir]
+      aux_tilesets: aux_tilesets
+#        aux_names: aux_names
+#        aux_file_formats: aux_file_formats
+#        aux_file_vars: aux_file_vars
+#        aux_cache_read_order: aux_cache_read_order
+#        aux_fixed_channel: aux_fixed_channel
+      fov_positioning: fov_positioning
+#        x-locs: x-locs
+#        x-shape: x-shape
+#        x-voxel: x-voxel
+#        y-locs: y-locs
+#        y-shape: y-shape
+#        y-voxel: y-voxel
+#        z-locs: z-locs
+#        z-shape: z-shape
+#        z-voxel: z-voxel
+    out: [spaceTx_converted]
 
   starfishRunner:
     run: steps/starfishRunner.cwl
     in:
-      exp_loc: spaceTxConversion/tx_converted_dir
+      exp_loc: spaceTxConversion/spaceTx_converted
       flatten_axes: flatten_axes
       clip_img: clip_img
       use_ref_img: use_ref_img
       gaussian_lowpass: gaussian_lowpass
       zero_by_magnitude: zero_by_magnitude
-      decoding:
-        min_sigma: min_sigma_blob
-        max_sigma: max_sigma_blob
-        num_sigma: num_sigma_blob
-        threshold: threshold
-        is_volume: is_volume
-        overlap: overlap
-        decode_method: decode_method
-        filtered_results: filtered_results
-        decoder:
-          trace_building_strategy: trace_building_strategy
-          max_distance: max_distance
-          min_distance: min_distance
-          min_intensity: min_intensity
-          metric: metric
-          norm_order: norm_order
-          anchor_round: anchor_round
-          search_radius: search_radius
-          return_original_intensities: return_original_intensities
-        metric: metric
-        distance_threshold: distance_threshold
-        magnitude_threshold: magnitude_threshold
-        min_area: min_area_pixel
-        max_area: max_area_pixel
-        norm_order: norm_order
+      decoding: decoding
+#        min_sigma: min_sigma_blob
+#        max_sigma: max_sigma_blob
+#        num_sigma: num_sigma_blob
+#        threshold: threshold
+#        is_volume: is_volume
+#        overlap: overlap
+#        decode_method: decode_method
+#        filtered_results: filtered_results
+#        decoder:
+#          trace_building_strategy: trace_building_strategy
+#          max_distance: max_distance
+#          min_distance: min_distance
+#          min_intensity: min_intensity
+#          metric: metric
+#          norm_order: norm_order
+#          anchor_round: anchor_round
+#          search_radius: search_radius
+#          return_original_intensities: return_original_intensities
+#        metric: metric
+#        distance_threshold: distance_threshold
+#        magnitude_threshold: magnitude_threshold
+#        min_area: min_area_pixel
+#        max_area: max_area_pixel
+#        norm_order: norm_order
     out:
-      [decoded_dir]
+      [decoded]

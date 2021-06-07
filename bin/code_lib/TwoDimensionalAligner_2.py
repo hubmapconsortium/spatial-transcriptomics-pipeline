@@ -1,10 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-# Kian: added 201011 after having trouble importing SimpleITK normally
 import sys
-sitkPath = '/media/Home_Raid1_Voyager/kian/packages/201011_SimpleElastix/build/SimpleITK-build/Wrapping/Python'
-sys.path.insert(1, sitkPath)
 import SimpleITK as sitk
 
 import os, re
