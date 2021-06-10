@@ -50,10 +50,6 @@ inputs:
 
 #step 2 - spaceTxConversion
 
-  tiffs:
-    type: Directory
-    doc: The directory containing all .tiff files
-
   codebook:
     type:
       - type: record
@@ -160,10 +156,6 @@ inputs:
 
 # step 3 - starfishRunner
 
-  exp_loc:
-    type: Directory
-    doc: Location of directory containing starfish experiment.json file
-
   flatten_axes:
     type: string[]?
     doc: Which axes, if any, to compress in the image preprocessing steps.
@@ -267,10 +259,10 @@ inputs:
           magnitude_threshold:
             type: float
             doc: spots with intensity less than this value are filtered.
-          min_area_pixel:
+          min_area:
             type: int
             doc: Spots with total area less than this value are filtered
-          max_area_pixel:
+          max_area:
             type: int
             doc: Spots with total area greater than this value are filtered
           norm_order:

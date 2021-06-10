@@ -15,6 +15,7 @@ import scipy.ndimage as ndimage
 from code_lib import tifffile as tiff # <http://www.lfd.uci.edu/~gohlke/code/tifffile.py> # Kian: added 201011
 from argparse import ArgumentParser
 from pathlib import Path
+from glob import glob
 
 # server = "voyager"
 
@@ -113,7 +114,8 @@ def cli(dir_data_raw, dir_output, dir_output_aligned,
 	t0 = time()
 	#MIP
 	if skip_projection:
-		dir_output = dir_data_raw
+		for filename in glob(path.join(dir_data_raw,"**/*.*"), recursive=True):
+			shutil.copy(filename, dir_output)
 		print("skipping image projection")
 	else:
 		for rnd in rnd_list:
@@ -135,8 +137,8 @@ def cli(dir_data_raw, dir_output, dir_output_aligned,
 	position_list = listdirectories(path.join(dir_output))
 	if skip_align:
 		print("skipping alignment")
-		for file_name in os.listdir(dir_output):
-			shutil.move(os.path.join(dir_output, file_name), dir_output_aligned)
+		for filename in glob(path.join(dir_output,"**/*.*"), recursive=True):
+			shutil.copy(filename, dir_output_aligned)
 		# TODO what do we need here?
 	else:
 	#Align

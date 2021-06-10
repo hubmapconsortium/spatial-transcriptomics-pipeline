@@ -4,7 +4,7 @@ import starfish
 import starfish.data
 from datetime import datetime
 from starfish.spots import AssignTargets
-from starfish import Codebook, ImageStack
+from starfish import Codebook, ImageStack, IntensityTable
 from starfish.types import Axes, Coordinates, CoordinateValue, Features, TraceBuildingStrategies, Levels
 
 import numpy as np
@@ -87,6 +87,13 @@ def pixelDriver(imgs, codebook, pixelRunnerKwargs):
         decoded[fov] = pixelRunner.run(imgs[fov])[0]
     return decoded
 
+def saveTable(table, savename):
+    intensities = IntensityTable(table.where(table[Features.PASSES_THRESHOLDS], drop=True))
+    traces = intensities.stack(traces=(Axes.ROUND.value, Axes.CH.value))
+    traces = traces.to_features_dataframe()
+    traces.to_csv(savename)
+
+
 def run(output_dir, experiment, blob_based, imagePreProKwargs, blobRunnerKwargs, decodeRunnerKwargs, pixelRunnerKwargs):
     if not path.isdir(output_dir):
         makedirs(output_dir)
@@ -114,7 +121,8 @@ def run(output_dir, experiment, blob_based, imagePreProKwargs, blobRunnerKwargs,
     
     #saving 
     for fov in decoded.keys():
-        decoded[fov].to_decoded_dataframe().save_csv(output_dir+fov+"_decoded.csv") 
+        saveTable(decoded[fov], output_dir+fov+"_decoded.csv")
+        #decoded[fov].to_decoded_dataframe().save_csv(output_dir+fov+"_decoded.csv") 
     
     sys.stdout = sys.__stdout__
     return 0
@@ -148,7 +156,7 @@ if __name__ == "__main__":
     p.add_argument("--num-sigma", type=int, nargs="?")
     p.add_argument("--threshold", type=float, nargs="?")
     p.add_argument("--overlap", type=float, nargs="?")
-    p.add_argument("is-volume", dest="is_volume", action='store_true')
+    p.add_argument("--is-volume", dest="is_volume", action='store_true')
 
     ### aside, are we going to want to include the ability to run a sweep?
 
