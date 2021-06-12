@@ -12,7 +12,8 @@ Folder         | Output from           | Input to
 1_Projected    | aligner.cwl           |
 2_Registered   | aligner.cwl           | spaceTxConversion.cwl
 3_tx_converted | spaceTxConversion.cwl | starfishRunner.cwl
-4_Decoded      | starfishRunner.cwl    |                       
+4_Decoded      | starfishRunner.cwl    | segmentation.cwl
+5_Segmented    | segmentation.cwl      |
 
 ## Development
 Code in this repository is formatted with [black](https://github.com/psf/black) and

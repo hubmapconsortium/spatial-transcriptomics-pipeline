@@ -121,9 +121,10 @@ def run(output_dir, experiment, blob_based, imagePreProKwargs, blobRunnerKwargs,
     
     #saving 
     for fov in decoded.keys():
-        saveTable(decoded[fov], output_dir+fov+"_decoded.csv")
+        saveTable(decoded[fov], output_dir+"csv/"+fov+"_decoded.csv")
         #decoded[fov].to_decoded_dataframe().save_csv(output_dir+fov+"_decoded.csv") 
-    
+        decoded[fov].to_netcdf(output_dir+"csv/"+fov+"_decoded.cdf")
+
     sys.stdout = sys.__stdout__
     return 0
 
