@@ -15,6 +15,18 @@ inputs:
       prefix: --decoded-loc
     doc: Location of the directory that is the output from the starfishRunner step.
 
+  exp_loc:
+    type: Directory
+    inputBinding:
+      prefix: --exp-loc
+    doc: Location of directory containing the 'experiment.json' file
+
+  aux_name:
+    type: string
+    inputBinding:
+      prefix: --aux-name
+    doc: The name of the aux view to look at in the experiment file.
+
   fov_count:
     type: int
     inputBinding:
@@ -49,11 +61,6 @@ inputs:
             inputBinding:
               prefix: --file-formats-labeled
             doc: Layout for name of each labelled image. Will be formatted with String.format([fov index])
-          file_formats_original:
-            type: string 
-            inputBinding:
-              prefix: --file-formats-original
-            doc: Layout for the name of each original image.  Will be formatted with String.format([fov index]).
        - type: record
          name: basic_watershed
          fields:
