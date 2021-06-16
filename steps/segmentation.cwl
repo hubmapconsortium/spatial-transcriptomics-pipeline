@@ -34,7 +34,7 @@ inputs:
     doc: The number of FOVs that are included in this experiment
 
   binary_mask:
-    type: 
+    type:
       - type: record
         name: roi_set
         fields:
@@ -61,37 +61,37 @@ inputs:
             inputBinding:
               prefix: --file-formats-labeled
             doc: Layout for name of each labelled image. Will be formatted with String.format([fov index])
-       - type: record
-         name: basic_watershed
-         fields:
-           img_threshold:
-             type: float
-             inputBinding:
-               prefix: --img-thresh
-             doc: Global threshold value for images
-           min_dist:
-             type: int
-             inputBinding:
-               prefix: --min-dist
-             doc: minimum distance (pixels) between distance transformed peaks
-           min_allowed_size:
-             type: int
-             inputBinding: 
-               prefix: --min-size
-             doc: minimum size for a cell (in pixels)
-           max_allowed_size:
-             type: int
-             inputBinding:
-               prefix: --max-size
-             doc: maxiumum size for a cell (in pixels)
-           masking_radius:
-             type: int
-             inputBinding:
-               prefix: --masking-radius
-             doc: Radius for white tophat noise filter
+      - type: record
+        name: basic_watershed
+        fields:
+          img_threshold:
+            type: float
+            inputBinding:
+              prefix: --img-thresh
+            doc: Global threshold value for images
+          min_dist:
+            type: int
+            inputBinding:
+              prefix: --min-dist
+            doc: minimum distance (pixels) between distance transformed peaks
+          min_allowed_size:
+            type: int
+            inputBinding: 
+              prefix: --min-size
+            doc: minimum size for a cell (in pixels)
+          max_allowed_size:
+            type: int
+            inputBinding:
+              prefix: --max-size
+            doc: maxiumum size for a cell (in pixels)
+          masking_radius:
+            type: int
+            inputBinding:
+              prefix: --masking-radius
+            doc: Radius for white tophat noise filter
 
-  outputs:
-    segmented:
-      type: Directory
-      outputBinding:
-        glob: "5_Segmented/"
+outputs:
+  segmented:
+    type: Directory
+    outputBinding:
+      glob: "5_Segmented/"

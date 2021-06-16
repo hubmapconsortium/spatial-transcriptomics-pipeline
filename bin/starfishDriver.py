@@ -51,7 +51,8 @@ def imagePrePro(imgs,
 def blobRunner(img, ref_img=None,
         min_sigma=(0.5,0.5,0.5), max_sigma=(8,8,8), num_sigma=10,
         threshold=0.1, is_volume=False, overlap=0.5):
-    bd = starfish.spots.FindSpots.BlobDetector(min_sigma, max_sigma, num_sigma, threshold, is_volume, overlap=overlap)
+    bd = starfish.spots.FindSpots.BlobDetector(min_sigma=min_sigma, max_sigma=max_sigma, num_sigma=num_sigma,
+            threshold=threshold, is_volume=is_volume, overlap=overlap)
     results = None
     print(vars(bd))
     print(vars(img))
@@ -98,6 +99,12 @@ def run(output_dir, experiment, blob_based, imagePreProKwargs, blobRunnerKwargs,
     if not path.isdir(output_dir):
         makedirs(output_dir)
     
+    if not path.isdir(output_dir+"csv/"):
+        makedirs(output_dir+"csv")
+
+    if not path.isdir(output_dir+"cdf/"):
+        makedirs(output_dir+"cdf")
+
     reporter = open(path.join(output_dir,datetime.now().strftime("%Y-%d-%m_%H:%M_starfish_runner.log")),'w')
     sys.stdout = reporter
     sys.stderr = reporter
@@ -123,7 +130,7 @@ def run(output_dir, experiment, blob_based, imagePreProKwargs, blobRunnerKwargs,
     for fov in decoded.keys():
         saveTable(decoded[fov], output_dir+"csv/"+fov+"_decoded.csv")
         #decoded[fov].to_decoded_dataframe().save_csv(output_dir+fov+"_decoded.csv") 
-        decoded[fov].to_netcdf(output_dir+"csv/"+fov+"_decoded.cdf")
+        decoded[fov].to_netcdf(output_dir+"cdf/"+fov+"_decoded.cdf")
 
     sys.stdout = sys.__stdout__
     return 0

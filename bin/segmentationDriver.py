@@ -1,19 +1,22 @@
-#!/usr/bin/python3
+#!/usr/bin/env python
 
 from time import time
 from datetime import datetime
-import numpy as np
-import pandas as pd
-from pathlib import path
+from pathlib import Path
 from os import path, makedirs
+from glob import glob
+from argparse import ArgumentParser
 import sys
 from typing import Set
 import starfish
 import starfish.data
-from starfish.types import Levels, Axes
+from starfish.types import Levels, Axes, Features
 from starfish import DecodedIntensityTable, BinaryMaskCollection, IntensityTable, ImageStack
-from starfish.image import Filter
+from starfish.image import Filter as ImgFilter
 from starfish.morphology import Binarize, Filter, Merge, Segment
+from starfish.spots import AssignTargets
+import numpy as np
+import pandas as pd
 
 def masksFromRoi(img_stack, roi_set, file_formats):
     masks = []
@@ -30,35 +33,48 @@ def masksFromLabeledImages(img_stack, labeled_image, file_formats_labeled):
     return masks
 
 def masksFromWatershed(img_stack, img_thresh, min_dist, min_size, max_size, masking_radius):
-    wt_filt = Filter.WhiteTophat(masking_radius, is_volume=False)
+    wt_filt = ImgFilter.WhiteTophat(masking_radius, is_volume=False)
     thresh_filt = Binarize.ThresholdBinarize(img_thresh)
     area_filt = Filter.AreaFilter(min_size, max_size)
     area_mask = Filter.Reduce("logical_or", lambda shape: np.zeros(shape=shape, dtype=np.bool))
     segmenter = Segment.WatershedSegment()
     masks = []
     for img in img_stack:
-        working_img = wt_filt.run(img, in_place=False)
+        img_flat = img.reduce({Axes.ROUND}, func="max")
+        working_img = wt_filt.run(img_flat, in_place=False)
         working_img = thresh_filt.run(working_img)
         working_img = area_filt.run(working_img)
-        masks.append(segmenter.run(working_img))
+        masks.append(segmenter.run(img_flat,working_img))
     return masks
 
-def saveTable(table, savename):
-    intensities = IntensityTable(table.where(table[Features.PASSES_THRESHOLDS], drop=True))
-    traces = intensities.stack(traces=(Axes.ROUND.value, Axes.CH.value))
-    traces = traces.to_features_dataframe()
-    traces.to_csv(savename)
+#def saveTable(table, savename):
+#    intensities = IntensityTable(table.where(table[Features.PASSES_THRESHOLDS], drop=True))
+#    traces = intensities.stack(traces=(Axes.ROUND.value, Axes.CH.value))
+#    traces = traces.to_features_dataframe()
+#    traces.to_csv(savename)
 
 def run(input_loc, exp_loc, output_loc, fov_count, aux_name, roiKwargs, labeledKwargs, watershedKwargs):
     # read in netcdfs based on how we saved prev step
     results = []
     masks = []
-    for i in range(fov_count):
-        table_name = "{}csv/{}_decoded.cdf".format(input_loc, i)
-        results.append(DecodedIntensityTable.open_netcdf(table_name))
+    for f in glob("{}/cdf/*_decoded.cdf".format(input_loc)):
+        results.append(DecodedIntensityTable.open_netcdf(f))
+        print("loaded "+f)
+
+    if not path.isdir(output_dir):
+        makedirs(output_dir)
+        print("made "+output_dir)
+
+    if not path.isdir(output_dir+"csv/"):
+        makedirs(output_dir+"csv")
+        print("made "+output_dir+"csv")
+
+    if not path.isdir(output_dir+"cdf/"):
+        makedirs(output_dir+"cdf")
+        print("made "+output_dir+"cdf")
 
     # load in the images we want to look at
-    exp = starfish.core.experiment.experiment.Experiment.from_json(exp_loc + "/experiment.json")
+    exp = starfish.core.experiment.experiment.Experiment.from_json(str(exp_loc / "experiment.json"))
     img_stack = []
     for key in exp.keys():
         img_stack.append(exp[key].get_image(aux_name))
@@ -78,12 +94,12 @@ def run(input_loc, exp_loc, output_loc, fov_count, aux_name, roiKwargs, labeledK
         raise Exception("Parameters do not specify means of defining mask.")
 
     # apply mask to tables, save results
-    al = AssignTargets.label()
+    al = AssignTargets.Label()
     for i in range(fov_count):
         labeled = al.run(masks[i], results[i])
         labeled = labeled[labeled.cell_id != 'nan']
-        saveTable(labeled[fov], output_dir+"csv/"+fov+"_segmented.csv")
-        labeled.to_netcdf(output_dir+"csv/"+fov+"_segmented.cdf")
+        labeled.to_decoded_dataframe().save_csv(output_dir+"csv/"+str(i)+"_segmented.csv")
+        labeled.to_netcdf(output_dir+"csv/"+str(i)+"_segmented.cdf")
 
 
 def addKwarg(parser, kwargdict, var):
@@ -118,10 +134,10 @@ if __name__ == "__main__":
 
     args = p.parse_args()
 
-    fov_count = args["fov_count"]
-    input_dir = args["decoded_loc"]
-    exp_dir = args["exp_loc"]
-    aux_name = args["aux_name"]
+    fov_count = args.fov_count
+    input_dir = args.decoded_loc
+    exp_dir = args.exp_loc
+    aux_name = args.aux_name
 
     roiKwargs = {}
     addKwarg(args, roiKwargs, "roi_set")
