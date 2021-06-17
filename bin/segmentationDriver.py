@@ -46,9 +46,10 @@ def masksFromWatershed(img_stack, img_threshold, min_dist, min_size, max_size, m
         img_flat = img.reduce({Axes.ROUND}, func="max")
         working_img = wt_filt.run(img_flat, in_place=False)
         working_img = thresh_filt.run(working_img)
-        working_img = thresh_filt.run(working_img)
-        working_img = area_filt.run(working_img)
-        masks.append(segmenter.run(img_flat,working_img))
+        labeled = min_dist_label.run(working_img)
+        working_img = area_filt.run(labeled)
+        working_img = area_mask.run(working_img)
+        masks.append(segmenter.run(img_flat,labeled,working_img))
     return masks
 
 #def saveTable(table, savename):
@@ -115,7 +116,7 @@ def run(input_loc, exp_loc, output_loc, fov_count, aux_name, roiKwargs, labeledK
         labeled = labeled[labeled.cell_id != 'nan']
         labeled.to_decoded_dataframe().save_csv(output_dir+"csv/"+str(i)+"_segmented.csv")
         labeled.to_netcdf(output_dir+"cdf/"+str(i)+"_segmented.cdf")
-        print("saved "+fov_count)
+        print("saved "+str(fov_count))
     
     sys.stdout = sys.__stdout__
 
@@ -144,7 +145,7 @@ if __name__ == "__main__":
     p.add_argument("--file-formats-labeled", type=str, nargs="?")
 
     # for runnning basic watershed pipeline using starfish
-    p.add_argument("--img-thresh", type=float, nargs="?")
+    p.add_argument("--img-threshold", type=float, nargs="?")
     p.add_argument("--min-dist", type=int, nargs="?")
     p.add_argument("--min-size", type=int, nargs="?")
     p.add_argument("--max-size", type=int, nargs="?")
