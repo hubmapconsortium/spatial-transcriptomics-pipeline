@@ -67,7 +67,7 @@ inputs:
           img_threshold:
             type: float
             inputBinding:
-              prefix: --img-thresh
+              prefix: --img-threshold
             doc: Global threshold value for images
           min_dist:
             type: int

@@ -17,6 +17,8 @@ from starfish.morphology import Binarize, Filter, Merge, Segment
 from starfish.spots import AssignTargets
 import numpy as np
 import pandas as pd
+from tqdm import tqdm
+from functools import partialmethod
 
 def masksFromRoi(img_stack, roi_set, file_formats):
     masks = []
@@ -32,16 +34,18 @@ def masksFromLabeledImages(img_stack, labeled_image, file_formats_labeled):
         masks.append(BinaryMaskCollection.from_external_labeled_image(label_name, img_stack[i]))
     return masks
 
-def masksFromWatershed(img_stack, img_thresh, min_dist, min_size, max_size, masking_radius):
+def masksFromWatershed(img_stack, img_threshold, min_dist, min_size, max_size, masking_radius):
     wt_filt = ImgFilter.WhiteTophat(masking_radius, is_volume=False)
-    thresh_filt = Binarize.ThresholdBinarize(img_thresh)
-    area_filt = Filter.AreaFilter(min_size, max_size)
+    thresh_filt = Binarize.ThresholdBinarize(img_threshold)
+    min_dist_label = Filter.MinDistanceLabel(min_dist, 1)
+    area_filt = Filter.AreaFilter(min_area=min_size, max_area=max_size)
     area_mask = Filter.Reduce("logical_or", lambda shape: np.zeros(shape=shape, dtype=np.bool))
     segmenter = Segment.WatershedSegment()
     masks = []
     for img in img_stack:
         img_flat = img.reduce({Axes.ROUND}, func="max")
         working_img = wt_filt.run(img_flat, in_place=False)
+        working_img = thresh_filt.run(working_img)
         working_img = thresh_filt.run(working_img)
         working_img = area_filt.run(working_img)
         masks.append(segmenter.run(img_flat,working_img))
@@ -54,16 +58,17 @@ def masksFromWatershed(img_stack, img_thresh, min_dist, min_size, max_size, mask
 #    traces.to_csv(savename)
 
 def run(input_loc, exp_loc, output_loc, fov_count, aux_name, roiKwargs, labeledKwargs, watershedKwargs):
-    # read in netcdfs based on how we saved prev step
-    results = []
-    masks = []
-    for f in glob("{}/cdf/*_decoded.cdf".format(input_loc)):
-        results.append(DecodedIntensityTable.open_netcdf(f))
-        print("loaded "+f)
 
     if not path.isdir(output_dir):
         makedirs(output_dir)
-        print("made "+output_dir)
+   
+    #disabling tdqm for pipeline runs
+    tqdm.__init__ = partialmethod(tqdm.__init__, disable=True)
+
+    # redirecting output to log
+    reporter = open(path.join(output_dir,datetime.now().strftime("%Y-%d-%m_%H:%M_starfish_segmenter.log")),'w')
+    sys.stdout = reporter
+    sys.stderr = reporter
 
     if not path.isdir(output_dir+"csv/"):
         makedirs(output_dir+"csv")
@@ -72,6 +77,13 @@ def run(input_loc, exp_loc, output_loc, fov_count, aux_name, roiKwargs, labeledK
     if not path.isdir(output_dir+"cdf/"):
         makedirs(output_dir+"cdf")
         print("made "+output_dir+"cdf")
+
+    # read in netcdfs based on how we saved prev step
+    results = []
+    masks = []
+    for f in glob("{}/cdf/*_decoded.cdf".format(input_loc)):
+        results.append(DecodedIntensityTable.open_netcdf(f))
+        print("loaded "+f)
 
     # load in the images we want to look at
     exp = starfish.core.experiment.experiment.Experiment.from_json(str(exp_loc / "experiment.json"))
@@ -82,12 +94,15 @@ def run(input_loc, exp_loc, output_loc, fov_count, aux_name, roiKwargs, labeledK
     # determine how we generate mask, then make it
     if len(roiKwargs.keys()) > 0:
         # then apply roi
+        print("applying Roi mask")
         masks = masksFromRoi(img_stack, **roiKwargs)
     elif len(labeledKwargs.keys()) > 0:
         # then apply images
+        print("applying labeled image mask")
         masks = masksFromLabeledImages(img_stack, **labeledKwargs)
     elif len(watershedKwargs.keys()) > 0:
         # then go thru watershed pipeline
+        print("running basic threshold and watershed pipeline")
         masks = masksFromWatershed(img_stack, **watershedKwargs)
     else:
         #throw error
@@ -99,7 +114,10 @@ def run(input_loc, exp_loc, output_loc, fov_count, aux_name, roiKwargs, labeledK
         labeled = al.run(masks[i], results[i])
         labeled = labeled[labeled.cell_id != 'nan']
         labeled.to_decoded_dataframe().save_csv(output_dir+"csv/"+str(i)+"_segmented.csv")
-        labeled.to_netcdf(output_dir+"csv/"+str(i)+"_segmented.cdf")
+        labeled.to_netcdf(output_dir+"cdf/"+str(i)+"_segmented.cdf")
+        print("saved "+fov_count)
+    
+    sys.stdout = sys.__stdout__
 
 
 def addKwarg(parser, kwargdict, var):
@@ -148,7 +166,7 @@ if __name__ == "__main__":
     addKwarg(args, labeledKwargs, "file_formats_labeled")
 
     watershedKwargs = {}
-    addKwarg(args, watershedKwargs, "img_thresh")
+    addKwarg(args, watershedKwargs, "img_threshold")
     addKwarg(args, watershedKwargs, "min_dist")
     addKwarg(args, watershedKwargs, "min_size")
     addKwarg(args, watershedKwargs, "max_size")
