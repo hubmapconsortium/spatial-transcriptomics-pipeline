@@ -269,6 +269,71 @@ inputs:
             type: int?
             doc: Order of L_p norm to apply to intensities and codes when using metric_decode to pair each intensities to its closest target (default = 2)
 
+# 4 - Segmentation
+
+  aux_name:
+    type: string
+    inputBinding:
+      prefix: --aux-name
+    doc: The name of the aux view to look at in the experiment file for image segmentation.
+
+  binary_mask:
+    type:
+      - type: record
+        name: roi_set
+        fields:
+          roi_set:
+            type: Directory
+            inputBinding: 
+              prefix: --roi-set
+            doc: Directory of RoiSet.zip for each fov, from fiji segmentation
+          file_formats:
+            type: string
+            inputBinding:
+              prefix: --file-formats
+            doc: Layout for name of each RoiSet.zip, per fov. Will be formatted with String.format([fov index]).
+      - type: record
+        name: labeled_image
+        fields:
+          labeled_image:
+            type: Directory
+            inputBinding:
+              prefix: --labeled-image
+            doc: Directory of labeled images with image segmentation data, such as from ilastik classification.
+          file_formats_labeled:
+            type: string
+            inputBinding:
+              prefix: --file-formats-labeled
+            doc: Layout for name of each labelled image. Will be formatted with String.format([fov index])
+      - type: record
+        name: basic_watershed
+        fields:
+          img_threshold:
+            type: float
+            inputBinding:
+              prefix: --img-threshold
+            doc: Global threshold value for images
+          min_dist:
+            type: int
+            inputBinding:
+              prefix: --min-dist
+            doc: minimum distance (pixels) between distance transformed peaks
+          min_allowed_size:
+            type: int
+            inputBinding: 
+              prefix: --min-size
+            doc: minimum size for a cell (in pixels)
+          max_allowed_size:
+            type: int
+            inputBinding:
+              prefix: --max-size
+            doc: maxiumum size for a cell (in pixels)
+          masking_radius:
+            type: int
+            inputBinding:
+              prefix: --masking-radius
+            doc: Radius for white tophat noise filter
+
 outputs: 
   1_Projected:
     type: Directory
@@ -285,6 +350,9 @@ outputs:
   4_Decoded:
     type: Directory
     outputSource: starfishRunner/decoded
+  5_Segmented:
+    type: Directory
+    outputSource: segmentation/segmented
 
 steps:
   align:
@@ -321,21 +389,6 @@ steps:
       file_vars: file_vars
       cache_read_order: cache_read_order
       aux_tilesets: aux_tilesets
-#        aux_names: aux_names
-#        aux_file_formats: aux_file_formats
-#        aux_file_vars: aux_file_vars
-#        aux_cache_read_order: aux_cache_read_order
-#        aux_fixed_channel: aux_fixed_channel
-      fov_positioning: fov_positioning
-#        x-locs: x-locs
-#        x-shape: x-shape
-#        x-voxel: x-voxel
-#        y-locs: y-locs
-#        y-shape: y-shape
-#        y-voxel: y-voxel
-#        z-locs: z-locs
-#        z-shape: z-shape
-#        z-voxel: z-voxel
     out: [spaceTx_converted]
 
   starfishRunner:
@@ -348,29 +401,16 @@ steps:
       gaussian_lowpass: gaussian_lowpass
       zero_by_magnitude: zero_by_magnitude
       decoding: decoding
-#        min_sigma: min_sigma_blob
-#        max_sigma: max_sigma_blob
-#        num_sigma: num_sigma_blob
-#        threshold: threshold
-#        is_volume: is_volume
-#        overlap: overlap
-#        decode_method: decode_method
-#        filtered_results: filtered_results
-#        decoder:
-#          trace_building_strategy: trace_building_strategy
-#          max_distance: max_distance
-#          min_distance: min_distance
-#          min_intensity: min_intensity
-#          metric: metric
-#          norm_order: norm_order
-#          anchor_round: anchor_round
-#          search_radius: search_radius
-#          return_original_intensities: return_original_intensities
-#        metric: metric
-#        distance_threshold: distance_threshold
-#        magnitude_threshold: magnitude_threshold
-#        min_area: min_area_pixel
-#        max_area: max_area_pixel
-#        norm_order: norm_order
     out:
       [decoded]
+
+  segmentation:
+    run: steps/segmentation.cwl
+    in:
+      decoded_loc: starfishRunner/decoded
+      exp_loc: spaceTxConversion/spaceTx_converted
+      aux_name: aux_name
+      fov_count: fov_count
+      binary_mask: binary_mask
+    out: 
+      [segmented]

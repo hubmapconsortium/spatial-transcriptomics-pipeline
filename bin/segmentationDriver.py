@@ -39,7 +39,7 @@ def masksFromWatershed(img_stack, img_threshold, min_dist, min_size, max_size, m
     thresh_filt = Binarize.ThresholdBinarize(img_threshold)
     min_dist_label = Filter.MinDistanceLabel(min_dist, 1)
     area_filt = Filter.AreaFilter(min_area=min_size, max_area=max_size)
-    area_mask = Filter.Reduce("logical_or", lambda shape: np.zeros(shape=shape, dtype=np.bool))
+    area_mask = Filter.Reduce("logical_or", lambda shape: np.zeros(shape=shape, dtype=bool))
     segmenter = Segment.WatershedSegment()
     masks = []
     for img in img_stack:
@@ -81,9 +81,13 @@ def run(input_loc, exp_loc, output_loc, fov_count, aux_name, roiKwargs, labeledK
 
     # read in netcdfs based on how we saved prev step
     results = []
+    keys = []
     masks = []
     for f in glob("{}/cdf/*_decoded.cdf".format(input_loc)):
         results.append(DecodedIntensityTable.open_netcdf(f))
+        name = f[len(str(input_loc))+5:-12]
+        print("found fov key: "+name)
+        keys.append(name)
         print("loaded "+f)
 
     # load in the images we want to look at
@@ -114,9 +118,11 @@ def run(input_loc, exp_loc, output_loc, fov_count, aux_name, roiKwargs, labeledK
     for i in range(fov_count):
         labeled = al.run(masks[i], results[i])
         labeled = labeled[labeled.cell_id != 'nan']
-        labeled.to_decoded_dataframe().save_csv(output_dir+"csv/"+str(i)+"_segmented.csv")
-        labeled.to_netcdf(output_dir+"cdf/"+str(i)+"_segmented.cdf")
-        print("saved "+str(fov_count))
+        labeled.to_decoded_dataframe().save_csv(output_dir+"csv/df_"+keys[i]+"_segmented.csv")
+        labeled.to_netcdf(output_dir+"cdf/df_"+keys[i]+"_segmented.cdf")
+        labeled.to_expression_matrix().to_pandas().to_csv(output_dir+"csv/exp_"+keys[i]+"_segmented.csv")
+        labeled.to_expression_matrix().save(output_dir+"cdf/exp_"+keys[i]+"_segmented.cdf")
+        print("saved fov key: {}, index {}".format(keys[i],i))
     
     sys.stdout = sys.__stdout__
 
