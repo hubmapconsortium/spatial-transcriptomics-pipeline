@@ -273,8 +273,6 @@ inputs:
 
   aux_name:
     type: string
-    inputBinding:
-      prefix: --aux-name
     doc: The name of the aux view to look at in the experiment file for image segmentation.
 
   binary_mask:
@@ -284,54 +282,36 @@ inputs:
         fields:
           roi_set:
             type: Directory
-            inputBinding: 
-              prefix: --roi-set
             doc: Directory of RoiSet.zip for each fov, from fiji segmentation
           file_formats:
             type: string
-            inputBinding:
-              prefix: --file-formats
             doc: Layout for name of each RoiSet.zip, per fov. Will be formatted with String.format([fov index]).
       - type: record
         name: labeled_image
         fields:
           labeled_image:
             type: Directory
-            inputBinding:
-              prefix: --labeled-image
             doc: Directory of labeled images with image segmentation data, such as from ilastik classification.
           file_formats_labeled:
             type: string
-            inputBinding:
-              prefix: --file-formats-labeled
             doc: Layout for name of each labelled image. Will be formatted with String.format([fov index])
       - type: record
         name: basic_watershed
         fields:
           img_threshold:
             type: float
-            inputBinding:
-              prefix: --img-threshold
             doc: Global threshold value for images
           min_dist:
             type: int
-            inputBinding:
-              prefix: --min-dist
             doc: minimum distance (pixels) between distance transformed peaks
           min_allowed_size:
             type: int
-            inputBinding: 
-              prefix: --min-size
             doc: minimum size for a cell (in pixels)
           max_allowed_size:
             type: int
-            inputBinding:
-              prefix: --max-size
             doc: maxiumum size for a cell (in pixels)
           masking_radius:
             type: int
-            inputBinding:
-              prefix: --masking-radius
             doc: Radius for white tophat noise filter
 
 outputs: 
