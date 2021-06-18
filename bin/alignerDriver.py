@@ -7,7 +7,6 @@ import re, shutil, warnings, sys	# Kian: added 201011
 from time import time
 from datetime import datetime
 from code_lib import TwoDimensionalAligner_2 as myAligner # Kian: added 201011
-#from OutputGrabber import OutputGrabber
 from os import chdir, listdir, getcwd, path, makedirs, remove,  walk
 import numpy as np
 import matplotlib.pyplot as plt
@@ -91,20 +90,8 @@ def cli(dir_data_raw, dir_output, dir_output_aligned,
 	cycle_reference_index, channel_DIC_reference, channel_DIC, cycle_other, channel_DIC_other_vals,
         skip_projection, skip_align):
 
-
-	if not path.isdir(dir_output):
-		makedirs(dir_output)
-
-	if not path.isdir(dir_output_aligned):
-		makedirs(dir_output_aligned)
-
 	currentTime = datetime.now() 
-	reportFile = path.join(dir_output_aligned, currentTime.strftime("%Y-%d-%m_%H:%M_SITKAlignment.log"))
-	sys.stdout = open(reportFile, 'w') # redirecting the stdout to the log file
-	sys.stderr = open(reportFile, 'w')
-        #redirect_stdout(open(reportFile, 'w'))
-
-
+	reportFile = path.join(dir_output, currentTime.strftime("%Y-%d-%m_%H:%M_SITKAlignment.log"))
 
 	#Which cycle to align to
 	cycle_reference = rnd_list[cycle_reference_index]
@@ -114,10 +101,17 @@ def cli(dir_data_raw, dir_output, dir_output_aligned,
 	t0 = time()
 	#MIP
 	if skip_projection:
-		for filename in glob(path.join(dir_data_raw,"**/*.*"), recursive=True):
-			shutil.copy(filename, dir_output)
+		#for filename in glob(path.join(dir_data_raw,"**/*.*"), recursive=True):
+		#	shutil.copy(filename, dir_output)
+		shutil.copytree(dir_data_raw,dir_output)
+		sys.stdout = open(reportFile, 'w') # redirecting the stdout to the log file
+		sys.stderr = open(reportFile, 'w') # need to put this in a weird spot due to folder creation collision
 		print("skipping image projection")
 	else:
+		if not path.isdir(dir_output):
+			makedirs(dir_output)
+		sys.stdout = open(reportFile, 'w') # redirecting the stdout to the log file
+		sys.stderr = open(reportFile, 'w') # need to put this in a weird spot due to folder creation collision
 		for rnd in rnd_list:
 			if ("DRAQ5" in rnd or "anchor" in rnd):
 				channel_list = [0, 1]
@@ -137,11 +131,13 @@ def cli(dir_data_raw, dir_output, dir_output_aligned,
 	position_list = listdirectories(path.join(dir_output))
 	if skip_align:
 		print("skipping alignment")
-		for filename in glob(path.join(dir_output,"**/*.*"), recursive=True):
-			shutil.copy(filename, dir_output_aligned)
-		# TODO what do we need here?
+		#for filename in glob(path.join(dir_output,"**/*.*"), recursive=True):
+		#	shutil.copy(filename, dir_output_aligned)
+		shutil.copytree(dir_output, dir_output_aligned)
 	else:
 	#Align
+		if not path.isdir(dir_output_aligned):
+			makedirs(dir_output_aligned)
 		for position in position_list:
 			#	position = 'Position{:03d}'.format(posi)
 			#	cycle_list = ["dc3","dc4","DRAQ5"]
