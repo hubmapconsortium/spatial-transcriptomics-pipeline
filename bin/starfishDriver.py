@@ -32,14 +32,14 @@ def imagePrePro(imgs,
         img = imgs[fov]
         if flatten_axes:
             img = img.reduce(flatten_axes, func="max")
-        if clip:
-            clip = starfish.image.Filter.Clip(p_max=99.9, is_volume=True, level_method=Levels.SCALE_BY_CHUNK)
-            clip.run(img, in_place=True)
         if gaussian_lowpass:
             gaus = starfish.image.Filter.GaussianLowPass(gaussian_lowpass)
             gaus.run(img, in_place=True)
+        if clip:
+            clip = starfish.image.Filter.Clip(p_max=99.9, is_volume=True, level_method=Levels.SCALE_BY_CHUNK)
+            clip.run(img, in_place=True)
         if zero_by_magnitude:
-            z_filt = starfish.image.Filter.ZeroByChannelMagnitude(thresh=zero_by_magnitude, normalize=False)
+            z_filt = starfish.image.Filter.ZeroByChannelMagnitude(thresh=zero_by_magnitude, normalize=True)
             z_filt.run(img, in_place=True)
         ref_img = None
         if ref:
