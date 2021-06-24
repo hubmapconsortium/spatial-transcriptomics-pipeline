@@ -4,6 +4,17 @@
 # HuBMAP Spatial Transcriptomics Pipeline
 A [CWL](https://www.commonwl.org/) pipeline for processing spatial transcriptomics data.
 
+## Steps
+
+Folder         | Output from           | Input to
+---------------|-----------------------|----------------------
+0_Raw          |                       | aligner.cwl
+1_Projected    | aligner.cwl           |
+2_Registered   | aligner.cwl           | spaceTxConversion.cwl
+3_tx_converted | spaceTxConversion.cwl | starfishRunner.cwl
+4_Decoded      | starfishRunner.cwl    | segmentation.cwl
+5_Segmented    | segmentation.cwl      |
+
 ## Development
 Code in this repository is formatted with [black](https://github.com/psf/black) and
 [isort](https://pypi.org/project/isort/), and this is checked via Travis CI.
@@ -27,6 +38,6 @@ Publication of tagged "release" versions of the pipeline is handled with the
 release a new pipeline version, *ensure that the `master` branch contains all commits that you want to include in the release,*
 then run
 ```shell
-tag_releae_pipeline v0.whatever
+tag_release_pipeline v0.whatever
 ```
 See the pipeline release managment script usage notes for additional options, such as GPG signing.

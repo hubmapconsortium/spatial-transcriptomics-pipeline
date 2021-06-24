@@ -1,1 +1,2 @@
-docker.pkg.github.com/hubmapconsortium/spatial-transcriptomics-pipeline/main docker/Dockerfile base_directory_build
+docker.pkg.github.com/hubmapconsortium/spatial-transcriptomics-pipeline/starfish docker/starfish/Dockerfile base_directory_build
+docker.pkg.github.com/hubmapconsortium/spatial-transcriptomics-pipeline/alignment docker/alignment/Dockerfile base_directory_build
