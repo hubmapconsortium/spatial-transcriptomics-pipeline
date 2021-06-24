@@ -6,7 +6,7 @@ baseCommand: /opt/alignerDriver.py
 
 requirements:
   DockerRequirement:
-    dockerPull: docker.pkg.github.com/hubmapconsortium/spatial-transcriptomics-pipeline/alignment:latest
+    dockerPull: docker.pkg.github.com/hubmapconsortium/spatial-transcriptomics-pipeline/alignment:1.0
   InitialWorkDirRequirement:
     listing:
       - $(inputs.raw_dir)
@@ -33,7 +33,7 @@ inputs:
 
   sigma:
     type: float
-    inputBinding: 
+    inputBinding:
       prefix: --sigma
     doc: Value used for Gaussian blur
 

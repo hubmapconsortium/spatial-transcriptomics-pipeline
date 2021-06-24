@@ -6,7 +6,7 @@ baseCommand: /opt/starfishDriver.py
 
 requirements:
   DockerRequirement:
-    dockerPull: docker.pkg.github.com/hubmapconsortium/spatial-transcriptomics-pipeline/starfish:latest
+    dockerPull: docker.pkg.github.com/hubmapconsortium/spatial-transcriptomics-pipeline/starfish:1.0
 
 inputs:
   exp_loc:
@@ -17,7 +17,7 @@ inputs:
 
   flatten_axes:
     type: string[]?
-    inputBinding: 
+    inputBinding:
       prefix: --flatten-axes
     doc: Which axes, if any, to compress in the image preprocessing steps.
 
@@ -87,11 +87,11 @@ inputs:
             doc: Method name for spot decoding. Refer to starfish documentation.
           filtered_results:
             type: boolean?
-            inputBinding: 
+            inputBinding:
               prefix: --filtered-results
             doc: Automatically remove genes that do not match a target and do not meet criteria.
           decoder:
-            type: 
+            type:
               - type: record
                 name: metric_distance
                 fields:
@@ -148,18 +148,18 @@ inputs:
                     inputBinding:
                       prefix: --anchor-round
                     doc: Round to refer to.  Required for nearest_neighbor.
-                  search_radius: 
+                  search_radius:
                     type: int?
                     inputBinding:
                       prefix: --search-radius
                     doc: Distance to search for matching spots.
-       
+
       - type: record
         name: pixel
         fields:
           metric:
             type: string
-            inputBinding: 
+            inputBinding:
               prefix: --metric
             doc: The sklearn metric string to pass to NearestNeighbors
           distance_threshold:

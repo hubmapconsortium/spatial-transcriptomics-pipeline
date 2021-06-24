@@ -135,7 +135,7 @@ inputs:
         - name: x-voxel
           type: float
           doc: size of voxels in the x-axis
-        - name: y-locs 
+        - name: y-locs
           type: string
           doc: list of y-axis start locations per fov index
         - name: y-shape
@@ -206,7 +206,7 @@ inputs:
             type: boolean?
             doc: Automatically remove genes that do not match a target and do not meet criteria.
           decoder:
-            type: 
+            type:
               - type: record
                 name: metric_distance
                 fields:
@@ -243,10 +243,10 @@ inputs:
                   anchor_round:
                     type: int?
                     doc: Round to refer to.  Required for nearest_neighbor.
-                  search_radius: 
+                  search_radius:
                     type: int?
                     doc: Distance to search for matching spots.
-       
+
       - type: record
         name: pixel
         fields:
@@ -314,7 +314,7 @@ inputs:
             type: int
             doc: Radius for white tophat noise filter
 
-outputs: 
+outputs:
   1_Projected:
     type: Directory
     outputSource: align/projected
@@ -354,7 +354,7 @@ steps:
   spaceTxConversion:
     run: steps/spaceTxConversion.cwl
     in:
-      tiffs: align/registered 
+      tiffs: align/registered
       codebook: codebook
 #        csv: codebook_csv
 #        json: codebook_json
@@ -392,5 +392,5 @@ steps:
       aux_name: aux_name
       fov_count: fov_count
       binary_mask: binary_mask
-    out: 
+    out:
       [segmented]

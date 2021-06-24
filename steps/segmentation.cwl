@@ -6,7 +6,7 @@ baseCommand: /opt/segmentationDriver.py
 
 requirements:
   DockerRequirement:
-    dockerPull: docker.pkg.github.com/hubmapconsortium/spatial-transcriptomics-pipeline/starfish:latest
+    dockerPull: docker.pkg.github.com/hubmapconsortium/spatial-transcriptomics-pipeline/starfish:1.0
 
 inputs:
   decoded_loc:
@@ -40,7 +40,7 @@ inputs:
         fields:
           roi_set:
             type: Directory
-            inputBinding: 
+            inputBinding:
               prefix: --roi-set
             doc: Directory of RoiSet.zip for each fov, from fiji segmentation
           file_formats:
@@ -76,7 +76,7 @@ inputs:
             doc: minimum distance (pixels) between distance transformed peaks
           min_allowed_size:
             type: int
-            inputBinding: 
+            inputBinding:
               prefix: --min-size
             doc: minimum size for a cell (in pixels)
           max_allowed_size:

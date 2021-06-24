@@ -6,7 +6,7 @@ baseCommand: /opt/spaceTxConverter.py
 
 requirements:
   DockerRequirement:
-    dockerPull: docker.pkg.github.com/hubmapconsortium/spatial-transcriptomics-pipeline/starfish:latest
+    dockerPull: docker.pkg.github.com/hubmapconsortium/spatial-transcriptomics-pipeline/starfish:1.0
 
 inputs:
   tiffs:
@@ -72,7 +72,7 @@ inputs:
 
   channel_offset:
     type: int?
-    inputBinding: 
+    inputBinding:
       prefix: --channel-offset
     doc: The index of the first channel (for file names).
 
@@ -144,7 +144,7 @@ inputs:
           inputBinding:
             prefix: --x-pos-voxel
           doc: size of voxels in the x-axis
-        - name: y-locs 
+        - name: y-locs
           type: string
           inputBinding:
             prefix: --y-pos-locs
