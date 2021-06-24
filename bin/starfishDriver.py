@@ -13,19 +13,43 @@ from argparse import ArgumentParser
 from pathlib import Path
 from os import path, makedirs
 import sys
-from typing import Set
+from typing import Set, Tuple, Mapping, Callable
 
 from tqdm import tqdm
 from functools import partialmethod
 
 # TODO parameter specifications, docstrings
 
-def imagePrePro(imgs, 
+def imagePrePro(imgs: Mapping[str, ImageStack], 
         flatten_axes: Set[Axes] = None, 
         gaussian_lowpass: float = None, 
         clip: bool = True, 
         zero_by_magnitude: float = None, 
-        ref: bool= False):
+        ref: bool= False) -> Tuple[Mapping[str, ImageStack], Mapping[str, ImageStack]]:
+    """
+    Runs basic image pre-processing on the image, given provided parameters.
+
+    Parameters
+    ----------
+    imgs : Mapping[str, ImageStack]
+        The images to be processed, with the corresponding FOV name as the key.
+    flatten_axes : Set[Axes]
+        If provided, the set of axes along which to project the image.
+    gaussian_lowpass : float
+        If provided, the standard deviation for the Gaussian Kernel to be applied.
+    clip : bool
+        If provided, the image will be scaled by chunks to the 0-99.9 range of values.
+    zero_by_magnitude : float
+        If provided, the L2 norm threshold under which values will be zeroed.
+    ref : bool
+        If provided, a maximum projection image will be provided.
+
+    Returns
+    -------
+    Tuple[Mapping[str, ImageStack], Mapping[str, ImageStack]]
+        The first item is the processed images, and the second item (if ref is True) is a projected max version of the imagestack.
+    
+    """
     ret_imgs = {}
     ret_ref = {}
     for fov in imgs.keys():
@@ -48,9 +72,31 @@ def imagePrePro(imgs,
         ret_ref[fov] = ref_img
     return ret_imgs, ret_ref
 
-def blobRunner(img, ref_img=None,
-        min_sigma=(0.5,0.5,0.5), max_sigma=(8,8,8), num_sigma=10,
-        threshold=0.1, is_volume=False, overlap=0.5):
+def blobRunner(img: ImageStack, ref_img: ImageStack = None,
+        min_sigma: Tuple[float,float,float] = (0.5,0.5,0.5), 
+        max_sigma: Tuple[float,float,float] = (8,8,8), 
+        num_sigma: int = 10,
+        threshold: float = 0.1, 
+        is_volume: bool = False, 
+        overlap:   float = 0.5)
+    -> SpotFindingResults:
+    """
+    The driver method for running blob-based spot detection, given a set of parameters.
+
+    Parameters
+    ----------
+    img : ImageStack
+        The target image for spot detection
+    ref_img : ImageStack
+        If provided, the reference image to be used for spot detection.
+    The remaining parameters are passed as-is to the starfish.spots.FindSpots.BlobDetector object.
+
+    Returns
+    -------
+    SpotFindingResults:
+        Starfish wrapper for an xarray with the spot data.
+
+    """
     bd = starfish.spots.FindSpots.BlobDetector(min_sigma=min_sigma, max_sigma=max_sigma, num_sigma=num_sigma,
             threshold=threshold, is_volume=is_volume, overlap=overlap)
     results = None
@@ -62,9 +108,33 @@ def blobRunner(img, ref_img=None,
         results = bd.run(image_stack=img)
     return results
 
-def decodeRunner(spots, codebook, decoderKwargs,
-        callableDecoder=starfish.spots.DecodeSpots.PerRoundMaxChannel, 
-        filtered_results=True):
+def decodeRunner(spots: SpotFindingResults,
+        codebook: Codebook, 
+        decoderKwargs: dict,
+        callableDecoder: Callable = starfish.spots.DecodeSpots.PerRoundMaxChannel, 
+        filtered_results: bool = True)
+    -> DecodedIntensityTable:
+    """
+    The driver for decoding spots into barcodes.
+
+    Parameters
+    ----------
+    spots: SpotFindingResults
+        Input spots for decoding
+    codebook: Codebook
+        The codebook to be used for decoding
+    decoderKwargs: dict
+        Dictionary with optional arguments to be passed to the decoder object.
+    callabeDecoder: Callable
+        The method for creating a decoder of the desired type. Defaults to PerRoundMaxChannel.
+    filtered_results: bool
+        If true, rows with no target or that do not pass thresholds will be removed.
+
+    Returns
+    -------
+    DecodedIntensityTable:
+        Starfish wrapper for an xarray with the labeled transcripts.
+    """
     decoder = callableDecoder(codebook=codebook, **decoderKwargs)
     results = decoder.run(spots=spots)
     if filtered_results:
@@ -72,7 +142,25 @@ def decodeRunner(spots, codebook, decoderKwargs,
         results = results[results.target != 'nan']
     return results
 
-def blobDriver(imgs, ref_img, codebook, blobRunnerKwargs, decodeRunnerKwargs):
+def blobDriver(imgs: Mapping[str, ImageStack], 
+        ref_img: Mapping[str, ImageStack], 
+        codebook: Codebook, 
+        blobRunnerKwargs: dict, 
+        decodeRunnerKwargs: dict)
+    -> Mapping[str,DecodedIntensityTable]:
+    """
+    Method to handle the blob-based version of the detection and decoding steps.
+
+    Parameters
+    ----------
+    imgs : Mapping[str, ImageStack]
+        
+
+    Returns
+    -------
+    Mapping[str, DecodedIntensityTable]:
+        A dictionary with the decoded tables stored by FOV name.
+    """
     fovs = imgs.keys()
     decoded = {}
     for fov in fovs:

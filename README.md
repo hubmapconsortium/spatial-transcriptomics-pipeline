@@ -38,6 +38,6 @@ Publication of tagged "release" versions of the pipeline is handled with the
 release a new pipeline version, *ensure that the `master` branch contains all commits that you want to include in the release,*
 then run
 ```shell
-tag_releae_pipeline v0.whatever
+tag_release_pipeline v0.whatever
 ```
 See the pipeline release managment script usage notes for additional options, such as GPG signing.
