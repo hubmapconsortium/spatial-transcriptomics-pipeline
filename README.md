@@ -15,6 +15,8 @@ Folder         | Output from           | Input to
 4_Decoded      | starfishRunner.cwl    | segmentation.cwl
 5_Segmented    | segmentation.cwl      |
 
+For specific inputs to each step or `pipeline.cwl`, refer to in-line `doc` fields.
+
 ## Development
 Code in this repository is formatted with [black](https://github.com/psf/black) and
 [isort](https://pypi.org/project/isort/), and this is checked via Travis CI.

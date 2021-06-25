@@ -8,7 +8,7 @@ from glob import glob
 from os import makedirs, path
 from pathlib import Path
 from time import time
-from typing import Set
+from typing import List, Mapping, Set
 
 import numpy as np
 import pandas as pd
@@ -27,7 +27,26 @@ from starfish.types import Axes, Features, Levels
 from tqdm import tqdm
 
 
-def masksFromRoi(img_stack, roi_set, file_formats):
+def masksFromRoi(
+    img_stack: List[ImageStack], roi_set: Path, file_formats: str
+) -> List[BinaryMaskCollection]:
+    """
+    Return a list of masks from provided RoiSet.zip files.
+
+    Parameters
+    ----------
+    img_stack: list[ImageStack]
+        The images that the masks are to be applied to, provided per FOV.
+    roi_set: Path
+        Directory containing RoiSet files.
+    file_formats: str
+        String that will have .format() applied for each FOV.  Will be appended to roi_set.
+
+    Returns
+    -------
+    list[BinaryMaskCollection]:
+        Binary masks for each FOV.
+    """
     masks = []
     for i in range(len(img_stack)):
         mask_name = ("{}/" + file_formats).format(roi_set, i)
@@ -35,7 +54,26 @@ def masksFromRoi(img_stack, roi_set, file_formats):
     return masks
 
 
-def masksFromLabeledImages(img_stack, labeled_image, file_formats_labeled):
+def masksFromLabeledImages(
+    img_stack: List[ImageStack], labeled_image: Path, file_formats_labeled: str
+) -> List[BinaryMaskCollection]:
+    """
+    Returns a list of masks from the provided labeled images.
+
+    Parameters
+    ----------
+    img_stack: list[ImageStack]
+        The images that the masks will be applied to, provided per FOV.
+    labeled_image: Path
+        Directory of labeled images with image segmentation data, such as from ilastik classification.
+    file_formats_labeled: str
+        Layout for name of each labelled image. Will be formatted with String.format([fov index])
+
+    Returns
+    -------
+    list[BinaryMaskCollection]:
+        Binary masks for each FOV.
+    """
     masks = []
     for i in range(len()):
         label_name = ("{}/" + file_formats_labeled).format(labeled_image, i)
@@ -43,7 +81,35 @@ def masksFromLabeledImages(img_stack, labeled_image, file_formats_labeled):
     return masks
 
 
-def masksFromWatershed(img_stack, img_threshold, min_dist, min_size, max_size, masking_radius):
+def masksFromWatershed(
+    img_stack: List[ImageStack],
+    img_threshold: float,
+    min_dist: int,
+    min_size: int,
+    max_size: int,
+    masking_radius: int,
+) -> List[BinaryMaskCollection]:
+    """
+    Runs a primitive thresholding and watershed pipeline to generate segmentation masks.
+
+    Parameters
+    ----------
+    img_threshold: float
+        Global threshold value for images.
+    min_dist: int
+        Minimum distance (pixels) between distance transformed peaks.
+    min_size: int
+        Minimum size for a cell (in pixels)
+    max_size: int
+        Maxiumum size for a cell (in pixels)
+    masking_radius: int
+        Radius for white tophat noise filter.
+
+    Returns
+    -------
+    list[BinaryMaskCollection]:
+        Binary masks for each FOV.
+    """
     wt_filt = ImgFilter.WhiteTophat(masking_radius, is_volume=False)
     thresh_filt = Binarize.ThresholdBinarize(img_threshold)
     min_dist_label = Filter.MinDistanceLabel(min_dist, 1)
@@ -62,16 +128,38 @@ def masksFromWatershed(img_stack, img_threshold, min_dist, min_size, max_size, m
     return masks
 
 
-# def saveTable(table, savename):
-#    intensities = IntensityTable(table.where(table[Features.PASSES_THRESHOLDS], drop=True))
-#    traces = intensities.stack(traces=(Axes.ROUND.value, Axes.CH.value))
-#    traces = traces.to_features_dataframe()
-#    traces.to_csv(savename)
-
-
 def run(
-    input_loc, exp_loc, output_loc, fov_count, aux_name, roiKwargs, labeledKwargs, watershedKwargs
+    input_loc: Path,
+    exp_loc: Path,
+    output_loc: str,
+    fov_count: int,
+    aux_name: str,
+    roiKwargs: dict,
+    labeledKwargs: dict,
+    watershedKwargs: dict,
 ):
+    """
+    Main class for generating and applying masks then saving output.
+
+    Parameters
+    ----------
+    input_loc: Path
+        Location of input cdf files, as formatted by starfishRunner.cwl
+    exp_loc: Path
+        Directory that contains "experiment.json" file for the experiment.
+    output_loc: str
+        Path to directory where output will be saved.
+    fov_count: int
+        The number of FOVs in the experiment.
+    aux_name: str
+        The name of the auxillary view to look at for image segmentation.
+    roiKwargs: dict
+        Dictionary with arguments for reading in masks from an RoiSet. See masksFromRoi.
+    labeledKwargs: dict
+        Dictionary with arguments for reading in masks from a labeled image. See masksFromLabeledImages.
+    watershedKwargs: dict
+        Dictionary with arguments for running basic watershed pipeline. See masksFromWatershed.
+    """
 
     if not path.isdir(output_dir):
         makedirs(output_dir)

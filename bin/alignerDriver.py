@@ -26,18 +26,6 @@ from code_lib import tifffile as tiff
 
 # <http://www.lfd.uci.edu/~gohlke/code/tifffile.py> # Kian: added 201011
 
-# server = "voyager"
-
-# if server.capitalize() == "Voyager":
-# 	server_selector = "_Voyager"
-# if server.capitalize() == "Miner":
-# 	server_selector = ""
-
-# if server.capitalize() == "Voyager":
-# 	server_selector = "_Voyager"
-# if server.capitalize() == "Miner":
-# 	server_selector = ""
-
 
 def listdirectories(directory=".", pattern="*"):  # Kian: added 201011
     """

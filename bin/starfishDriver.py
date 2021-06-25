@@ -12,7 +12,13 @@ import numpy as np
 import pandas as pd
 import starfish
 import starfish.data
-from starfish import Codebook, DecodedIntensityTable, ImageStack, IntensityTable
+from starfish import (
+    Codebook,
+    DecodedIntensityTable,
+    Experiment,
+    ImageStack,
+    IntensityTable,
+)
 from starfish.core.types import SpotFindingResults
 from starfish.spots import AssignTargets
 from starfish.types import (
@@ -24,8 +30,6 @@ from starfish.types import (
     TraceBuildingStrategies,
 )
 from tqdm import tqdm
-
-# TODO parameter specifications, docstrings
 
 
 def imagePrePro(
@@ -147,7 +151,7 @@ def decodeRunner(
     spots: SpotFindingResults
         Input spots for decoding
     codebook: Codebook
-        The codebook to be used for decoding
+        The codebook for the experiment, to be used for decoding.
     decoderKwargs: dict
         Dictionary with optional arguments to be passed to the decoder object.
     callabeDecoder: Callable
@@ -181,7 +185,15 @@ def blobDriver(
     Parameters
     ----------
     imgs : Mapping[str, ImageStack]
-
+        The images to be processed, with the corresponding FOV name as the key.
+    ref_img : Mapping[str, ImageStack]
+        If provided, the reference image that will be used during spot detection.
+    codebook : Codebook
+        The codebook for the experiment, to be used for decoding.
+    blobRunnerKwargs : dict
+        A dictionary of optional parameters to be used for spot detection. Refer to blobRunner for specifics.
+    decodeRunnerKwargs : dict
+        A dictionary of optional parameters to be used in decoding. Refer to decodeRunner for specifics.
 
     Returns
     -------
@@ -198,7 +210,28 @@ def blobDriver(
     return decoded
 
 
-def pixelDriver(imgs, codebook, pixelRunnerKwargs):
+def pixelDriver(
+    imgs: Mapping[str, ImageStack], codebook: Codebook, pixelRunnerKwargs: dict
+) -> Mapping[str, DecodedIntensityTable]:
+    """
+    Method to run Starfish's PixelSpotDecoder on the provided ImageStack
+
+    Parameters
+    ----------
+    imgs : Mapping[str, ImageStack]
+        The images to be processed, with the corresponding FOV name as the key.
+    codebook : Codebook
+        The codebook for the experiment, to be used for decoding.
+    pixelRunnerKwargs : dict
+        A dictionary of parameters to be passed to PixelSpotDecoder.
+
+
+    Returns
+    -------
+    Mapping[str, DecodedIntensityTable]:
+        A dictionary with the decoded tables stored by FOV name.
+
+    """
     fovs = imgs.keys()
     pixelRunner = starfish.spots.DetectPixels.PixelSpotDecoder(
         codebook=codebook, **pixelRunnerKwargs
@@ -209,7 +242,10 @@ def pixelDriver(imgs, codebook, pixelRunnerKwargs):
     return decoded
 
 
-def saveTable(table, savename):
+def saveTable(table: DecodedIntensityTable, savename: str):
+    """
+    Reformats and saves a DecodedIntensityTable.
+    """
     intensities = IntensityTable(table.where(table[Features.PASSES_THRESHOLDS], drop=True))
     traces = intensities.stack(traces=(Axes.ROUND.value, Axes.CH.value))
     traces = traces.to_features_dataframe()
@@ -217,14 +253,35 @@ def saveTable(table, savename):
 
 
 def run(
-    output_dir,
-    experiment,
-    blob_based,
-    imagePreProKwargs,
-    blobRunnerKwargs,
-    decodeRunnerKwargs,
-    pixelRunnerKwargs,
+    output_dir: str,
+    experiment: Experiment,
+    blob_based: bool,
+    imagePreProKwargs: dict,
+    blobRunnerKwargs: dict,
+    decodeRunnerKwargs: dict,
+    pixelRunnerKwargs: dict,
 ):
+    """
+    Main method for executing runs.  Sets up directories and calls appropriate driver methods.
+
+    Parameters
+    ----------
+    output_dir: str
+        Location to put all output from this tool.  Dir will be created if not present.
+    experiment: Experiment
+        Experiment object with corresponding images and codebook.
+    blob_based: bool
+        If true, use blob-detection and decoding methods. Else, use pixel-based methods.
+    imagePreProKwargs: dict
+        Dictionary with optional arguments for image pre-processing.  Refer to imgPrePro.
+    blobRunnerKwargs: dict
+        Dictionary with arguments for blob detection. Refer to blobRunner.
+    decodeRunnerKwargs: dict
+        Dictionary with arguments for spot-based decoding. Refer to decodeRunner.
+    pixelRunnerKwargs: dict
+        Dictionary with arguments for pixel-based detection and decoding.  Refer to starfish PixelSpotDecoder.
+
+    """
     if not path.isdir(output_dir):
         makedirs(output_dir)
 
