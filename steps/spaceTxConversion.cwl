@@ -72,7 +72,7 @@ inputs:
 
   channel_offset:
     type: int?
-    inputBinding: 
+    inputBinding:
       prefix: --channel-offset
     doc: The index of the first channel (for file names).
 
@@ -144,7 +144,7 @@ inputs:
           inputBinding:
             prefix: --x-pos-voxel
           doc: size of voxels in the x-axis
-        - name: y-locs 
+        - name: y-locs
           type: string
           inputBinding:
             prefix: --y-pos-locs

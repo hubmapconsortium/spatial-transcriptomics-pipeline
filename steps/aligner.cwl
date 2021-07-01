@@ -33,7 +33,7 @@ inputs:
 
   sigma:
     type: float
-    inputBinding: 
+    inputBinding:
       prefix: --sigma
     doc: Value used for Gaussian blur
 
