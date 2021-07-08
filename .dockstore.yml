@@ -1,0 +1,6 @@
+version: 1.2
+workflows:
+  - name: StarfishSpatialTranscriptomics
+    subclass: CWL
+    primaryDescriptorPath: /pipeline.cwl
+
