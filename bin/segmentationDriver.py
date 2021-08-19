@@ -183,6 +183,10 @@ def run(
         makedirs(output_dir + "cdf")
         print("made " + output_dir + "cdf")
 
+    if not path.isdir(output_dir + "h5ad/"):
+        makedirs(output_dir + "h5ad")
+        print("made " + output_dir + "h5ad")
+
     # read in netcdfs based on how we saved prev step
     results = []
     keys = []
@@ -232,6 +236,9 @@ def run(
             output_dir + "csv/exp_" + keys[i] + "_segmented.csv"
         )
         labeled.to_expression_matrix().save(output_dir + "cdf/exp_" + keys[i] + "_segmented.cdf")
+        labeled.to_expression_matrix().save_anndata(
+            output_dir + "h5ad/exp_" + keys[i] + "_segmented.h5ad"
+        )
         print("saved fov key: {}, index {}".format(keys[i], i))
 
     sys.stdout = sys.__stdout__
