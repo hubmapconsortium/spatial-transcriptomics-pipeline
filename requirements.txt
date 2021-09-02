@@ -2,3 +2,4 @@ numpy
 scikit-image==0.15.0
 tqdm
 anndata
+astropy
