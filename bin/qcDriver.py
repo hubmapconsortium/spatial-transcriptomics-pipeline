@@ -480,7 +480,7 @@ if __name__ == "__main__":
     p.add_argument("--roi", type=Path)
     p.add_argument("--x-size", type=int, nargs="?")
     p.add_argument("--y-size", type=int, nargs="?")
-    p.add_argument("--x-size", type=int, nargs="?")
+    p.add_argument("--z-size", type=int, nargs="?")
     p.add_argument("--run-ripley", dest="run_ripley", action="store_true")
     args = p.parse_args()
 
