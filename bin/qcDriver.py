@@ -7,6 +7,9 @@ import os
 import sys
 import time
 from argparse import ArgumentParser
+from datetime import datetime
+from functools import partialmethod
+from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -24,6 +27,7 @@ from starfish.core.types import (
     SpotFindingResults,
 )
 from starfish.types import Axes, Coordinates, CoordinateValue, Features
+from tqdm import tqdm
 
 # utility methods
 
@@ -421,12 +425,17 @@ def run(output_dir, transcripts, codebook, size, spots=None, segmask=None, doRip
     )
     sys.stdout = open(reportFile, "w")
 
+    print("transcripts {}\ncodebook {}\nspots {}".format(transcripts, codebook, spots))
+
+    # disabling tdqm for pipeline runs
+    tqdm.__init__ = partialmethod(tqdm.__init__, disable=True)
+
     results = {}
-    pdf = PdfPages(outputDir + "/graph_output.pdf")
+    pdf = PdfPages(output_dir + "/graph_output.pdf")
 
     if spots:
         spotRes = {}
-
+        print("finding spot metrics")
         relevSpots = spots
         if segmask:
             relevSpots = filterSpots(spots, segmask)
@@ -435,6 +444,7 @@ def run(output_dir, transcripts, codebook, size, spots=None, segmask=None, doRip
         spotRes["round_dist"] = getSpotRoundDist(pdf, relevSpots)
         spotRes["channel_dist"] = getSpotChannelDist(pdf, relevSpots)
         if doRipley:
+            print("starting ripley estimates")
             spatDens = getSpatitalDensity(spots, size, doMonte=True)
             spotRes["spatial_density"] = percentMoreClustered(spatDens)
             for k in spatDens[0].keys():
@@ -448,6 +458,7 @@ def run(output_dir, transcripts, codebook, size, spots=None, segmask=None, doRip
         results["spots"] = spotRes
 
     trRes = {}
+    print("starting transcript metrics")
     trRes["density"] = getTranscriptDensity(transcripts, codebook)
     trRes["per_cell"] = getTranscriptsPerCell(pdf, transcripts)
     if spots:
@@ -467,7 +478,6 @@ def run(output_dir, transcripts, codebook, size, spots=None, segmask=None, doRip
 
 if __name__ == "__main__":
     p = ArgumentParser()
-    p.add_argument("--output-dir", type=Path)
 
     p.add_argument("--codebook-exp", type=Path)
     p.add_argument("--spots-exp", type=Path)
@@ -484,11 +494,15 @@ if __name__ == "__main__":
     p.add_argument("--run-ripley", dest="run_ripley", action="store_true")
     args = p.parse_args()
 
+    print(args)
+
     # TODO: look into how to export the spots and transcripts from prior experiment
     codebook = False
     roi = False
     if args.codebook_exp:
-        exp = starfish.core.experiment.experiment.Experiment.from_json(args.codebook_exp)
+        exp = starfish.core.experiment.experiment.Experiment.from_json(
+            str(args.codebook_exp) + "/experiment.json"
+        )
         codebook = exp.codebook
         if args.roi:  # NOTE Going to assume 1 FOV for now
             img = exp["fov_000"].get_image("primary")
@@ -512,4 +526,4 @@ if __name__ == "__main__":
         size[1] = args.y_size
         size[2] = args.z_size
 
-    run(args.output_dir, transcripts, codebook, size, spots, roi, args.run_ripley)
+    run("6_qc/", transcripts, codebook, size, spots, roi, args.run_ripley)

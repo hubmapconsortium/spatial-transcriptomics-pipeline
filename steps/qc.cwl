@@ -2,7 +2,7 @@
 
 class: CommandLineTool
 cwlVersion: v1.1
-baseCommand: /opt/qcRunner.py
+baseCommand: /opt/qcDriver.py
 
 requirements:
   DockerRequirement:
@@ -23,29 +23,29 @@ inputs:
         name: exp
         fields:
           exp:
-            type: File
+            type: Directory
             inputBinding:
               prefix: --codebook-exp
             doc: The location of an experiment.json file, which has the corresponding codebook for this experiment.
   spots:
+    type:
     - 'null'
-    - type:
-        - type: record
-          name: pkl
-          fields:
-            pkl:
-              type: File
-              inputBinding:
-                prefix: --spots-pkl
-              doc: Spots found in this experiment, saved in a python pickle.
-        - type: record
-          name: exp
-          fields:
-            exp:
-              type: File
-              inputBinding:
-                prefix: --spots-exp
-              doc: The location of OUTPUT FROM EXPERIMENT. NETCDF?
+    - type: record
+      name: pkl
+      fields:
+        pkl:
+          type: File
+          inputBinding:
+            prefix: --spots-pkl
+          doc: Spots found in this experiment, saved in a python pickle.
+    - type: record
+      name: exp
+      fields:
+        exp:
+          type: File
+          inputBinding:
+            prefix: --spots-exp
+          doc: The location of OUTPUT FROM EXPERIMENT. NETCDF?
 
   transcripts:
     type:
@@ -84,11 +84,11 @@ inputs:
         - name: y-size
           type: int
           inputBinding:
-            prefix:  --y-size
+            prefix: --y-size
           doc: y-dimension of image
         - name: z-size
           type: int
-          inputbinding:
+          inputBinding:
             prefix: --z-size
           doc: number of z-stacks
 
@@ -97,3 +97,9 @@ inputs:
     inputBinding:
       prefix: --run-ripley
     doc: If true, will run ripley K estimates to find spatial density measures.  Can be slow.
+
+outputs:
+  qc_metrics:
+    type: Directory
+    outputBinding:
+      glob: "6_qc/"
