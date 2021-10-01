@@ -97,6 +97,12 @@ inputs:
     inputBinding:
       prefix: --run-ripley
     doc: If true, will run ripley K estimates to find spatial density measures.  Can be slow.
+  
+  save-pdf:
+    type: boolean?
+    inputBinding:
+      prefix: --save-pdf
+    doc: If true, will save graphical output to a pdf. Currently pdfs are bugged.
 
 outputs:
   qc_metrics:

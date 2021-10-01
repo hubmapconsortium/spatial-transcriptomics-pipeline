@@ -4,12 +4,14 @@ import functools
 import gc
 import math
 import os
+import pickle
 import sys
 import time
 from argparse import ArgumentParser
 from datetime import datetime
 from functools import partialmethod
 from pathlib import Path
+from time import time
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -117,6 +119,7 @@ def plotRipleyResults(pdf, results, key, doMonte=False, title=None):
 
     # plt.show()
     pdf.savefig(fig)
+    plt.close()
 
 
 ## Internal Metrics
@@ -271,9 +274,10 @@ def plotRipleyResults(pdf, results, key, doMonte=False):
     ax.set_aspect(abs(x1 - x0) / abs(y1 - y0))
 
     pdf.savefig(fig)
+    plt.close()
 
 
-def getSpotRoundDist(pdf, spots):
+def getSpotRoundDist(spots, pdf=False):
     roundTallies = {}
     for k, v in spots.items():
         r, ch = k
@@ -287,17 +291,20 @@ def getSpotRoundDist(pdf, spots):
     std = np.std(tally)
     skw = skew(tally)
 
-    fig = plt.figure()
-    plt.bar(list(range(len(tally))), tally)
-    plt.title("Spots per round")
-    plt.xlabel("Round number")
-    plt.ylabel("Spot count")
-    pdf.savefig(fig)
+    if pdf:
+        fig = plt.figure()
+        plt.bar(list(range(len(tally))), tally)
+        plt.title("Spots per round")
+        plt.xlabel("Round number")
+        plt.ylabel("Spot count")
 
-    return var, skw
+        pdf.savefig(fig)
+        plt.close()
+
+    return tally, std, skw
 
 
-def getSpotChannelDist(pdf, spots):
+def getSpotChannelDist(spots, pdf=False):
     channelTallies = {}
     for k, v in spots.items():
         r, ch = k
@@ -311,23 +318,25 @@ def getSpotChannelDist(pdf, spots):
     std = np.std(tally)
     skw = skew(tally)
 
-    fig = plt.figure()
-    plt.bar(list(range(len(tally))), tally)
-    plt.title("Spots per channel")
-    plt.xlabel("Channel number")
-    plt.ylabel("Spot count")
-    pdf.savefig(fig)
+    if pdf:
+        fig = plt.figure()
+        plt.bar(list(range(len(tally))), tally)
+        plt.title("Spots per channel")
+        plt.xlabel("Channel number")
+        plt.ylabel("Spot count")
+        pdf.savefig(fig)
+        plt.close()
+    return tally, std, skw
 
-    return std, skw
 
-
-def maskedSpatialDensity(pdf, masked, unmasked, imgsize, steps):
+def maskedSpatialDensity(masked, unmasked, imgsize, steps, pdf=False):
     maskedDens = getSpatialDensity(masked, imgsize, steps, True)
     unmaskedDens = getSpatialDensity(unmasked, imgsize, steps, True)
 
-    for k in unmaskedDens[0].keys():
-        plotRipleyResults(pdf, unmaskedDens, k, True, "Unmasked {}".format(str(key)))
-        plotRipleyResults(pdf, maskedDens, k, True, "Masked {}".format(str(key)))
+    if pdf:
+        for k in unmaskedDens[0].keys():
+            plotRipleyResults(pdf, unmaskedDens, k, True, "Unmasked {}".format(str(key)))
+            plotRipleyResults(pdf, maskedDens, k, True, "Masked {}".format(str(key)))
 
     maskedPer = percentMoreClustered(maskedDens)[0]
     unmaskedPer = percentMoreClustered(unmaskedDens)[0]
@@ -342,7 +351,7 @@ def getTranscriptDensity(transcripts, codebook):
     return np.shape(transcripts.data)[0] / len(codebook.target)
 
 
-def getTranscriptsPerCell(pdf, transcripts):
+def getTranscriptsPerCell(transcripts, pdf=False):
     counts = []
     cells = transcripts.cell_id.data.astype(np.int)
 
@@ -353,25 +362,23 @@ def getTranscriptsPerCell(pdf, transcripts):
     q1, mid, q3 = np.percentile(counts, [25, 50, 75])
     iqr_scale = 1.5
 
-    fig = plt.figure()
-    plt.bar(list(range(max(cells))), counts)
-    plt.axhline(
-        y=mid - iqr_scale * (q3 - q1), dashes=(1, 1), color="gray", label="Outlier Threshold"
-    )
-    plt.axhline(y=q1, dashes=(2, 2), color="black", label="IQR")
-    plt.axhline(y=mid, color="black", label="Median")
-    plt.axhline(y=q3, dashes=(2, 2), color="black")
-    plt.axhline(y=mid + iqr_scale * (q3 - q1), dashes=(1, 1), color="gray")
-    plt.title("Transcript count per cell")
-    plt.ylabel("Transcript count")
-    plt.legend()
+    if pdf:
+        fig = plt.figure()
+        plt.bar(list(range(max(cells))), counts)
+        plt.axhline(
+            y=mid - iqr_scale * (q3 - q1), dashes=(1, 1), color="gray", label="Outlier Threshold"
+        )
+        plt.axhline(y=q1, dashes=(2, 2), color="black", label="IQR")
+        plt.axhline(y=mid, color="black", label="Median")
+        plt.axhline(y=q3, dashes=(2, 2), color="black")
+        plt.axhline(y=mid + iqr_scale * (q3 - q1), dashes=(1, 1), color="gray")
+        plt.title("Transcript count per cell")
+        plt.ylabel("Transcript count")
+        plt.legend()
 
-    colors = [""]
-    plt.legend(dummies, labels)
-
-    pdf.savefig(fig)
-
-    return (np.std(counts), skew(counts))
+        pdf.savefig(fig)
+        plt.close()
+    return (counts, np.std(counts), skew(counts))
 
 
 def getFractionSpotsUsed(spots, transcripts):
@@ -380,43 +387,56 @@ def getFractionSpotsUsed(spots, transcripts):
     return trspotCount / spotCount
 
 
-def getTranscriptRoundDist(pdf, transcripts):
+def getTranscriptRoundDist(transcripts, pdf=False):
     conv = np.where(transcripts.data > 0, 1, 0)
     counts = np.sum(conv, axis=(0, 2))
     counts = [c / sum(counts) for c in counts]
     std = np.std(counts)
     skw = skew(counts)
 
-    fig = plt.figure()
-    plt.bar(range(len(counts)), counts)
-    plt.title("Transcript source spot distribution across rounds")
-    plt.ylabel("Spot count")
-    plt.xlabel("Round ID")
+    if pdf:
+        fig = plt.figure()
+        plt.bar(range(len(counts)), counts)
+        plt.title("Transcript source spot distribution across rounds")
+        plt.ylabel("Spot count")
+        plt.xlabel("Round ID")
 
-    pdf.savefig(fig)
+        pdf.savefig(fig)
+        plt.close()
+    return counts, std, skw
 
-    return std, skw
 
-
-def getTranscriptChannelDist(pdf, transcripts):
+def getTranscriptChannelDist(transcripts, pdf=False):
     conv = np.where(transcripts.data > 0, 1, 0)
     counts = np.sum(conv, axis=(0, 1))
     counts = [c / sum(counts) for c in counts]
     std = np.std(counts)
     skw = skew(counts)
 
-    fig = plt.figure()
-    plt.bar(range(len(counts)), counts)
-    plt.title("Transcript source spot distribution across channels")
-    plt.ylabel("Spot count")
-    plt.xlabel("Channel ID")
+    if pdf:
+        fig = plt.figure()
+        plt.bar(range(len(counts)), counts)
+        plt.title("Transcript source spot distribution across channels")
+        plt.ylabel("Spot count")
+        plt.xlabel("Channel ID")
 
-    pdf.savefig(fig)
+        pdf.savefig(fig)
+        plt.close()
+    return counts, std, skw
 
-    return std, skw
 
+def run(
+    output_dir,
+    transcripts,
+    codebook,
+    size,
+    spots=None,
+    segmask=None,
+    doRipley=False,
+    savePdf=False,
+):
 
-def run(output_dir, transcripts, codebook, size, spots=None, segmask=None, doRipley=False):
+    t0 = time()
 
     os.makedirs(output_dir, exist_ok=True)
 
@@ -425,51 +445,78 @@ def run(output_dir, transcripts, codebook, size, spots=None, segmask=None, doRip
     )
     sys.stdout = open(reportFile, "w")
 
+    t = time()
+    print("dir created " + str(t - t0))
     print("transcripts {}\ncodebook {}\nspots {}".format(transcripts, codebook, spots))
 
     # disabling tdqm for pipeline runs
     tqdm.__init__ = partialmethod(tqdm.__init__, disable=True)
 
     results = {}
-    pdf = PdfPages(output_dir + "/graph_output.pdf")
+    pdf = False
+    if savePdf:
+        pdf = PdfPages(output_dir + "/graph_output.pdf")
 
     if spots:
+        t1 = time()
         spotRes = {}
-        print("finding spot metrics")
+        print("finding spot metrics\n\ttime " + str(t1 - t0))
         relevSpots = spots
         if segmask:
-            relevSpots = filterSpots(spots, segmask)
+            relevSpots = filterSpots(spots, segmask, True)
 
+        ts = time()
         spotRes["density"] = getSpotDensity(relevSpots, codebook)
-        spotRes["round_dist"] = getSpotRoundDist(pdf, relevSpots)
-        spotRes["channel_dist"] = getSpotChannelDist(pdf, relevSpots)
+
+        t1 = time()
+        print("\tspot density time ", t1 - ts)
+
+        spotRes["round_dist"] = getSpotRoundDist(relevSpots, pdf)
+
+        t2 = time()
+        print("\tround dist time ", t2 - t1)
+
+        spotRes["channel_dist"] = getSpotChannelDist(relevSpots, pdf)
+
+        t3 = time()
+        print("\tchannel dist time ", t3 - t2)
+
         if doRipley:
-            print("starting ripley estimates")
+            t = time()
+            print("starting ripley estimates\n\ttime " + str(t - t0))
             spatDens = getSpatitalDensity(spots, size, doMonte=True)
             spotRes["spatial_density"] = percentMoreClustered(spatDens)
-            for k in spatDens[0].keys():
-                plotRipleyResults(pdf, spatDens, key, True)
+            if savePdf:
+                for k in spatDens[0].keys():
+                    plotRipleyResults(pdf, spatDens, key, True)
             if segmask:
                 invRelevSpots = filterSpots(spots, segmask, invert=True)
                 spotRes["masked_spatial_density"] = maskedSpatialDensity(
-                    pdf, relevSpots, invRelevSpots, size, steps=10
+                    relevSpots, invRelevSpots, size, 10, pdf
                 )
 
         results["spots"] = spotRes
+        t = time()
+        print("time for all spots metrics: " + str(t - t1))
 
+    t1 = time()
     trRes = {}
-    print("starting transcript metrics")
+    print("starting transcript metrics\n\ttime " + str(t1 - t0))
     trRes["density"] = getTranscriptDensity(transcripts, codebook)
-    trRes["per_cell"] = getTranscriptsPerCell(pdf, transcripts)
+    trRes["per_cell"] = getTranscriptsPerCell(transcripts, pdf)
     if spots:
         trRes["fraction_spots_used"] = getFractionSpotsUsed(relevSpots, transcripts)
-    trRes["round_dist"] = getTranscriptRoundDist(pdf, transcripts)
-    trRes["channel_dist"] = getTranscriptChannelDist(pdf, transcripts)
+    trRes["round_dist"] = getTranscriptRoundDist(transcripts, pdf)
+    trRes["channel_dist"] = getTranscriptChannelDist(transcripts, pdf)
 
     results["transcripts"] = trRes
+    t = time()
+    print("time for all transcript metrics: " + str(t - t1))
 
     # TODO convert to anndata and save
     # temp workaround
+    t = time()
+    print("Analysis complete\n\ttime " + str(t - t0))
     print(results)
 
     sys.stdout = sys.__stdout__
@@ -492,6 +539,7 @@ if __name__ == "__main__":
     p.add_argument("--y-size", type=int, nargs="?")
     p.add_argument("--z-size", type=int, nargs="?")
     p.add_argument("--run-ripley", dest="run_ripley", action="store_true")
+    p.add_argument("--save-pdf", dest="save_pdf", action="store_true")
     args = p.parse_args()
 
     print(args)
@@ -518,7 +566,7 @@ if __name__ == "__main__":
 
     transcripts = False
     if args.transcript_pkl:
-        transcript = pickle.load(open(args.transcript_pkl, "rb"))
+        transcripts = pickle.load(open(args.transcript_pkl, "rb"))
 
     size = [0, 0, 0]
     if args.x_size:  # specify in CWL that all or none must be specified, only needed when doRipley
@@ -526,4 +574,4 @@ if __name__ == "__main__":
         size[1] = args.y_size
         size[2] = args.z_size
 
-    run("6_qc/", transcripts, codebook, size, spots, roi, args.run_ripley)
+    run("6_qc/", transcripts, codebook, size, spots, roi, args.run_ripley, args.save_pdf)
