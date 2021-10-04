@@ -76,6 +76,12 @@ inputs:
       prefix: --channel-offset
     doc: The index of the first channel (for file names).
 
+  zplane_offset:
+    type: int?
+    inputBinding:
+      prefix: --zplane-offset
+    doc: The index of the first zplane (for file names).
+
   file_format:
     type: string
     inputBinding:

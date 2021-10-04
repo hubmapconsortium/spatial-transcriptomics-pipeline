@@ -79,8 +79,8 @@ class FISHTile(FetchedTile):
             The offset for the size of the image, mapped to the corresponding Axes object (X, Y, ZPLANE)
         """
         self._file_path = file_path
-        self._zplane = ch
-        self._ch = zplane
+        self._zplane = zplane
+        self._ch = ch
         self._rnd = rnd
         self.is_aux = is_aux
         self.cache_read_order = cache_read_order
@@ -199,6 +199,7 @@ class PrimaryTileFetcher(TileFetcher):
         file_format: str = "",
         file_vars: str = "",
         cache_read_order: list = [],
+        zplane_offset: int = 0,
         fov_offset: int = 0,
         round_offset: int = 0,
         channel_offset: int = 0,
@@ -225,12 +226,15 @@ class PrimaryTileFetcher(TileFetcher):
                 - fov
                 - offset_fov (fov + fov_offset)
                 - zplane
+                - offset_zplane (zplane + zplane_offset)
         cache_read_order: list
             Description of the order of the axes of the images. Each item in the list is one dimension in the image.
             The following strings will be converted to Axes objects and will be parsed based on the instance variables of the tile:
                 -Z -> Axes.ZPLANE
                 -CH -> Axes.CH
             All ofther values will be treated as an axis where the full contents will be read for each individual tile. (in pratice, this should only be Axes.X and Axes.Y)
+        zplane_offset: int
+            Integer to be added to zplane names when looking for external file names, equal to the number of the first index.
         fov_offset: int
             Integer to be added to fov names when looking for external file names, equal to the number of the first index.
         round_offset: int
@@ -252,6 +256,7 @@ class PrimaryTileFetcher(TileFetcher):
         self.file_vars = file_vars
         self.input_dir = input_dir
         self.cache_read_order = cache_read_order
+        self.zplane_offset = zplane_offset
         self.fov_offset = fov_offset
         self.round_offset = round_offset
         self.channel_offset = channel_offset
@@ -295,6 +300,7 @@ class PrimaryTileFetcher(TileFetcher):
             "fov": fov_id,
             "offset_fov": fov_id + self.fov_offset,
             "zplane": zplane_label,
+            "offset_zplane": zplane_label + self.zplane_offset,
         }
         file_path = os.path.join(
             self.input_dir, self.file_format.format(*[varTable[arg] for arg in self.file_vars])
@@ -329,6 +335,7 @@ class AuxTileFetcher(TileFetcher):
         file_format: str = "",
         file_vars: str = "",
         cache_read_order: list = [],
+        zplane_offset: int = 0,
         fov_offset: int = 0,
         round_offset: int = 0,
         channel_offset: int = 0,
@@ -356,6 +363,7 @@ class AuxTileFetcher(TileFetcher):
                 - fov
                 - offset_fov (fov + fov_offset)
                 - zplane
+                - offset_zplane (zplane + zplane_offset)
         cache_read_order: list
             Description of the order of the axes of the images. Each item in the list is one dimension in the image.
             The following strings will be converted to Axes objects and will be parsed based on the instance variables of the tile:
@@ -385,6 +393,7 @@ class AuxTileFetcher(TileFetcher):
         self.file_vars = file_vars.split(";")
         self.input_dir = input_dir
         self.cache_read_order = cache_read_order
+        self.zplane_offset = zplane_offset
         self.fov_offset = fov_offset
         self.round_offset = round_offset
         self.channel_offset = channel_offset
@@ -424,6 +433,7 @@ class AuxTileFetcher(TileFetcher):
             "fov": fov_id,
             "offset_fov": fov_id + self.fov_offset,
             "zplane": zplane_label,
+            "offset_zplane": zplane_label + self.zplane_offset,
         }
         file_path = os.path.join(
             self.input_dir, self.file_format.format(*[varTable[arg] for arg in self.file_vars])
@@ -522,6 +532,7 @@ def cli(
             - fov
             - offset_fov (fov + fov_offset)
             - zplane
+            - offset_zplane (zplane + zplane_offset)
     cache_read_order: list
         Description of the order of the axes of the images. Each item in the list is one dimension in the image.
     counts: dict
@@ -588,6 +599,7 @@ def cli(
         file_format,
         file_vars,
         cache_read_order_formatted,
+        counts["zplane_offset"],
         counts["fov_offset"],
         counts["round_offset"],
         counts["channel_offset"],
@@ -617,6 +629,7 @@ def cli(
                 aux_file_formats[i],
                 aux_file_vars[i],
                 aux_cache_read_order_formatted,
+                counts["zplane_offset"],
                 counts["fov_offset"],
                 counts["round_offset"],
                 counts["channel_offset"],
@@ -661,6 +674,7 @@ if __name__ == "__main__":
     p.add_argument("--zplane-count", type=int)
     p.add_argument("--channel-count", type=int)
     p.add_argument("--fov-count", type=int)
+    p.add_argument("--zplane-offset", type=int, default=0)
     p.add_argument("--round-offset", type=int, default=0)
     p.add_argument("--fov-offset", type=int, default=0)
     p.add_argument("--channel-offset", type=int, default=0)
@@ -747,6 +761,7 @@ if __name__ == "__main__":
         "channels": args.channel_count,
         "zplanes": args.zplane_count,
         "fovs": args.fov_count,
+        "zplane_offset": args.zplane_offset,
         "round_offset": args.round_offset,
         "fov_offset": args.fov_offset,
         "channel_offset": args.channel_offset,
