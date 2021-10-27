@@ -3,13 +3,14 @@
 import functools
 import gc
 import math
-import os
 import pickle
 import sys
 import time
 from argparse import ArgumentParser
 from datetime import datetime
 from functools import partialmethod
+from glob import glob
+from os import makedirs, path
 from pathlib import Path
 from time import time
 
@@ -21,7 +22,7 @@ import starfish.data
 from astropy.stats import RipleysKEstimator
 from matplotlib.backends.backend_pdf import PdfPages
 from scipy.stats import norm, skew
-from starfish import BinaryMaskCollection, Codebook, ImageStack
+from starfish import BinaryMaskCollection, Codebook, DecodedIntensityTable, ImageStack
 from starfish.core.types import (
     Number,
     PerImageSliceSpotResults,
@@ -438,11 +439,11 @@ def run(
 
     t0 = time()
 
-    os.makedirs(output_dir, exist_ok=True)
+    base_dir = path.dirname(output_dir) + "/"
+    if not path.isdir(base_dir):
+        makedirs(base_dir)
 
-    reportFile = os.path.join(
-        output_dir, datetime.now().strftime("%Y-%d-%m_%H:%M_TXconversion.log")
-    )
+    reportFile = output_dir + datetime.now().strftime("%Y-%d-%m_%H:%M_TXconversion.log")
     sys.stdout = open(reportFile, "w")
 
     t = time()
@@ -455,7 +456,7 @@ def run(
     results = {}
     pdf = False
     if savePdf:
-        pdf = PdfPages(output_dir + "/graph_output.pdf")
+        pdf = PdfPages(output_dir + "graph_output.pdf")
 
     if spots:
         t1 = time()
@@ -503,7 +504,8 @@ def run(
     trRes = {}
     print("starting transcript metrics\n\ttime " + str(t1 - t0))
     trRes["density"] = getTranscriptDensity(transcripts, codebook)
-    trRes["per_cell"] = getTranscriptsPerCell(transcripts, pdf)
+    if hasattr(transcripts, "cell_id"):
+        trRes["per_cell"] = getTranscriptsPerCell(transcripts, pdf)
     if spots:
         trRes["fraction_spots_used"] = getFractionSpotsUsed(relevSpots, transcripts)
     trRes["round_dist"] = getTranscriptRoundDist(transcripts, pdf)
@@ -527,8 +529,8 @@ if __name__ == "__main__":
     p = ArgumentParser()
 
     p.add_argument("--codebook-exp", type=Path)
-    p.add_argument("--spots-exp", type=Path)
-    p.add_argument("--transcript-exp", type=Path)
+    p.add_argument("--exp-output", type=Path)
+    p.add_argument("--has-spots", dest="has_spots", action="store_true")
 
     p.add_argument("--codebook-pkl", type=Path)
     p.add_argument("--spots-pkl", type=Path)
@@ -544,7 +546,6 @@ if __name__ == "__main__":
 
     print(args)
 
-    # TODO: look into how to export the spots and transcripts from prior experiment
     codebook = False
     roi = False
     if args.codebook_exp:
@@ -560,13 +561,26 @@ if __name__ == "__main__":
     elif args.codebook_pkl:
         codebook = pickle.load(open(args.codebook_pkl, "rb"))
 
-    spots = False
-    if args.spots_pkl:
-        spots = pickle.load(open(args.spots_pkl, "rb"))
-
     transcripts = False
     if args.transcript_pkl:
         transcripts = pickle.load(open(args.transcript_pkl, "rb"))
+    else:
+        # load transcripts from exp dir
+        transcripts = {}
+        for f in glob("{}/cdf/*_decoded.cdf".format(args.exp_output)):
+            name = f[len(str(args.exp_output)) + 5 : -12]
+            transcripts[name] = DecodedIntensityTable.open_netcdf(f)
+
+    spots = False
+    if args.spots_pkl:
+        spots = pickle.load(open(args.spots_pkl, "rb"))
+    elif args.has_spots:
+        # load spots from exp dir
+        spots = {}
+        for k in transcripts.keys():
+            spots[k] = SpotFindingResults.load(
+                "{}/spots/{}_SpotFindingResults.json".format(args.exp_output, k)
+            )
 
     size = [0, 0, 0]
     if args.x_size:  # specify in CWL that all or none must be specified, only needed when doRipley
@@ -574,4 +588,22 @@ if __name__ == "__main__":
         size[1] = args.y_size
         size[2] = args.z_size
 
-    run("6_qc/", transcripts, codebook, size, spots, roi, args.run_ripley, args.save_pdf)
+    if args.exp_output:
+        # reading in from experiment can have multiple FOVs
+        for k in transcripts.keys():
+            spot = False
+            if args.has_spots:
+                spot = spots[k]
+            run(
+                "6_qc/{}_".format(k),
+                transcripts[k],
+                codebook,
+                size,
+                spot,
+                roi,
+                args.run_ripley,
+                args.save_pdf,
+            )
+    else:
+        # pickle assumes one FOV
+        run("6_qc/", transcripts, codebook, size, spots, roi, args.run_ripley, args.save_pdf)

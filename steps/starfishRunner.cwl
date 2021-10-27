@@ -6,7 +6,7 @@ baseCommand: /opt/starfishDriver.py
 
 requirements:
   DockerRequirement:
-    dockerPull: docker.pkg.github.com/hubmapconsortium/spatial-transcriptomics-pipeline/starfish:latest
+    dockerPull: docker.pkg.github.com/hubmapconsortium/spatial-transcriptomics-pipeline/starfish-custom:latest
 
 inputs:
   exp_loc:

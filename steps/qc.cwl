@@ -6,7 +6,7 @@ baseCommand: /opt/qcDriver.py
 
 requirements:
   DockerRequirement:
-    dockerPull: docker.pkg.github.com/hubmapconsortium/spatial-transcriptomics-pipeline/starfish:latest
+    dockerPull: docker.pkg.github.com/hubmapconsortium/spatial-transcriptomics-pipeline/starfish-custom:latest
 
 inputs:
   codebook:
@@ -27,44 +27,34 @@ inputs:
             inputBinding:
               prefix: --codebook-exp
             doc: The location of an experiment.json file, which has the corresponding codebook for this experiment.
-  spots:
+  data:
     type:
-    - 'null'
     - type: record
       name: pkl
       fields:
-        pkl:
-          type: File
+        spots:
+          type: File?
           inputBinding:
             prefix: --spots-pkl
           doc: Spots found in this experiment, saved in a python pickle.
+        transcripts:
+          type: File
+          inputBinding:
+            prefix: --transcript-pkl
+          doc: The output DecodedIntensityTable, saved in a python pickle.
     - type: record
       name: exp
       fields:
         exp:
-          type: File
+          type: Directory
           inputBinding:
-            prefix: --spots-exp
-          doc: The location of OUTPUT FROM EXPERIMENT. NETCDF?
-
-  transcripts:
-    type:
-      - type: record
-        name: pkl
-        fields:
-          pkl:
-            type: File
-            inputBinding:
-              prefix: --transcript-pkl
-            doc: The output DecodedIntensityTable, saved in a python pickle.
-      - type: record
-        name: exp
-        fields:
-          exp:
-            type: File
-            inputBinding:
-              prefix: --transcript-exp
-            doc: The location of OUTPUT FROM EXPERIMENT. NETCDF?
+            prefix: --exp-output
+          doc: The location of output of starfish runner step, 4_Decoded. Contains spots (if applicable) and netcdfs containing the DecodedIntensityTable.
+        has-spots: 
+          type: boolean?
+          inputBinding:
+            prefix: --has-spots
+          doc: If true, will look for spots within the experiment field.
 
   roi:
     type: File?

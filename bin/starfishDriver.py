@@ -178,7 +178,7 @@ def blobDriver(
     codebook: Codebook,
     blobRunnerKwargs: dict,
     decodeRunnerKwargs: dict,
-) -> Mapping[str, DecodedIntensityTable]:
+) -> Tuple[Mapping[str, SpotFindingResults], Mapping[str, DecodedIntensityTable]]:
     """
     Method to handle the blob-based version of the detection and decoding steps.
 
@@ -197,17 +197,20 @@ def blobDriver(
 
     Returns
     -------
+    SpotFindingResults:
+        The container with information regarding spot locations.
+
     Mapping[str, DecodedIntensityTable]:
         A dictionary with the decoded tables stored by FOV name.
     """
     fovs = imgs.keys()
+    blobs = {}
     decoded = {}
     for fov in fovs:
-        blobs = blobRunner(
-            imgs[fov], ref_img=ref_img[fov] if ref_img else None, **blobRunnerKwargs
-        )
-        decoded[fov] = decodeRunner(blobs, codebook, **decodeRunnerKwargs)
-    return decoded
+        blob = blobRunner(imgs[fov], ref_img=ref_img[fov] if ref_img else None, **blobRunnerKwargs)
+        blobs[fov] = blob
+        decoded[fov] = decodeRunner(blob, codebook, **decodeRunnerKwargs)
+    return blobs, decoded
 
 
 def pixelDriver(
@@ -291,6 +294,9 @@ def run(
     if not path.isdir(output_dir + "cdf/"):
         makedirs(output_dir + "cdf")
 
+    if blob_based and not path.isdir(output_dir + "spots/"):
+        makedirs(output_dir + "spots")
+
     reporter = open(
         path.join(output_dir, datetime.now().strftime("%Y-%d-%m_%H:%M_starfish_runner.log")), "w"
     )
@@ -320,7 +326,7 @@ def run(
 
     decoded = {}
     if blob_based:
-        decoded = blobDriver(
+        blobs, decoded = blobDriver(
             imgs, ref_imgs, experiment.codebook, blobRunnerKwargs, decodeRunnerKwargs
         )
     else:
@@ -331,6 +337,8 @@ def run(
         saveTable(decoded[fov], output_dir + "csv/" + fov + "_decoded.csv")
         # decoded[fov].to_decoded_dataframe().save_csv(output_dir+fov+"_decoded.csv")
         decoded[fov].to_netcdf(output_dir + "cdf/" + fov + "_decoded.cdf")
+        if blob_based:
+            blobs[fov].save(output_dir + "spots/" + fov + "_")
 
     sys.stdout = sys.__stdout__
     return 0
