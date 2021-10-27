@@ -6,7 +6,7 @@ RUN python3 -m pip install -r /opt/requirements.txt \
  && python3 -m pip install starfish \
  && rm -rf /root/cache/.pip /opt/requirements.txt
 
-RUN echo "import matplotlib" | python
+RUN echo "import matplotlib.pyplot as plt" | python
 
 COPY bin /opt
 RUN chmod +x /opt/*.py

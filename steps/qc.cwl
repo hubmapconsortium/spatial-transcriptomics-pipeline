@@ -98,4 +98,4 @@ outputs:
   qc_metrics:
     type: Directory
     outputBinding:
-      glob: "6_qc/"
+      glob: "6_QC/"

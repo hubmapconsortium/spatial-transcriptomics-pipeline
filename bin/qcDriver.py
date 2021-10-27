@@ -426,7 +426,7 @@ def getTranscriptChannelDist(transcripts, pdf=False):
     return counts, std, skw
 
 
-def run(
+def runFOV(
     output_dir,
     transcripts,
     codebook,
@@ -439,19 +439,7 @@ def run(
 
     t0 = time()
 
-    base_dir = path.dirname(output_dir) + "/"
-    if not path.isdir(base_dir):
-        makedirs(base_dir)
-
-    reportFile = output_dir + datetime.now().strftime("%Y-%d-%m_%H:%M_TXconversion.log")
-    sys.stdout = open(reportFile, "w")
-
-    t = time()
-    print("dir created " + str(t - t0))
     print("transcripts {}\ncodebook {}\nspots {}".format(transcripts, codebook, spots))
-
-    # disabling tdqm for pipeline runs
-    tqdm.__init__ = partialmethod(tqdm.__init__, disable=True)
 
     results = {}
     pdf = False
@@ -521,11 +509,63 @@ def run(
     print("Analysis complete\n\ttime " + str(t - t0))
     print(results)
 
+    return 0
+
+
+def run(
+    transcripts,
+    codebook,
+    size,
+    fovs=None,
+    spots=None,
+    segmask=None,
+    doRipley=False,
+    savePdf=False,
+):
+
+    t0 = time()
+
+    output_dir = "6_QC/"
+    if not path.isdir(output_dir):
+        makedirs(output_dir)
+
+    reportFile = output_dir + datetime.now().strftime("%Y-%d-%m_%H:%M_TXconversion.log")
+    sys.stdout = open(reportFile, "w")
+
+    t = time()
+    print("dir created " + str(t - t0))
+    if fovs:
+        for f in fovs:
+            print("\ton fov " + f)
+            fov_dir = "{}/{}_".format(output_dir, f)
+            spot = False
+            if args.has_spots:
+                spot = spots[f]
+            run(
+                fov_dir,
+                transcripts[k],
+                codebook,
+                size,
+                spot,
+                segmask,
+                doRipley,
+                savePdf,
+            )
+    else:
+        runFOV(output_dir, transcripts, codebook, size, spots, segmask, doRipley, savePdf)
+
+    t = time()
+    print("Analysis complete\n\ttime " + str(t - t0))
+
     sys.stdout = sys.__stdout__
     return 0
 
 
 if __name__ == "__main__":
+
+    # disabling tdqm for pipeline runs
+    tqdm.__init__ = partialmethod(tqdm.__init__, disable=True)
+
     p = ArgumentParser()
 
     p.add_argument("--codebook-exp", type=Path)
@@ -588,22 +628,8 @@ if __name__ == "__main__":
         size[1] = args.y_size
         size[2] = args.z_size
 
+    fovs = False
     if args.exp_output:
         # reading in from experiment can have multiple FOVs
-        for k in transcripts.keys():
-            spot = False
-            if args.has_spots:
-                spot = spots[k]
-            run(
-                "6_qc/{}_".format(k),
-                transcripts[k],
-                codebook,
-                size,
-                spot,
-                roi,
-                args.run_ripley,
-                args.save_pdf,
-            )
-    else:
-        # pickle assumes one FOV
-        run("6_qc/", transcripts, codebook, size, spots, roi, args.run_ripley, args.save_pdf)
+        fovs = [k for k in transcripts.keys()]
+    run(transcripts, codebook, size, fovs, spots, roi, args.run_ripley, args.save_pdf)
