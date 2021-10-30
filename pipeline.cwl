@@ -314,6 +314,15 @@ inputs:
             type: int
             doc: Radius for white tophat noise filter
 
+# 5 - QC
+
+  find_ripley:
+    type: boolean?
+    doc: If true, will run ripley K estimates to find spatial density measures.  Can be slow.
+  save_pdf:
+    type: boolean?
+    doc: If true, will save graphical output to a pdf. Currently pdfs are bugged.
+
 outputs:
   1_Projected:
     type: Directory
@@ -333,6 +342,9 @@ outputs:
   5_Segmented:
     type: Directory
     outputSource: segmentation/segmented
+  6_QC:
+    type: Directory
+    outputSource: qc/qc_metrics
 
 steps:
   align:
@@ -394,3 +406,39 @@ steps:
       binary_mask: binary_mask
     out:
       [segmented]
+
+  qc:
+    run: steps/qc.cwl
+    in:
+      codebook:
+        source: spaceTxConversion/spaceTx_converted
+        valueFrom: |
+          ${
+            return {exp: self};
+          }
+      roi:
+        source: binary_mask
+        valueFrom: $(self.roi_set)
+      imagesize:
+        source: fov_positioning
+        valueFrom: |
+          ${
+            return {
+              x-size: self.x-shape,
+              y-size: self.y-shape,
+              z-size: self.z-shape
+            };
+          }
+      find_ripley: find_ripley
+      save_pdf: save_pdf
+      data:
+        source: [starfishRunner/decoded, decoding]
+        valueFrom: |
+          ${
+            return {
+              exp: self[0],
+              has_spots: $(typeof self.decode_method != 'undefined')
+            };
+          }
+    out:
+      [qc_metrics]

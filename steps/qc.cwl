@@ -82,13 +82,13 @@ inputs:
             prefix: --z-size
           doc: number of z-stacks
 
-  find-ripley:
+  find_ripley:
     type: boolean?
     inputBinding:
       prefix: --run-ripley
     doc: If true, will run ripley K estimates to find spatial density measures.  Can be slow.
   
-  save-pdf:
+  save_pdf:
     type: boolean?
     inputBinding:
       prefix: --save-pdf
