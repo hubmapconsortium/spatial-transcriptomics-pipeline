@@ -390,12 +390,18 @@ if __name__ == "__main__":
     p.add_argument("--metric", type=str, nargs="?")  # NOTE also used in pixelRunner
     p.add_argument("--norm-order", type=int, nargs="?")  # NOTE also used in pixelRunner
     p.add_argument("--anchor-round", type=int, nargs="?")  # also used in PerRoundMaxChannel
-    p.add_argument("--search-radius", type=int, nargs="?")  # also used in PerRoundMaxChannel
+    p.add_argument(
+        "--search-radius", type=int, nargs="?"
+    )  # also used in PerRoundMaxChannel, CheckAll
     p.add_argument("--return-original-intensities", type=bool, nargs="?")
     p.add_argument(
         "--filtered_results", dest="filtered_results", action="store_true"
     )  # defined by us
     p.set_defaults(filtered_results=False)
+
+    ## CheckAll
+    p.add_argument("--filter-rounds", type=int, nargs="?")
+    p.add_argument("--error-rounds", type=int, nargs="?")
 
     # pixelRunner kwargs
     p.add_argument("--distance-threshold", type=float, nargs="?")
@@ -440,6 +446,8 @@ if __name__ == "__main__":
     addKwarg(args, blobRunnerKwargs, "threshold")
     addKwarg(args, blobRunnerKwargs, "overlap")
     addKwarg(args, blobRunnerKwargs, "is_volume")
+    addKwarg(args, blobRunnerKwargs, "filter_rounds")
+    addKwarg(args, blobRunnerKwargs, "error_rounds")
 
     pixelRunnerKwargs = {}
     addKwarg(args, pixelRunnerKwargs, "metric")
@@ -460,11 +468,16 @@ if __name__ == "__main__":
             method = starfish.spots.DecodeSpots.MetricDistance
         elif method == "SimpleLookupDecoder":
             method = starfish.spots.DecodeSpots.SimpleLookupDecoder
+        elif metho == "CheckAll":
+            method = starfish.spots.DecodeSpots.CheckAll
         else:
             raise Exception("DecodeSpots method " + str(method) + " is not a valid method.")
 
         trace_strat = args.trace_building_strategy
-        if method != starfish.spots.DecodeSpots.SimpleLookupDecoder:
+        if (
+            method == starfish.spots.DecodeSpots.PerRoundMaxChannel
+            or meth == starfish.spots.DecodeSpots.MetricDistance
+        ):
             if trace_strat == "SEQUENTIAL":
                 trace_strat = TraceBuildingStrategies.SEQUENTIAL
             elif trace_strat == "EXACT_MATCH":
