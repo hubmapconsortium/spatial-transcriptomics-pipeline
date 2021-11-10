@@ -99,6 +99,7 @@ def blobRunner(
     num_sigma: int = 10,
     threshold: float = 0.1,
     is_volume: bool = False,
+    detector_method: str = "blob_log",
     overlap: float = 0.5,
 ) -> SpotFindingResults:
     """
@@ -124,6 +125,7 @@ def blobRunner(
         num_sigma=num_sigma,
         threshold=threshold,
         is_volume=is_volume,
+        detector_method=detector_method,
         overlap=overlap,
     )
     results = None
@@ -209,6 +211,7 @@ def blobDriver(
     for fov in fovs:
         blob = blobRunner(imgs[fov], ref_img=ref_img[fov] if ref_img else None, **blobRunnerKwargs)
         blobs[fov] = blob
+        print("found total spots {}".format(blob.count_total_spots()))
         decoded[fov] = decodeRunner(blob, codebook, **decodeRunnerKwargs)
     return blobs, decoded
 
@@ -374,6 +377,7 @@ if __name__ == "__main__":
     p.add_argument("--num-sigma", type=int, nargs="?")
     p.add_argument("--threshold", type=float, nargs="?")
     p.add_argument("--overlap", type=float, nargs="?")
+    p.add_argument("--detector-method", type=str, nargs="?")
     p.add_argument("--is-volume", dest="is_volume", action="store_true")
 
     ### aside, are we going to want to include the ability to run a sweep?
@@ -446,8 +450,7 @@ if __name__ == "__main__":
     addKwarg(args, blobRunnerKwargs, "threshold")
     addKwarg(args, blobRunnerKwargs, "overlap")
     addKwarg(args, blobRunnerKwargs, "is_volume")
-    addKwarg(args, blobRunnerKwargs, "filter_rounds")
-    addKwarg(args, blobRunnerKwargs, "error_rounds")
+    addKwarg(args, blobRunnerKwargs, "detector_method")
 
     pixelRunnerKwargs = {}
     addKwarg(args, pixelRunnerKwargs, "metric")
@@ -468,7 +471,7 @@ if __name__ == "__main__":
             method = starfish.spots.DecodeSpots.MetricDistance
         elif method == "SimpleLookupDecoder":
             method = starfish.spots.DecodeSpots.SimpleLookupDecoder
-        elif metho == "CheckAll":
+        elif method == "CheckAll":
             method = starfish.spots.DecodeSpots.CheckAll
         else:
             raise Exception("DecodeSpots method " + str(method) + " is not a valid method.")
@@ -476,7 +479,7 @@ if __name__ == "__main__":
         trace_strat = args.trace_building_strategy
         if (
             method == starfish.spots.DecodeSpots.PerRoundMaxChannel
-            or meth == starfish.spots.DecodeSpots.MetricDistance
+            or method == starfish.spots.DecodeSpots.MetricDistance
         ):
             if trace_strat == "SEQUENTIAL":
                 trace_strat = TraceBuildingStrategies.SEQUENTIAL
@@ -488,6 +491,8 @@ if __name__ == "__main__":
                 raise Exception("TraceBuildingStrategies " + str(trace_strat) + " is not valid.")
             decodeKwargs["trace_building_strategy"] = trace_strat
 
+    addKwarg(args, decodeKwargs, "filter_rounds")
+    addKwarg(args, decodeKwargs, "error_rounds")
     addKwarg(args, decodeKwargs, "max_distance")
     addKwarg(args, decodeKwargs, "min_intensity")
     addKwarg(args, decodeKwargs, "metric")

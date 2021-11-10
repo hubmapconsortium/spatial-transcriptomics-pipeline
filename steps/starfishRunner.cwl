@@ -80,6 +80,11 @@ inputs:
             inputBinding:
               prefix: --overlap
             doc: Amount of overlap allowed between blobs, passed to blob detector
+          detector_method:
+            type: string?
+            inputBinding:
+              prefix: --detector-method
+            doc: Name of the scikit-image spot detection method to use
           decode_method:
             type: string
             inputBinding:
