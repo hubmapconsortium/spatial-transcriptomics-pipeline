@@ -419,6 +419,7 @@ steps:
       roi:
         source: binary_mask
         valueFrom: $(self.roi_set)
+      segemented_loc: segmentation/segmented
       imagesize:
         source: fov_positioning
         valueFrom: |

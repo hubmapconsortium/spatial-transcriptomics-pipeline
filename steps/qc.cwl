@@ -27,6 +27,12 @@ inputs:
             inputBinding:
               prefix: --codebook-exp
             doc: The location of an experiment.json file, which has the corresponding codebook for this experiment.
+  segmented_loc:
+    type: Directory?
+    inputBinding:
+      prefix: --segmented-loc
+    doc: The location of the output from the segmentation step, if it was performed.
+
   data:
     type:
     - type: record

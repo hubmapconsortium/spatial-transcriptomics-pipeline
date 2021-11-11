@@ -24,6 +24,7 @@ from matplotlib.backends.backend_pdf import PdfPages
 from scipy.stats import norm, skew
 from starfish import BinaryMaskCollection, Codebook, DecodedIntensityTable, ImageStack
 from starfish.core.types import (
+    DecodedSpots,
     Number,
     PerImageSliceSpotResults,
     SpotAttributes,
@@ -352,9 +353,9 @@ def getTranscriptDensity(transcripts, codebook):
     return np.shape(transcripts.data)[0] / len(codebook.target)
 
 
-def getTranscriptsPerCell(transcripts, pdf=False):
+def getTranscriptsPerCell(segmented, pdf=False):
     counts = []
-    cells = transcripts.cell_id.data.astype(np.int)
+    cells = segmented.data["cell_id"]
 
     for i in range(max(cells)):
         counts.append(sum(cells == i))
@@ -433,6 +434,7 @@ def runFOV(
     size,
     spots=None,
     segmask=None,
+    segmentaiton=None,
     doRipley=False,
     savePdf=False,
 ):
@@ -492,8 +494,8 @@ def runFOV(
     trRes = {}
     print("starting transcript metrics\n\ttime " + str(t1 - t0))
     trRes["density"] = getTranscriptDensity(transcripts, codebook)
-    if hasattr(transcripts, "cell_id"):
-        trRes["per_cell"] = getTranscriptsPerCell(transcripts, pdf)
+    if segmentation:
+        trRes["per_cell"] = getTranscriptsPerCell(segmentation, pdf)
     if spots:
         trRes["fraction_spots_used"] = getFractionSpotsUsed(relevSpots, transcripts)
     trRes["round_dist"] = getTranscriptRoundDist(transcripts, pdf)
@@ -519,6 +521,7 @@ def run(
     fovs=None,
     spots=None,
     segmask=None,
+    segmentation=None,
     doRipley=False,
     savePdf=False,
 ):
@@ -539,20 +542,34 @@ def run(
             print("\ton fov " + f)
             fov_dir = "{}/{}_".format(output_dir, f)
             spot = False
+            segment = False
             if args.has_spots:
                 spot = spots[f]
-            run(
+            if args.segmentation_loc:
+                segment = segmentation[f]
+            runFOV(
                 fov_dir,
                 transcripts[k],
                 codebook,
                 size,
                 spot,
                 segmask,
+                segment,
                 doRipley,
                 savePdf,
             )
     else:
-        runFOV(output_dir, transcripts, codebook, size, spots, segmask, doRipley, savePdf)
+        runFOV(
+            output_dir,
+            transcripts,
+            codebook,
+            size,
+            spots,
+            segmask,
+            segmentation,
+            doRipley,
+            savePdf,
+        )
 
     t = time()
     print("Analysis complete\n\ttime " + str(t - t0))
@@ -575,6 +592,7 @@ if __name__ == "__main__":
     p.add_argument("--codebook-pkl", type=Path)
     p.add_argument("--spots-pkl", type=Path)
     p.add_argument("--transcript-pkl", type=Path)
+    p.add_argument("--segmentation-loc", type=Path, nargs="?")
 
     p.add_argument("--roi", type=Path)
     p.add_argument("--x-size", type=int, nargs="?")
@@ -611,6 +629,13 @@ if __name__ == "__main__":
             name = f[len(str(args.exp_output)) + 5 : -12]
             transcripts[name] = DecodedIntensityTable.open_netcdf(f)
 
+    segmentation = False
+    if args.segmentation_loc:
+        segmentation = {}
+        for f in glob("{}/csv/df_*_segmented.csv"):
+            name = f[len(str(args.segmentation_loc)) + 8 : -14]
+            segmentation[name] = DecodedSpots.load_csv(f)
+
     spots = False
     if args.spots_pkl:
         spots = pickle.load(open(args.spots_pkl, "rb"))
@@ -632,4 +657,6 @@ if __name__ == "__main__":
     if args.exp_output:
         # reading in from experiment can have multiple FOVs
         fovs = [k for k in transcripts.keys()]
-    run(transcripts, codebook, size, fovs, spots, roi, args.run_ripley, args.save_pdf)
+    run(
+        transcripts, codebook, size, fovs, spots, segmentation, roi, args.run_ripley, args.save_pdf
+    )
