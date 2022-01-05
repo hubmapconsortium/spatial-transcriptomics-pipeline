@@ -202,9 +202,13 @@ def run(
     exp = starfish.core.experiment.experiment.Experiment.from_json(
         str(exp_loc / "experiment.json")
     )
+    print("loaded " + str(exp_loc / "experiment.json"))
+
     img_stack = []
     for key in exp.keys():
-        img_stack.append(exp[key].get_image(aux_name))
+        print("looking at " + key + ", " + aux_name)
+        cur_img = exp[key].get_image(aux_name)
+        img_stack.append(cur_img)
 
     # determine how we generate mask, then make it
     if len(roiKwargs.keys()) > 0:
@@ -227,7 +231,7 @@ def run(
     al = AssignTargets.Label()
     for i in range(fov_count):
         labeled = al.run(masks[i], results[i])
-        labeled = labeled[labeled.cell_id != "nan"]
+        # labeled = labeled[labeled.cell_id != "nan"]
         labeled.to_decoded_dataframe().save_csv(
             output_dir + "csv/df_" + keys[i] + "_segmented.csv"
         )
