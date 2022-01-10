@@ -2,13 +2,20 @@
 
 class: CommandLineTool
 cwlVersion: v1.2
-baseCommand: ["run_baysor.sh"]
+baseCommand: ["bash","run_baysor.sh"]
 
 requirements:
   DockerRequirement:
-    dockerPull: vpetukhov/baysor:v0.5.0
+    #dockerPull: vpetukhov/baysor:v0.5.0
+    #dockerPull: waltsbaysor:latest
+    dockerPull: docker.pkg.github.com/hubmapconsortium/spatial-transcriptomics-pipeline/baysor:latest
+  InlineJavascriptRequirement: {}
   InitialWorkDirRequirement:
     listing:
+      - entry: "$({class: 'Directory', path: '/user/baysoruser', listing: []})"
+        entryname: baysoruser
+        writable: true
+
       - entryname: run_baysor.sh
         entry: |-
           #!/usr/bin/env bash
@@ -28,7 +35,7 @@ requirements:
           baysor run "$@"
   EnvVarRequirement:
     envDef:
-      HOME: "/root"
+      HOME: "/home/baysoruser"
 
 inputs:
   csv:
@@ -37,44 +44,44 @@ inputs:
       position: 6
     doc: csv with transcript information
   priors:
-    type: string?
+    type: File?
     inputBinding:
       position: 7
-    doc: Name of column with prior segmentation.
-  x_col:
-    type: string?
-    inputBinding:
-      position: 2
-      prefix: -x
-    default: xc
-    doc: Name of the column with x information
-  y_col:
-    type: string?
-    inputBinding:
-      position: 3
-      prefix: -y
-    default: yc
-    doc: Name of the column with y information
-  z_col:
-    type: string?
-    inputBinding:
-      position: 4
-      prefix: -z
-    default: zc
-    doc: Name of the column with z information
-  gene_col:
-    type: string?
-    inputBinding:
-      position: 5
-      prefix: --gene
-    default: target
-    doc: Name of the column with gene names
+    doc: Binary Mask image with prior segmentation.
   scale:
     type: int?
     inputBinding:
       position: 1
       prefix: -s
-    doc: Scale of pixels in image.
+    doc: Expected scale equal to cell radius in the same units as x, y, and z.
+  x_col:
+    type: string?
+    inputBinding:
+      position: 2
+      prefix: -x
+    doc: Name of the column with x information
+    default: x_min
+  y_col:
+    type: string?
+    inputBinding:
+      position: 3
+      prefix: -y
+    default: y_min
+    doc: Name of the column with y information
+  z_col:
+    type: string?
+    inputBinding:
+      position: 5
+      prefix: -z
+    default: z_min
+    doc: Name of the column with z information
+  gene_col:
+    type: string?
+    inputBinding:
+      position: 4
+      prefix: --gene
+    default: target
+    doc: Name of the column with gene names
 
 outputs:
   segmented:
