@@ -477,23 +477,19 @@ def parse_codebook(codebook_csv: str) -> Codebook:
         Codebook object in SpaceTx format.
     """
     csv: pd.DataFrame = pd.read_csv(codebook_csv, index_col=0)
-    integer_round_ids = range(csv.shape[1])
-    csv.columns = integer_round_ids
+    genes = csv.index.values
+    data_raw = csv.values
+    rounds = csv.shape[1]
+    channels = data_raw.max()
 
-    mappings = []
+    # convert data_raw -> data, where data is genes x channels x rounds
+    data = np.zeros((len(data_raw), rounds, channels))
+    for b in range(len(data_raw)):
+        for i in range(len(data_raw[b])):
+            if data_raw[b][i] != 0:
+                data[b][i][data_raw[b][i] - 1] = 1
 
-    for gene, channel_series in csv.iterrows():
-        mappings.append(
-            {
-                Features.CODEWORD: [
-                    {Axes.ROUND.value: r, Axes.CH.value: c - 1, Features.CODE_VALUE: 1}
-                    for r, c in channel_series.items()
-                ],
-                Features.TARGET: gene,
-            }
-        )
-
-    return Codebook.from_code_array(mappings)
+    return Codebook.from_numpy(genes, rounds, channels, data)
 
 
 def cli(
