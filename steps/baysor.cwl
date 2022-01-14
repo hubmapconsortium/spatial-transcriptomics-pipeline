@@ -2,40 +2,13 @@
 
 class: CommandLineTool
 cwlVersion: v1.2
-baseCommand: ["bash","run_baysor.sh"]
+baseCommand: ["baysor","run"]
 
 requirements:
   DockerRequirement:
     #dockerPull: vpetukhov/baysor:v0.5.0
     #dockerPull: waltsbaysor:latest
     dockerPull: docker.pkg.github.com/hubmapconsortium/spatial-transcriptomics-pipeline/baysor:latest
-  InlineJavascriptRequirement: {}
-  InitialWorkDirRequirement:
-    listing:
-      - entry: "$({class: 'Directory', path: '/user/baysoruser', listing: []})"
-        entryname: baysoruser
-        writable: true
-
-      - entryname: run_baysor.sh
-        entry: |-
-          #!/usr/bin/env bash
-          # Set the exit code of a pipeline to that of the rightmost command
-          # to exit with a non-zero status, or zero if all commands of the pipeline exit
-          set -o pipefail
-          # cause a bash script to exit immediately when a command fails
-          set -e
-          # cause the bash shell to treat unset variables as an error and exit immediately
-          set -u
-          # echo each line of the script to stdout so we can see what is happening
-          set -o xtrace
-          #to turn off echo do 'set +o xtrace'
-          # Call the baysor script that is processed by Julia and pass all arguments to it
-          env
-          cat /bin/baysor
-          baysor run "$@"
-  EnvVarRequirement:
-    envDef:
-      HOME: "/home/baysoruser"
 
 inputs:
   csv:
