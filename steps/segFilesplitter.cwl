@@ -1,7 +1,8 @@
+#!/usr/bin/env cwl-runner
+
 cwlVersion: v1.2
 class: CommandLineTool
-requirements:
-  ShellCommandRequirement: {}
+baseCommand: ["ls"]
 
 inputs:
   segDir:
@@ -9,13 +10,10 @@ inputs:
     doc: Directory with output from starfish segmentation step.
 
 outputs:
-  baysorDir:
-    type: Directory[]
-    doc: One directory for each FOV, containing the mask and csv files.
-  outputBinding:
-    glob: "baysor_*/"
-
-arguments:
-    - shellQuote: false
-      valueFrom: >
-        
+  csvs:
+    type: File[]
+    outputBinding:
+      glob:"*/df_segmented.csv"
+  priors:
+    type: File[]
+      glob: "*/mask.tiff"

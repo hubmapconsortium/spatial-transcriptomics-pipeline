@@ -12,6 +12,7 @@ from typing import List, Mapping, Set
 
 import numpy as np
 import pandas as pd
+import PIL
 import starfish
 import starfish.data
 from starfish import (
@@ -175,17 +176,17 @@ def run(
     sys.stdout = reporter
     sys.stderr = reporter
 
-    if not path.isdir(output_dir + "csv/"):
-        makedirs(output_dir + "csv")
-        print("made " + output_dir + "csv")
+    # if not path.isdir(output_dir + "csv/"):
+    #    makedirs(output_dir + "csv")
+    #    print("made " + output_dir + "csv")
 
-    if not path.isdir(output_dir + "cdf/"):
-        makedirs(output_dir + "cdf")
-        print("made " + output_dir + "cdf")
+    # if not path.isdir(output_dir + "cdf/"):
+    #    makedirs(output_dir + "cdf")
+    #    print("made " + output_dir + "cdf")
 
-    if not path.isdir(output_dir + "h5ad/"):
-        makedirs(output_dir + "h5ad")
-        print("made " + output_dir + "h5ad")
+    # if not path.isdir(output_dir + "h5ad/"):
+    #    makedirs(output_dir + "h5ad")
+    #    print("made " + output_dir + "h5ad")
 
     # read in netcdfs based on how we saved prev step
     results = []
@@ -197,6 +198,9 @@ def run(
         print("found fov key: " + name)
         keys.append(name)
         print("loaded " + f)
+        if not path.isdir(output_dir + name):
+            makedirs(output_dir + name)
+            print("made " + output_dir + name)
 
     # load in the images we want to look at
     exp = starfish.core.experiment.experiment.Experiment.from_json(
@@ -227,22 +231,23 @@ def run(
         # throw error
         raise Exception("Parameters do not specify means of defining mask.")
 
+    # save masks to tiffs for later processing
+    for i in range(len(masks)):
+        flat = np.sum(masks[i].to_label_image().xarray.values, axis=0) > 0
+        PIL.Image.fromarray(flat).save("{}/{}/mask.tiff".format(output_dir, keys[i]))
+
     # apply mask to tables, save results
     al = AssignTargets.Label()
     for i in range(fov_count):
         labeled = al.run(masks[i], results[i])
         # labeled = labeled[labeled.cell_id != "nan"]
-        labeled.to_decoded_dataframe().save_csv(
-            output_dir + "csv/df_" + keys[i] + "_segmented.csv"
-        )
-        labeled.to_netcdf(output_dir + "cdf/df_" + keys[i] + "_segmented.cdf")
+        labeled.to_decoded_dataframe().save_csv(output_dir + keys[i] + "/df_segmented.csv")
+        labeled.to_netcdf(output_dir + keys[i] + "/df_segmented.cdf")
         labeled.to_expression_matrix().to_pandas().to_csv(
-            output_dir + "csv/exp_" + keys[i] + "_segmented.csv"
+            output_dir + keys[i] + "/exp_segmented.csv"
         )
-        labeled.to_expression_matrix().save(output_dir + "cdf/exp_" + keys[i] + "_segmented.cdf")
-        labeled.to_expression_matrix().save_anndata(
-            output_dir + "h5ad/exp_" + keys[i] + "_segmented.h5ad"
-        )
+        labeled.to_expression_matrix().save(output_dir + keys[i] + "/exp_segmented.cdf")
+        labeled.to_expression_matrix().save_anndata(output_dir + keys[i] + "/exp_segmented.h5ad")
         print("saved fov key: {}, index {}".format(keys[i], i))
 
     sys.stdout = sys.__stdout__
