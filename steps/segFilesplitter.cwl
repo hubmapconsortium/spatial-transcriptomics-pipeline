@@ -2,7 +2,14 @@
 
 cwlVersion: v1.2
 class: CommandLineTool
-baseCommand: [ls,-l]
+baseCommand: [ls]
+
+requirements:
+  DockerRequirement:
+    dockerPull: ubuntu:latest
+  InitialWorkDirRequirement:
+    listing:
+      - $(inputs.segDir)
 
 inputs:
   segDir:
@@ -15,10 +22,10 @@ outputs:
       type: array
       items: File
     outputBinding:
-      glob: "*/df_segmented.csv"
+      glob: "**/**/df_segmented.csv"
   priors:
     type:
       type: array
       items: File
     outputBinding:
-      glob: "*/mask.tiff"
+      glob: "**/**/mask.tiff"
