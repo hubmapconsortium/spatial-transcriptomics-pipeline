@@ -2,20 +2,12 @@
 
 cwlVersion: v1.2
 class: CommandLineTool
-baseCommand: ["echo", "hello"]
-
-requirements:
-  InitialWorkDirRequirement:
-    listing:
-      - $(inputs.segDir)
+baseCommand: [ls,-l]
 
 inputs:
   segDir:
     type: Directory
     doc: Directory with output from starfish segmentation step.
-    inputBinding:
-      position: 1
-      valueFrom: $(self.basename)
 
 outputs:
   csvs:
@@ -23,7 +15,7 @@ outputs:
       type: array
       items: File
     outputBinding:
-      glob:"*/df_segmented.csv"
+      glob: "*/df_segmented.csv"
   priors:
     type:
       type: array
