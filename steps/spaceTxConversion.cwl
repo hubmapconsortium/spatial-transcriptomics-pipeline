@@ -125,11 +125,21 @@ inputs:
           inputBinding:
             prefix: --aux-cache-read-order
           doc: Order of non x,y dimensions within each image. One entry per aux_name, with semicolon-delimited vars.
-        aux_fixed_channel:
+        aux_channel_count:
           type: int[]?
           inputBinding:
-            prefix: --aux-fixed-channel
-          doc: Which channel to refer to in aux images.
+            prefix: --aux-channel-count
+          doc: Count of channels in each aux image
+        aux_channel_slope:
+          type: float[]?
+          inputBinding:
+            prefix: --aux-channel-slope
+          doc: Used to convert 0-indexed channel IDs to the channel index within the image.  Calculated as (image index) = int(index*slope) + intercept
+        aux_channel_intercept:
+          type: int[]?
+          inputBinding:
+            prefix: --aux-channel-intercept
+          doc: Used to convert 0-indexed channel IDs to the channel index within the image.  Calculated as (image index) = int(index*slope) + intercept
 
   fov_positioning:
     - 'null'

@@ -58,9 +58,6 @@ class FISHTile(FetchedTile):
             The number of the channel layer.
         rnd: int
             The number of the imaging round.
-        is_aux: bool
-            if false: The tile in question is primary.
-            else: Is an aux image, var is an int with the number of the channel.
         cache_read_order: list
             Description of the order of the axes of the images. Each item in the list is one dimension in the image.
             The following strings will be converted to Axes objects and will be parsed based on the instance variables of the tile:
@@ -82,7 +79,6 @@ class FISHTile(FetchedTile):
         self._zplane = zplane
         self._ch = ch
         self._rnd = rnd
-        self.is_aux = is_aux
         self.cache_read_order = cache_read_order
         if locs:
             self.locs = locs
@@ -162,10 +158,7 @@ class FISHTile(FetchedTile):
                 if axis == Axes.ZPLANE:
                     slices.append(self._zplane)
                 elif axis == Axes.CH:
-                    if self.is_aux:
-                        slices.append(self.is_aux)
-                    else:
-                        slices.append(self._ch)
+                    slices.append(self._ch)
                 else:
                     slices.append(slice(0, img.shape[i]))
             slices = tuple(slices)
@@ -175,13 +168,12 @@ class FISHTile(FetchedTile):
             return img
         except IndexError as e:
             print(
-                "\t{}\nshape: {}\tcache read: {}\nzpl: {} ch: {} is aux: {}\nwith error {}".format(
+                "\t{}\nshape: {}\tcache read: {}\nzpl: {} ch: {}\nwith error {}".format(
                     self._file_path,
                     img.shape,
                     self.cache_read_order,
                     self._zplane,
                     self._ch,
-                    self.is_aux,
                     e,
                 )
             )
@@ -311,16 +303,13 @@ class PrimaryTileFetcher(TileFetcher):
                 zplane_label,
                 ch_label,
                 round_label,
-                False,
                 self.cache_read_order,
                 self.locs[fov_id],
                 self.voxel,
                 self.img_shape,
             )
         else:
-            return FISHTile(
-                file_path, zplane_label, ch_label, round_label, False, self.cache_read_order
-            )
+            return FISHTile(file_path, zplane_label, ch_label, round_label, self.cache_read_order)
 
 
 class AuxTileFetcher(TileFetcher):
@@ -335,6 +324,8 @@ class AuxTileFetcher(TileFetcher):
         file_format: str = "",
         file_vars: str = "",
         cache_read_order: list = [],
+        channel_slope: float = 0,
+        channel_intercept: int = 0,
         zplane_offset: int = 0,
         fov_offset: int = 0,
         round_offset: int = 0,
@@ -370,6 +361,15 @@ class AuxTileFetcher(TileFetcher):
                 -Z -> Axes.ZPLANE
                 -CH -> Axes.CH
             All ofther values will be treated as an axis where the full contents will be read for each individual tile. (in pratice, this should only be Axes.X and Axes.Y)
+        channel_slope: float
+            The slope for converting 0-indexed channel IDs to the channel ID within the image. Combined with the below variable with the following formula:
+
+                (img channel) = int(slope*channel ID) + intercept
+
+        channel_intercept: int
+            The intercept for converting 0-index channel IDs to the channel ID within the image.
+        zplane_offset: int
+            Integer to be added to zplane names when looking for external files names, equal to the number of the first index.
         fov_offset: int
             Integer to be added to fov names when looking for external file names, equal to the number of the first index.
         round_offset: int
@@ -393,6 +393,8 @@ class AuxTileFetcher(TileFetcher):
         self.file_vars = file_vars.split(";")
         self.input_dir = input_dir
         self.cache_read_order = cache_read_order
+        self.slope = channel_slope
+        self.intercept = channel_intercept
         self.zplane_offset = zplane_offset
         self.fov_offset = fov_offset
         self.round_offset = round_offset
@@ -438,27 +440,28 @@ class AuxTileFetcher(TileFetcher):
         file_path = os.path.join(
             self.input_dir, self.file_format.format(*[varTable[arg] for arg in self.file_vars])
         )
+
+        ch_label_adj = int(self.slope * ch_label) + self.intercept
+
         if self.locs:
             return FISHTile(
                 file_path,
                 zplane_label,
-                self.fixed_channel,
+                ch_label_adj,
                 round_label,
-                self.fixed_channel,
                 self.cache_read_order,
                 self.locs[fov_id],
                 self.voxel,
                 self.img_shape,
-            )  # CHANNEL ID IS FIXED
+            )
         else:
             return FISHTile(
                 file_path,
                 zplane_label,
-                self.fixed_channel,
+                ch_label_adj,
                 round_label,
-                self.fixed_channel,
                 self.cache_read_order,
-            )  # CHANNEL ID IS FIXED
+            )
 
 
 def parse_codebook(codebook_csv: str) -> Codebook:
@@ -503,7 +506,9 @@ def cli(
     aux_file_formats: list = [],
     aux_file_vars: list = [],
     aux_cache_read_order: list = [],
-    aux_fixed_channel: list = [],
+    aux_channel_count: list = [],
+    aux_channel_slope: list = [],
+    aux_channel_intercept: list = [],
     locs: List[Mapping[Axes, float]] = None,
     shape: Mapping[Axes, int] = None,
     voxel: Mapping[Axes, float] = None,
@@ -542,8 +547,12 @@ def cli(
         The same as file_vars, but for each individual aux view. Items within each list entry are semicolon (;) delimited.
     aux_cache_read_order: list
         The same as cache_read_order, but for each individual aux view. Items within each list entry are semicolon (;) delimited.
-    aux_fixed_channel: list
-        The channel for each aux view to look at in their respective image files.
+    aux_channel_count: list
+        The total number of channels per aux view.
+    aux_channel_slope: list
+        The slope for converting 0-indexed channel IDs to the channel ID within the image.
+    aux_channel_intercept: list
+        The intercept for converting 0-index channel IDs to the channel ID within the image.
     locs: List[Mapping[Axes, float]]
         Each list item refers to the fov of the same index. The start location of the image, mapped to the corresponding Axes object (X, Y, or ZPLANE)
     shape: Mapping[Axes, int]
@@ -571,15 +580,6 @@ def cli(
         Axes.CH: counts["channels"],
         Axes.ZPLANE: counts["zplanes"],
     }
-
-    aux_image_dimensions: Mapping[Union[str, Axes], int] = {
-        Axes.ROUND: counts["rounds"],
-        Axes.CH: 1,
-        Axes.ZPLANE: counts["zplanes"],
-    }
-
-    # file_format = "HybCycle_{}/MMStack_Pos{}.ome.tif"
-    # file_vars = ["offset_round", "offset_fov"]
 
     cache_read_order_formatted = []
     for item in cache_read_order:
@@ -609,6 +609,11 @@ def cli(
     if aux_names:
         for i in range(len(aux_names)):
             name = aux_names[i]
+            aux_image_dimensions: Mapping[Union[str, Axes], int] = {
+                Axes.ROUND: counts["rounds"],
+                Axes.CH: int(aux_channel_count[i]),
+                Axes.ZPLANE: counts["zplanes"],
+            }
             aux_name_to_dimensions[name] = aux_image_dimensions
             aux_cache_read_order_raw = aux_cache_read_order[i].split(";")
             aux_cache_read_order_formatted = []
@@ -625,11 +630,12 @@ def cli(
                 aux_file_formats[i],
                 aux_file_vars[i],
                 aux_cache_read_order_formatted,
+                aux_channel_slope[i],
+                aux_channel_intercept[i],
                 counts["zplane_offset"],
                 counts["fov_offset"],
                 counts["round_offset"],
                 counts["channel_offset"],
-                aux_fixed_channel[i],
                 locs,
                 shape,
                 voxel,
@@ -680,8 +686,10 @@ if __name__ == "__main__":
     p.add_argument("--aux-names", nargs="+")
     p.add_argument("--aux-file-formats", nargs="+")
     p.add_argument("--aux-file-vars", nargs="+")
-    p.add_argument("--aux-fixed-channel", type=int, nargs="+")
     p.add_argument("--aux-cache-read-order", nargs="+")
+    p.add_argument("--aux-channel-count", nargs="+")
+    p.add_argument("--aux-channel-slope", nargs="+")
+    p.add_argument("--aux-channel-intercept", nargs="+")
     p.add_argument("--x-pos-locs", type=str, nargs="?")
     p.add_argument("--x-pos-shape", type=int, nargs="?")
     p.add_argument("--x-pos-voxel", type=float, nargs="?")
@@ -700,8 +708,10 @@ if __name__ == "__main__":
                 len(args.aux_names) if args.aux_names else 0,
                 len(args.aux_file_formats) if args.aux_file_formats else 0,
                 len(args.aux_file_vars) if args.aux_file_vars else 0,
-                len(args.aux_fixed_channel) if args.aux_fixed_channel else 0,
                 len(args.aux_cache_read_order) if args.aux_cache_read_order else 0,
+                len(args.aux_channel_count) if args.aux_channel_count else 0,
+                len(args.aux_channel_slope) if args.aux_channel_slope else 0,
+                len(args.aux_channel_intercept) if args.aux_channel_intercept else 0,
             }
         )
         > 1
@@ -710,8 +720,10 @@ if __name__ == "__main__":
             args.aux_names,
             args.aux_file_formats,
             args.aux_file_vars,
-            args.aux_fixed_channel,
             args.aux_cache_read_order,
+            args.aux_channel_count,
+            args.aux_channel_slope,
+            args.aux_channel_intercept,
         )
         raise Exception("Dimensions of all aux parameters must match.")
 
@@ -773,7 +785,9 @@ if __name__ == "__main__":
         args.aux_file_formats,
         args.aux_file_vars,
         args.aux_cache_read_order,
-        args.aux_fixed_channel,
+        args.aux_channel_count,
+        args.aux_channel_slope,
+        args.aux_channel_intercept,
         locs,
         shape,
         voxel,
