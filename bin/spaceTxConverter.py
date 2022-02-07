@@ -683,13 +683,13 @@ if __name__ == "__main__":
     p.add_argument("--file-format", type=str)
     p.add_argument("--file-vars", nargs="+")
     p.add_argument("--cache-read-order", nargs="+")
-    p.add_argument("--aux-names", nargs="+")
-    p.add_argument("--aux-file-formats", nargs="+")
-    p.add_argument("--aux-file-vars", nargs="+")
-    p.add_argument("--aux-cache-read-order", nargs="+")
-    p.add_argument("--aux-channel-count", nargs="+")
-    p.add_argument("--aux-channel-slope", nargs="+")
-    p.add_argument("--aux-channel-intercept", nargs="+")
+    p.add_argument("--aux-names", nargs="+", const=None)
+    p.add_argument("--aux-file-formats", nargs="+", const=None)
+    p.add_argument("--aux-file-vars", nargs="+", const=None)
+    p.add_argument("--aux-cache-read-order", nargs="+", const=None)
+    p.add_argument("--aux-channel-count", nargs="+", const=None)
+    p.add_argument("--aux-channel-slope", nargs="+", const=None)
+    p.add_argument("--aux-channel-intercept", nargs="+", const=None)
     p.add_argument("--x-pos-locs", type=str, nargs="?")
     p.add_argument("--x-pos-shape", type=int, nargs="?")
     p.add_argument("--x-pos-voxel", type=float, nargs="?")
@@ -702,29 +702,30 @@ if __name__ == "__main__":
 
     args = p.parse_args()
 
-    if (
-        len(
-            {
-                len(args.aux_names) if args.aux_names else 0,
-                len(args.aux_file_formats) if args.aux_file_formats else 0,
-                len(args.aux_file_vars) if args.aux_file_vars else 0,
-                len(args.aux_cache_read_order) if args.aux_cache_read_order else 0,
-                len(args.aux_channel_count) if args.aux_channel_count else 0,
-                len(args.aux_channel_slope) if args.aux_channel_slope else 0,
-                len(args.aux_channel_intercept) if args.aux_channel_intercept else 0,
-            }
-        )
-        > 1
-    ):
-        print(
-            args.aux_names,
-            args.aux_file_formats,
-            args.aux_file_vars,
-            args.aux_cache_read_order,
-            args.aux_channel_count,
-            args.aux_channel_slope,
-            args.aux_channel_intercept,
-        )
+    aux_lens = []
+    aux_vars = [
+        args.aux_input_dir,
+        args.aux_file_formats,
+        args.aux_file_formats,
+        args.aux_file_vars,
+        args.aux_names,
+        args.aux_cache_read_order,
+        args.aux_channel_count,
+        args.aux_channel_slope,
+        args.aux_channel_intercept,
+    ]
+
+    for item in aux_vars:
+        if isinstance(item, list):
+            aux_lens.append(len(item))
+        elif item is not None:
+            aux_lens.append(1)
+        else:
+            aux_lens.append(0)
+
+    if len(set(aux_lens)) > 1:
+        print(aux_vars)
+        print(aux_lens)
         raise Exception("Dimensions of all aux parameters must match.")
 
     output_dir = "3_tx_converted/"
