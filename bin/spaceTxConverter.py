@@ -38,7 +38,6 @@ class FISHTile(FetchedTile):
         zplane: int,
         ch: int,
         rnd: int,
-        is_aux: bool,
         cache_read_order: list,
         locs: Mapping[Axes, float] = None,
         voxel: Mapping[Axes, float] = None,
@@ -393,8 +392,8 @@ class AuxTileFetcher(TileFetcher):
         self.file_vars = file_vars.split(";")
         self.input_dir = input_dir
         self.cache_read_order = cache_read_order
-        self.slope = channel_slope
-        self.intercept = channel_intercept
+        self.slope = float(channel_slope)
+        self.intercept = int(channel_intercept)
         self.zplane_offset = zplane_offset
         self.fov_offset = fov_offset
         self.round_offset = round_offset
@@ -441,7 +440,8 @@ class AuxTileFetcher(TileFetcher):
             self.input_dir, self.file_format.format(*[varTable[arg] for arg in self.file_vars])
         )
 
-        ch_label_adj = int(self.slope * ch_label) + self.intercept
+        print("aux view channel: int({} * {}) + {}".format(self.slope, ch_label, self.intercept))
+        ch_label_adj = int(self.slope * int(ch_label)) + self.intercept
 
         if self.locs:
             return FISHTile(
