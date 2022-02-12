@@ -1,51 +1,30 @@
+#!/usr/bin/env python
+
 import functools
-import math
 import os
 import shutil
+import sys
 from argparse import ArgumentParser
-from collections import defaultdict
 from copy import deepcopy
-from functools import partial
-from itertools import chain, combinations, islice, permutations, product
+from datetime import datetime
+from functools import partial, partialmethod
 from os import makedirs, path
 from pathlib import Path
-from typing import Any, Dict, Hashable, List, Mapping, Optional, Sequence, Tuple, Union
 
 import numpy as np
 import pandas as pd
-import ray
-import scipy
-import scipy.stats as st
-import skimage.io
+import skimage
 import starfish
 import tifffile as tiff
 import xarray as xr
-from joblib import Parallel, delayed
-from scipy import ndimage, stats
-from skimage import morphology, restoration
+from scipy import ndimage
+from skimage import morphology, registration, restoration
 from skimage.morphology import ball, dilation, disk, opening
 from skimage.registration import phase_cross_correlation
-from starfish import BinaryMaskCollection, Codebook, Experiment, ImageStack
-from starfish.core.expression_matrix.expression_matrix import ExpressionMatrix
-from starfish.core.intensity_table.intensity_table import IntensityTable
-from starfish.core.types import (
-    DecodedSpots,
-    Number,
-    PerImageSliceSpotResults,
-    SpotAttributes,
-    SpotFindingResults,
-)
-from starfish.experiment.builder import FetchedTile, TileFetcher, write_experiment_json
+from starfish import BinaryMaskCollection, Experiment, ImageStack
+from starfish.experiment.builder import write_experiment_json
 from starfish.morphology import Binarize
-from starfish.spots import AssignTargets
-from starfish.types import (
-    Axes,
-    Coordinates,
-    CoordinateValue,
-    Features,
-    Levels,
-    TraceBuildingStrategies,
-)
+from starfish.types import Levels
 from tqdm import tqdm
 
 
@@ -202,17 +181,19 @@ def cli(
 ):
 
     if not path.isdir(output_dir):
-        mkdirs(output_dir)
+        makedirs(output_dir)
 
     reporter = open(
         path.join(output_dir, datetime.now().strftime("%Y-%d-%m_%H:%M_img_processing.log")), "w"
     )
     sys.stdout = reporter
-    sys.stderr = repoter
+    sys.stderr = reporter
 
     tqdm.__init__ = partialmethod(tqdm.__init__, disable=True)
 
-    exp = starfish.core.experiment.experiment.Experiment.from_json(input_dir / "experiment.json")
+    exp = starfish.core.experiment.experiment.Experiment.from_json(
+        str(input_dir / "experiment.json")
+    )
     for fov in exp.keys():
         img = exp[fov].get_image("primary")
         register = exp[fov].get_image(aux_name)
@@ -228,7 +209,7 @@ def cli(
         print("\tclip and scaling...")
         # Scale image, clipping all but the highest intensities to zero
         clip = starfish.image.Filter.ClipPercentileToZero(
-            p_min=pmin, p_max=99.9, is_volume=True, level_method=Levels.SCALE_BY_CHUNK
+            p_min=clip_min, p_max=99.9, is_volume=True, level_method=Levels.SCALE_BY_CHUNK
         )
         clip.run(img, in_place=True)
 
