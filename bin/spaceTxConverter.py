@@ -440,6 +440,12 @@ class AuxTileFetcher(TileFetcher):
             self.input_dir, self.file_format.format(*[varTable[arg] for arg in self.file_vars])
         )
 
+        print(
+            "fov: {} round: {} channel: {} zplane: {}".format(
+                fov_id, round_label, ch_label, zplane_label
+            )
+        )
+
         print("aux view channel: int({} * {}) + {}".format(self.slope, ch_label, self.intercept))
         ch_label_adj = int(self.slope * int(ch_label)) + self.intercept
 
@@ -570,9 +576,7 @@ def cli(
 
     os.makedirs(output_dir, exist_ok=True)
 
-    reportFile = os.path.join(
-        output_dir, datetime.now().strftime("%Y-%d-%m_%H:%M_TXconversion.log")
-    )
+    reportFile = os.path.join(output_dir, datetime.now().strftime("%Y%m%d_%H%M_TXconversion.log"))
     sys.stdout = open(reportFile, "w")
 
     image_dimensions: Mapping[Union[str, Axes], int] = {
@@ -704,7 +708,6 @@ if __name__ == "__main__":
 
     aux_lens = []
     aux_vars = [
-        args.aux_input_dir,
         args.aux_file_formats,
         args.aux_file_formats,
         args.aux_file_vars,
@@ -728,7 +731,7 @@ if __name__ == "__main__":
         print(aux_lens)
         raise Exception("Dimensions of all aux parameters must match.")
 
-    output_dir = "3_tx_converted/"
+    output_dir = "2_tx_converted/"
 
     # parse loc info
     locs = []

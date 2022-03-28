@@ -27,10 +27,10 @@ inputs:
             inputBinding:
               prefix: --codebook-exp
             doc: The location of an experiment.json file, which has the corresponding codebook for this experiment.
-  segmented_loc:
+  segmentation_loc:
     type: Directory?
     inputBinding:
-      prefix: --segmented-loc
+      prefix: --segmentation-loc
     doc: The location of the output from the segmentation step, if it was performed.
 
   data:
@@ -56,7 +56,7 @@ inputs:
           inputBinding:
             prefix: --exp-output
           doc: The location of output of starfish runner step, 4_Decoded. Contains spots (if applicable) and netcdfs containing the DecodedIntensityTable.
-        has-spots: 
+        has_spots:
           type: boolean?
           inputBinding:
             prefix: --has-spots
@@ -104,4 +104,4 @@ outputs:
   qc_metrics:
     type: Directory
     outputBinding:
-      glob: "6_QC/"
+      glob: "7_QC/"

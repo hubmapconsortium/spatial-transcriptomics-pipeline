@@ -170,7 +170,7 @@ def run(
 
     # redirecting output to log
     reporter = open(
-        path.join(output_dir, datetime.now().strftime("%Y-%d-%m_%H:%M_starfish_segmenter.log")),
+        path.join(output_dir, datetime.now().strftime("%Y%m%d_%H%M_starfish_segmenter.log")),
         "w",
     )
     sys.stdout = reporter
@@ -233,15 +233,18 @@ def run(
 
     # save masks to tiffs for later processing
     for i in range(len(masks)):
-        flat = np.sum(masks[i].to_label_image().xarray.values, axis=0) > 0
-        PIL.Image.fromarray(flat).save("{}/{}/mask.tiff".format(output_dir, keys[i]))
+        binmask = masks[i].to_label_image().xarray.values
+        while len(binmask.shape) > 2:
+            binmask = np.sum(binmask, axis=0)
+        binmask = binmask > 0
+        PIL.Image.fromarray(binmask).save("{}/{}/mask.tiff".format(output_dir, keys[i]))
 
     # apply mask to tables, save results
     al = AssignTargets.Label()
     for i in range(fov_count):
         labeled = al.run(masks[i], results[i])
         # labeled = labeled[labeled.cell_id != "nan"]
-        labeled.to_decoded_dataframe().save_csv(output_dir + keys[i] + "/df_segmented.csv")
+        labeled.to_decoded_dataframe().save_csv(output_dir + keys[i] + "/segmentation.csv")
         labeled.to_netcdf(output_dir + keys[i] + "/df_segmented.cdf")
         labeled.to_expression_matrix().to_pandas().to_csv(
             output_dir + keys[i] + "/exp_segmented.csv"

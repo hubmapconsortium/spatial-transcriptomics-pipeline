@@ -2,6 +2,7 @@
 
 import sys
 from argparse import ArgumentParser
+from datetime import datetime
 from os import makedirs, path
 from pathlib import Path
 from typing import Dict, List
@@ -73,25 +74,29 @@ def reformatter(
     fov_offset: int = 0,
     round_offset: int = 0,
     channel_offset: int = 0,
-    aux_input_dir: List[str] = [],
     aux_file_formats: List[str] = [],
     aux_file_vars: List[List[str]] = [],
     aux_names: List[str] = [],
     aux_cache_read_order: List[List[str]] = [],
+    aux_channel_count: List[int] = [],
     aux_channel_slope: List[float] = [],
     aux_channel_intercept: List[int] = [],
 ):
-    combined_input_dir = [str(input_dir)] + [str(item) for item in aux_input_dir]
+
+    reportFile = path.join(output_dir, datetime.now().strftime("%Y%d%m_%H%M_psorting.log"))
+    sys.stdout = open(reportFile, "w")
+
     combined_file_format = [file_format] + aux_file_formats
     combined_file_vars = [file_vars] + aux_file_vars
     combined_names = [""] + aux_names
     combined_cache_read_order = [cache_read_order] + aux_cache_read_order
+    combined_channel_count = [len(channels_conv[0])] + aux_channel_count
     channel_slope = [1] + aux_channel_slope
     channel_intercept = [0] + aux_channel_intercept
-    views = len(combined_input_dir)
+    views = len(combined_names)
 
     for r in cycles_conv.keys():
-        for c in channels_conv[r % len(channels_conv)].keys():
+        for c in range(max(combined_channel_count)):
             for fov in range(fov_count):
                 varTable = {
                     "channel": c,
@@ -102,62 +107,65 @@ def reformatter(
                     "offset_fov": fov + fov_offset,
                 }
                 for target in range(views):
-                    file_path = path.join(
-                        combined_input_dir[target],
-                        combined_file_format[target].format(
-                            *[varTable[arg] for arg in combined_file_vars[target]]
-                        ),
-                    )
+                    if c < combined_channel_count[target]:
+                        file_path = path.join(
+                            input_dir,
+                            combined_file_format[target].format(
+                                *[varTable[arg] for arg in combined_file_vars[target]]
+                            ),
+                        )
 
-                    img = tiff.imread(file_path)
-                    # img_out = img
+                        img = tiff.imread(file_path)
+                        # img_out = img
 
-                    # figure out what slice to take.
-                    slices = []
-                    for i in range(len(combined_cache_read_order[target])):
-                        axis = combined_cache_read_order[target][i]
-                        if axis == "ch":
-                            c_adj = int(channel_slope[target] * c) + channel_intercept[target]
-                            slices.append(int(c_adj))
-                        elif axis == "round":
-                            slices.append(r)
-                        else:
-                            slices.append(slice(0, img.shape[i]))
+                        # figure out what slice to take.
+                        slices = []
+                        for i in range(len(combined_cache_read_order[target])):
+                            axis = combined_cache_read_order[target][i]
+                            if axis == "ch":
+                                c_adj = int(channel_slope[target] * c) + channel_intercept[target]
+                                slices.append(int(c_adj))
+                            elif axis == "round":
+                                slices.append(r)
+                            else:
+                                slices.append(slice(0, img.shape[i]))
 
-                    # take slices out of image and reduce unneeded dims
-                    slices = tuple(slices)
-                    # print(slices)
-                    img_out = np.squeeze(img[slices])
+                        # take slices out of image and reduce unneeded dims
+                        slices = tuple(slices)
+                        # print(slices)
+                        img_out = np.squeeze(img[slices])
 
-                    # convert to new rounds/channels
-                    pr = cycles_conv[r]
-                    pc = channels_conv[r % len(channels_conv)][c]
+                        # convert to new rounds/channels
+                        pr = cycles_conv[r]
+                        pc = channels_conv[r % len(channels_conv)][c]
 
-                    # get output string
-                    varTableConv = {
-                        "channel": pc,
-                        "offset_channel": pc + channel_offset,
-                        "round": pr,
-                        "offset_round": pr + round_offset,
-                        "fov": fov,
-                        "offset_fov": fov + fov_offset,
-                        "aux_name": combined_names[target],
-                    }
-                    output_path = path.join(
-                        output_dir,
-                        output_format.format(*[varTableConv[arg] for arg in output_vars]),
-                    )
-                    print("{}\n->{}".format(file_path, output_path))
-                    print(np.shape(img_out))
-                    tiff.imsave(output_path, img_out)
+                        # get output string
+                        varTableConv = {
+                            "channel": pc,
+                            "offset_channel": pc + channel_offset,
+                            "round": pr,
+                            "offset_round": pr + round_offset,
+                            "fov": fov,
+                            "offset_fov": fov + fov_offset,
+                            "aux_name": combined_names[target],
+                        }
+                        output_path = path.join(
+                            output_dir,
+                            output_format.format(*[varTableConv[arg] for arg in output_vars]),
+                        )
+                        print("{}\n->{}".format(file_path, output_path))
+                        print(np.shape(img_out))
+                        tiff.imsave(output_path, img_out)
 
+    sys.stdout = sys.__stdout__
     return True
 
 
 if __name__ == "__main__":
     p = ArgumentParser()
     p.add_argument("--input-dir", type=Path)
-    p.add_argument("--codebook", type=Path)
+    p.add_argument("--codebook-csv", type=Path, nargs="?")
+    p.add_argument("--codebook-json", type=Path, nargs="?")
     p.add_argument("--channel-yml", type=Path)
     p.add_argument("--cycle-yml", type=Path)
     p.add_argument("--file-format", type=str)
@@ -170,11 +178,11 @@ if __name__ == "__main__":
     p.add_argument("--fov-count", type=int)
     p.add_argument("--channel-slope", type=float)
     p.add_argument("--channel-intercept", type=int)
-    p.add_argument("--aux-input-dir", type=Path, nargs="+", const=None)
     p.add_argument("--aux-file-formats", type=str, nargs="+", const=None)
     p.add_argument("--aux-file-vars", type=str, nargs="+", const=None)
     p.add_argument("--aux-names", type=str, nargs="+", const=None)
     p.add_argument("--aux-cache-read-order", type=str, nargs="+", const=None)
+    p.add_argument("--aux-channel-count", type=int, nargs="+", const=None)
     p.add_argument("--aux-channel-slope", type=float, nargs="+", const=None)
     p.add_argument("--aux-channel-intercept", type=float, nargs="+", const=None)
 
@@ -182,12 +190,11 @@ if __name__ == "__main__":
 
     aux_lens = []
     aux_vars = [
-        args.aux_input_dir,
-        args.aux_file_formats,
         args.aux_file_formats,
         args.aux_file_vars,
         args.aux_names,
         args.aux_cache_read_order,
+        args.aux_channel_count,
         args.aux_channel_slope,
         args.aux_channel_intercept,
     ]
@@ -237,15 +244,22 @@ if __name__ == "__main__":
         fov_offset=args.fov_offset,
         round_offset=args.round_offset,
         channel_offset=args.channel_offset,
-        aux_input_dir=args.aux_input_dir,
         aux_file_formats=args.aux_file_formats,
         aux_file_vars=aux_file_vars,
         aux_names=args.aux_names,
         aux_cache_read_order=aux_cache_read_order,
+        aux_channel_count=args.aux_channel_count,
         aux_channel_slope=args.aux_channel_slope,
         aux_channel_intercept=args.aux_channel_intercept,
     )
 
-    codebook = parse_codebook(args.codebook)
+    if args.codebook_csv:
+        codebook = parse_codebook(args.codebook_csv)
+    elif args.codebook_json:
+        codebook = Codebook.open_json(args.codebook_json)
+    else:
+        print("Can't convert notebook, none provided.")
+
     conv_codebook = convert_codebook(codebook, cycles_conv, channels_conv)
-    codebook.to_json(output_dir + "trueround_codebook.json")
+    codebook.to_json(output_dir + "pround_codebook.json")
+    conv_codebook.to_json(output_dir + "codebook.json")

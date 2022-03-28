@@ -1,6 +1,8 @@
 #!/usr/bin/env python
 
 import functools
+import hashlib
+import json
 import os
 import shutil
 import sys
@@ -93,11 +95,26 @@ def saveExp(source_dir: str, save_dir: str, exp: Experiment = None):
     # copy the non-tiff files to the new directory
     cp_files = [x for x in os.listdir(source_dir) if x[-5:] != ".tiff"]
     for file in cp_files:
-        shutil.copyfile(f"{source_dir}/{file}", f"{save_dir}/{file}")
+        if "fov" in file:
+            # if file contains images, we need to update sha's
+            data = json.load(open(str(source_dir) + "/" + file))
+            for i in range(len(data["tiles"])):
+                abspath = str(save_dir) + "/" + data["tiles"][i]["file"]
+                with open(os.fspath(abspath), "rb") as fh:
+                    hsh = hashlib.sha256(fh.read()).hexdigest()
+                data["tiles"][i]["sha256"] = hsh
+                print(f"\tupdated hash for {data['tiles'][i]['file']}")
+            with open(str(save_dir) + "/" + file, "w") as f:
+                json.dump(data, f)
+            print(f"saved {file} with modified hashes")
+        else:
+            # we can just copy the rest of the files
+            shutil.copyfile(f"{source_dir}/{file}", f"{save_dir}/{file}")
+            print(f"copied {file}")
 
 
 def removeBg(opening_size: int, img: ImageStack):
-    # Estimate background with a large morphological openening and divide out from image
+    # Estimate background with a large morphological opening and divide out from image
     # Size of 10 seems to work well here (and for intron) and doesn't take too long (longer for 3D)
     for r in range(img.num_rounds):
         for ch in range(img.num_chs):
@@ -116,8 +133,9 @@ def registerImgs(img: ImageStack, aux_img: ImageStack):
     # transformations to the corresponding primary images. Registration images should be 3D with (z, y, x) dimension order
     reference = aux_img.xarray.data[0, 0, :, :, :]
     shifts = {}
-    for r in range(5):
-        for ch in range(12):
+    shape = aux_img.raw_shape
+    for r in range(shape[0]):
+        for ch in range(shape[1]):
             reg_img = aux_img.xarray.data[r, ch, :, :, :]
             shift, error, diffphase = phase_cross_correlation(
                 reference, reg_img, upsample_factor=100
@@ -125,7 +143,6 @@ def registerImgs(img: ImageStack, aux_img: ImageStack):
             shifts[(r, ch)] = shift
 
     # Create transformation matrices
-    shape = img.raw_shape
     tforms = {}
     for (r, ch) in shifts:
         tform = np.diag([1.0] * 4)
@@ -138,10 +155,15 @@ def registerImgs(img: ImageStack, aux_img: ImageStack):
         tforms[(r, ch)] = tform
 
     # Register images
+    same_size = aux_img.raw_shape == img.raw_shape
+
     for r in range(img.num_rounds):
         for ch in range(img.num_chs):
+            ch_aux = 0
+            if same_size:
+                ch_aux = ch
             img.xarray.data[r, ch] = ndimage.affine_transform(
-                img.xarray.data[r, ch], np.linalg.inv(tforms[(r, ch)]), output_shape=shape[2:]
+                img.xarray.data[r, ch], np.linalg.inv(tforms[(r, ch_aux)]), output_shape=shape[2:]
             )
 
 
@@ -184,7 +206,7 @@ def cli(
         makedirs(output_dir)
 
     reporter = open(
-        path.join(output_dir, datetime.now().strftime("%Y-%d-%m_%H:%M_img_processing.log")), "w"
+        path.join(output_dir, datetime.now().strftime("%Y%m%d_%H%M_img_processing.log")), "w"
     )
     sys.stdout = reporter
     sys.stderr = reporter

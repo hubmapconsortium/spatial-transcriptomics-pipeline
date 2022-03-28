@@ -32,65 +32,6 @@ from starfish.types import (
 from tqdm import tqdm
 
 
-def imagePrePro(
-    imgs: Mapping[str, ImageStack],
-    flatten_axes: Set[Axes] = None,
-    gaussian_lowpass: float = None,
-    clip: bool = True,
-    zero_by_magnitude: float = None,
-    ref: bool = False,
-) -> Tuple[Mapping[str, ImageStack], Mapping[str, ImageStack]]:
-    """
-    Runs basic image pre-processing on the image, given provided parameters.
-
-    Parameters
-    ----------
-    imgs : Mapping[str, ImageStack]
-        The images to be processed, with the corresponding FOV name as the key.
-    flatten_axes : Set[Axes]
-        If provided, the set of axes along which to project the image.
-    gaussian_lowpass : float
-        If provided, the standard deviation for the Gaussian Kernel to be applied.
-    clip : bool
-        If provided, the image will be scaled by chunks to the 0-99.9 range of values.
-    zero_by_magnitude : float
-        If provided, the L2 norm threshold under which values will be zeroed.
-    ref : bool
-        If provided, a maximum projection image will be provided.
-
-    Returns
-    -------
-    Tuple[Mapping[str, ImageStack], Mapping[str, ImageStack]]
-        The first item is the processed images, and the second item (if ref is True) is a projected max version of the imagestack.
-
-    """
-    ret_imgs = {}
-    ret_ref = {}
-    for fov in imgs.keys():
-        img = imgs[fov]
-        if flatten_axes:
-            img = img.reduce(flatten_axes, func="max")
-        if gaussian_lowpass:
-            gaus = starfish.image.Filter.GaussianLowPass(gaussian_lowpass)
-            gaus.run(img, in_place=True)
-        if clip:
-            clip = starfish.image.Filter.Clip(
-                p_max=99.9, is_volume=True, level_method=Levels.SCALE_BY_CHUNK
-            )
-            clip.run(img, in_place=True)
-        if zero_by_magnitude:
-            z_filt = starfish.image.Filter.ZeroByChannelMagnitude(
-                thresh=zero_by_magnitude, normalize=True
-            )
-            z_filt.run(img, in_place=True)
-        ref_img = None
-        if ref:
-            ref_img = img.reduce({Axes.CH, Axes.ROUND, Axes.ZPLANE}, func="max")
-        ret_imgs[fov] = img
-        ret_ref[fov] = ref_img
-    return ret_imgs, ret_ref
-
-
 def blobRunner(
     img: ImageStack,
     ref_img: ImageStack = None,
@@ -254,6 +195,7 @@ def saveTable(table: DecodedIntensityTable, savename: str):
     """
     intensities = IntensityTable(table.where(table[Features.PASSES_THRESHOLDS], drop=True))
     traces = intensities.stack(traces=(Axes.ROUND.value, Axes.CH.value))
+    # traces = table.stack(traces=(Axes.ROUND.value, Axes.CH.value))
     traces = traces.to_features_dataframe()
     traces.to_csv(savename)
 
@@ -262,7 +204,7 @@ def run(
     output_dir: str,
     experiment: Experiment,
     blob_based: bool,
-    imagePreProKwargs: dict,
+    use_ref: bool,
     blobRunnerKwargs: dict,
     decodeRunnerKwargs: dict,
     pixelRunnerKwargs: dict,
@@ -278,8 +220,8 @@ def run(
         Experiment object with corresponding images and codebook.
     blob_based: bool
         If true, use blob-detection and decoding methods. Else, use pixel-based methods.
-    imagePreProKwargs: dict
-        Dictionary with optional arguments for image pre-processing.  Refer to imgPrePro.
+    use_ref: bool
+        If true, a reference image will be used and created by flattening the fov.
     blobRunnerKwargs: dict
         Dictionary with arguments for blob detection. Refer to blobRunner.
     decodeRunnerKwargs: dict
@@ -301,17 +243,17 @@ def run(
         makedirs(output_dir + "spots")
 
     reporter = open(
-        path.join(output_dir, datetime.now().strftime("%Y-%d-%m_%H:%M_starfish_runner.log")), "w"
+        path.join(output_dir, datetime.now().strftime("%Y%m%d_%H%M_starfish_runner.log")), "w"
     )
     sys.stdout = reporter
     sys.stderr = reporter
 
     print(
-        "output_dir: {}\nexp: {}\nblob_based: {}\nprepro: {}\nblobrunner: {}\ndecoderunner: {}\npixelrunner: {}\n".format(
+        "output_dir: {}\nexp: {}\nblob_based: {}\nuse_ref: {}\nblobrunner: {}\ndecoderunner: {}\npixelrunner: {}\n".format(
             output_dir,
             experiment,
             blob_based,
-            imagePreProKwargs,
+            use_ref,
             blobRunnerKwargs,
             decodeRunnerKwargs,
             pixelRunnerKwargs,
@@ -325,7 +267,11 @@ def run(
     for fov in experiment.keys():
         imgs[fov] = experiment[fov].get_image("primary")
 
-    imgs, ref_imgs = imagePrePro(imgs, **imagePreProKwargs)
+    ref_imgs = None
+    if use_ref:
+        ref_imgs = {}
+        for fov in experiment.keys():
+            ref_imgs[fov] = imgs[fov].reduce({Axes.CH, Axes.ROUND, Axes.ZPLANE}, func="max")
 
     decoded = {}
     if blob_based:
@@ -362,15 +308,6 @@ if __name__ == "__main__":
     # inputs
     p.add_argument("--exp-loc", type=Path)
 
-    # image processing args
-    p.add_argument("--flatten-axes", type=str, nargs="*")
-    p.add_argument("--gaussian-lowpass", type=float, nargs="?")
-    p.add_argument("--clip-img", dest="clip_img", action="store_true")
-    p.add_argument("--zero-by-magnitude", type=float, nargs="?")
-    p.add_argument("--use-ref-img", dest="use_ref_img", action="store_true")
-    p.set_defaults(clip_img=False)
-    p.set_defaults(use_ref_img=False)
-
     # blobRunner kwargs
     p.add_argument("--min-sigma", type=float, nargs="*")
     p.add_argument("--max-sigma", type=float, nargs="*")
@@ -379,7 +316,8 @@ if __name__ == "__main__":
     p.add_argument("--overlap", type=float, nargs="?")
     p.add_argument("--detector-method", type=str, nargs="?")
     p.add_argument("--is-volume", dest="is_volume", action="store_true")
-
+    p.add_argument("--use-ref-img", dest="use_ref_img", action="store_true")
+    p.set_defaults(use_ref_img=False)
     ### aside, are we going to want to include the ability to run a sweep?
 
     # decodeRunner kwargs
@@ -420,24 +358,6 @@ if __name__ == "__main__":
 
     exploc = args.exp_loc / "experiment.json"
     experiment = starfish.core.experiment.experiment.Experiment.from_json(str(exploc))
-
-    imagePreProKwargs = {}
-    addKwarg(args, imagePreProKwargs, "gaussian_lowpass")
-    addKwarg(args, imagePreProKwargs, "zero_by_magnitude")
-    imagePreProKwargs["clip"] = args.clip_img
-    imagePreProKwargs["ref"] = args.use_ref_img
-    if args.flatten_axes:
-        ax_set = set()
-        for ax in args.flatten_axes:
-            if ax == "ZPLANE":
-                ax_set.add(Axes.ZPLANE)
-            elif ax == "CH":
-                ax_set.add(Axes.CH)
-            elif ax == "ROUND":
-                ax_set.add(Axes.ROUND)
-        imagePreProKwargs["flatten_axes"] = ax_set
-    else:
-        imagePreProKwargs["flatten_axes"] = False
 
     blobRunnerKwargs = {}
     # addKwarg(args, blobRunnerKwargs, "min_sigma")
@@ -503,11 +423,13 @@ if __name__ == "__main__":
     decodeRunnerKwargs = {"decoderKwargs": decodeKwargs, "callableDecoder": method}
     addKwarg(args, decodeRunnerKwargs, "return_original_intensities")
 
+    use_ref = args.use_ref_img
+
     run(
         output_dir,
         experiment,
         blob_based,
-        imagePreProKwargs,
+        use_ref,
         blobRunnerKwargs,
         decodeRunnerKwargs,
         pixelRunnerKwargs,

@@ -32,7 +32,7 @@ steps:
             type: array
             items: File
           outputBinding:
-            glob: "**/**/df_segmented.csv"
+            glob: "**/**/segmentation.csv"
         priors:
           type:
             type: array

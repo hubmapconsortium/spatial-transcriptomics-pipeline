@@ -19,6 +19,7 @@ import numpy as np
 import pandas as pd
 import starfish
 import starfish.data
+import yaml
 from astropy.stats import RipleysKEstimator
 from matplotlib.backends.backend_pdf import PdfPages
 from scipy.stats import norm, skew
@@ -355,10 +356,17 @@ def getTranscriptDensity(transcripts, codebook):
 
 def getTranscriptsPerCell(segmented, pdf=False):
     counts = []
-    cells = segmented.data["cell_id"]
+    # column to look at will be different depending if we've run baysor
+    if "cell" in segmented.keys():
+        cells = segmented["cell"]
+    else:
+        cells = segmented["cell_id"]
 
-    for i in range(max(cells)):
-        counts.append(sum(cells == i))
+    # remove unassigned cells
+    cells = [int(x) for x in cells if not np.isnan(x)]
+
+    for i in range(int(max(cells)) + 1):
+        counts.append(len([x for x in cells if x == i]))
 
     counts.sort()
     q1, mid, q3 = np.percentile(counts, [25, 50, 75])
@@ -434,14 +442,14 @@ def runFOV(
     size,
     spots=None,
     segmask=None,
-    segmentaiton=None,
+    segmentation=None,
     doRipley=False,
     savePdf=False,
 ):
 
     t0 = time()
 
-    print("transcripts {}\ncodebook {}\nspots {}".format(transcripts, codebook, spots))
+    # print("transcripts {}\ncodebook {}\nspots {}\nsegmented {}".format(transcripts, codebook, spots, segmentation))
 
     results = {}
     pdf = False
@@ -449,9 +457,8 @@ def runFOV(
         pdf = PdfPages(output_dir + "graph_output.pdf")
 
     if spots:
-        t1 = time()
         spotRes = {}
-        print("finding spot metrics\n\ttime " + str(t1 - t0))
+        print("finding spot metrics")
         relevSpots = spots
         if segmask:
             relevSpots = filterSpots(spots, segmask, True)
@@ -460,21 +467,21 @@ def runFOV(
         spotRes["density"] = getSpotDensity(relevSpots, codebook)
 
         t1 = time()
-        print("\tspot density time ", t1 - ts)
+        print("\tspot density elapsed time ", t1 - ts)
 
         spotRes["round_dist"] = getSpotRoundDist(relevSpots, pdf)
 
         t2 = time()
-        print("\tround dist time ", t2 - t1)
+        print("\tround dist elapsed time ", t2 - t1)
 
         spotRes["channel_dist"] = getSpotChannelDist(relevSpots, pdf)
 
         t3 = time()
-        print("\tchannel dist time ", t3 - t2)
+        print("\tchannel dist elapsed time ", t3 - t2)
 
         if doRipley:
             t = time()
-            print("starting ripley estimates\n\ttime " + str(t - t0))
+            print("\n\tstarting ripley estimates")
             spatDens = getSpatitalDensity(spots, size, doMonte=True)
             spotRes["spatial_density"] = percentMoreClustered(spatDens)
             if savePdf:
@@ -485,18 +492,20 @@ def runFOV(
                 spotRes["masked_spatial_density"] = maskedSpatialDensity(
                     relevSpots, invRelevSpots, size, 10, pdf
                 )
+            t1 = time()
+            print("\tcompleted ripley estimates, elapsed time ", t - t1)
 
         results["spots"] = spotRes
         t = time()
-        print("time for all spots metrics: " + str(t - t1))
+        print("time for all spots metrics: " + str(t - t0))
 
     t1 = time()
     trRes = {}
-    print("starting transcript metrics\n\ttime " + str(t1 - t0))
-    trRes["density"] = getTranscriptDensity(transcripts, codebook)
-    if segmentation:
+    print("\nstarting transcript metrics")
+    if segmentation is not None:
         trRes["per_cell"] = getTranscriptsPerCell(segmentation, pdf)
-    if spots:
+    trRes["density"] = getTranscriptDensity(transcripts, codebook)
+    if spots is not None:
         trRes["fraction_spots_used"] = getFractionSpotsUsed(relevSpots, transcripts)
     trRes["round_dist"] = getTranscriptRoundDist(transcripts, pdf)
     trRes["channel_dist"] = getTranscriptChannelDist(transcripts, pdf)
@@ -505,13 +514,10 @@ def runFOV(
     t = time()
     print("time for all transcript metrics: " + str(t - t1))
 
-    # TODO convert to anndata and save
-    # temp workaround
     t = time()
-    print("Analysis complete\n\ttime " + str(t - t0))
-    print(results)
+    print("\nFOV Analysis complete\n\ttotal time elapsed " + str(t - t0))
 
-    return 0
+    return results
 
 
 def run(
@@ -528,51 +534,57 @@ def run(
 
     t0 = time()
 
-    output_dir = "6_QC/"
+    output_dir = "7_QC/"
     if not path.isdir(output_dir):
         makedirs(output_dir)
 
-    reportFile = output_dir + datetime.now().strftime("%Y-%d-%m_%H:%M_TXconversion.log")
+    reportFile = output_dir + datetime.now().strftime("%Y%m%d_%H%M_QC_metrics.log")
     sys.stdout = open(reportFile, "w")
 
     t = time()
     print("dir created " + str(t - t0))
+    # print(f"fovs:\n\t{fovs}\nspots:\n\t{spots}\nsegmentation:\n\t{segmentation}\ndoRipley: {doRipley}\nsavePdf: {savePdf}")
+    results = {}
     if fovs:
         for f in fovs:
-            print("\ton fov " + f)
+            print(f"\ton fov '{f}'")
             fov_dir = "{}/{}_".format(output_dir, f)
             spot = False
-            segment = False
-            if args.has_spots:
+            segmentOne = False
+            if spots:
                 spot = spots[f]
-            if args.segmentation_loc:
-                segment = segmentation[f]
-            runFOV(
-                fov_dir,
-                transcripts[k],
-                codebook,
-                size,
-                spot,
-                segmask,
-                segment,
-                doRipley,
-                savePdf,
+            if segmentation:
+                segmentOne = segmentation[f]
+            results[f] = runFOV(
+                output_dir=fov_dir,
+                transcripts=transcripts[f],
+                codebook=codebook,
+                size=size,
+                spots=spot,
+                segmask=segmask,
+                segmentation=segmentOne,
+                doRipley=doRipley,
+                savePdf=savePdf,
             )
-    else:
-        runFOV(
-            output_dir,
-            transcripts,
-            codebook,
-            size,
-            spots,
-            segmask,
-            segmentation,
-            doRipley,
-            savePdf,
+    else:  # this only really happens if loading in pickles
+        results = runFOV(
+            output_dir=output_dir,
+            transcripts=transcripts,
+            codebook=codebook,
+            size=size,
+            spots=spots,
+            segmask=segmask,
+            segmentation=segmentation,
+            doRipley=doRipley,
+            savePdf=savePdf,
         )
 
     t = time()
-    print("Analysis complete\n\ttime " + str(t - t0))
+    print("Analysis complete\n\ttotal time elapsed: " + str(t - t0))
+
+    with open(output_dir + "QC_results.yml", "w") as fl:
+        yaml.dump(results, fl)
+    print("Results saved.")
 
     sys.stdout = sys.__stdout__
     return 0
@@ -606,12 +618,16 @@ if __name__ == "__main__":
 
     codebook = False
     roi = False
+
     if args.codebook_exp:
-        exp = starfish.core.experiment.experiment.Experiment.from_json(
-            str(args.codebook_exp) + "/experiment.json"
-        )
-        codebook = exp.codebook
-        if args.roi:  # NOTE Going to assume 1 FOV for now
+        codebook = Codebook.open_json(str(args.codebook_exp) + "/codebook.json")
+
+        if (
+            args.roi
+        ):  # NOTE Going to assume 1 FOV for now. Largely used for debugging, not pipeline runs.
+            exp = starfish.core.experiment.experiment.Experiment.from_json(
+                str(args.codebook_exp) + "/experiment.json"
+            )
             img = exp["fov_000"].get_image("primary")
             roi = BinaryMaskCollection.from_fiji_roi_set(
                 path_to_roi_set_zip=args.roi, original_image=img
@@ -630,11 +646,14 @@ if __name__ == "__main__":
             transcripts[name] = DecodedIntensityTable.open_netcdf(f)
 
     segmentation = False
-    if args.segmentation_loc:
+    if (
+        args.segmentation_loc
+    ):  # if this is true, going to assume baysorStaged dir-wise FOV structure
         segmentation = {}
-        for f in glob("{}/csv/df_*_segmented.csv"):
-            name = f[len(str(args.segmentation_loc)) + 8 : -14]
-            segmentation[name] = DecodedSpots.load_csv(f)
+        for name in transcripts.keys():
+            segmentation[name] = pd.read_csv(
+                "{}/{}/segmentation.csv".format(args.segmentation_loc, name)
+            )
 
     spots = False
     if args.spots_pkl:
@@ -658,5 +677,5 @@ if __name__ == "__main__":
         # reading in from experiment can have multiple FOVs
         fovs = [k for k in transcripts.keys()]
     run(
-        transcripts, codebook, size, fovs, spots, segmentation, roi, args.run_ripley, args.save_pdf
+        transcripts, codebook, size, fovs, spots, roi, segmentation, args.run_ripley, args.save_pdf
     )

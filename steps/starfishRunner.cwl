@@ -15,35 +15,11 @@ inputs:
       prefix: --exp-loc
     doc: Location of directory containing starfish experiment.json file
 
-  flatten_axes:
-    type: string[]?
-    inputBinding:
-      prefix: --flatten-axes
-    doc: Which axes, if any, to compress in the image preprocessing steps.
-
-  clip_img:
-    type: boolean?
-    inputBinding:
-      prefix: --clip-img
-    doc: Whether to rescale and clip images across rounds.
-
   use_ref_img:
     type: boolean?
     inputBinding:
       prefix: --use-ref-img
     doc: Whether to generate a reference image and use it alongside spot detection.
-
-  gaussian_lowpass:
-    type: float?
-    inputBinding:
-      prefix: --gaussian-lowpass
-    doc: If included, standard deviation for gaussian kernel in lowpass filter
-
-  zero_by_magnitude:
-    type: float?
-    inputBinding:
-      prefix: --zero-by-magnitude
-    doc: If included, pixels in each round that have a L2 norm across channels below this threshold are set to 0.
 
   decoding:
     type:

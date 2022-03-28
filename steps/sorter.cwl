@@ -6,7 +6,7 @@ baseCommand: /opt/pseudoSort.py
 
 requirements:
   DockerRequirement:
-    dockerPull: docker.pkg.github.com/hubmapconsortium/spatial-transcriptomics-pipeline/starfish:latest
+    dockerPull: docker.pkg.github.com/hubmapconsortium/spatial-transcriptomics-pipeline/starfish-custom:latest
 
 inputs:
   input_dir:
@@ -16,10 +16,23 @@ inputs:
     doc: The root directory containing all images.
 
   codebook:
-    type: File
-    inputBinding:
-      prefix: --codebook
-    doc: csv-formatted codebook, as outlined in the readme.
+    type:
+      - type: record
+        name: csv
+        fields:
+          csv:
+            type: File
+            inputBinding:
+              prefix: --codebook-csv
+            doc: The codebook for this experiment in .csv format, where the rows are barcodes and the columns are imaging rounds. Column IDs are expected to be sequential, and round identifiers are expected to be integers (not roman numerals).
+      - type: record
+        name: json
+        fields:
+          json:
+            type: File
+            inputBinding:
+              prefix: --codebook-json
+            doc: The codebook for this experiment, already formatted in the spaceTx defined .json format.
 
   channel_yml:
     type: File
@@ -86,11 +99,6 @@ inputs:
       type: record
       name: aux_tilesets
       fields:
-        aux_input_dir:
-          type: Directory[]?
-          inputBinding:
-            prefix: --aux-input-dir
-          doc: Folders containing aux views. Can be the same as primary views.
         aux_names:
           type: string[]?
           inputBinding:
@@ -111,6 +119,11 @@ inputs:
           inputBinding:
             prefix: --aux-cache-read-order
           doc: Order of non x,y dimensions within each image. One entry per aux_name, with semicolon-delimited vars.
+        aux_channel_count:
+          type: int[]?
+          inputBinding:
+            prefix: --aux-channel-count
+          doc: Count of channels in each aux image
         aux_channel_slope:
           type: float[]?
           inputBinding:

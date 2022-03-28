@@ -6,7 +6,7 @@ baseCommand: /opt/spaceTxConverter.py
 
 requirements:
   DockerRequirement:
-    dockerPull: docker.pkg.github.com/hubmapconsortium/spatial-transcriptomics-pipeline/starfish:latest
+    dockerPull: docker.pkg.github.com/hubmapconsortium/spatial-transcriptomics-pipeline/starfish-custom:latest
 
 inputs:
   tiffs:
@@ -195,5 +195,5 @@ outputs:
   spaceTx_converted:
     type: Directory
     outputBinding:
-      glob: "3_tx_converted/"
+      glob: "2_tx_converted/"
 

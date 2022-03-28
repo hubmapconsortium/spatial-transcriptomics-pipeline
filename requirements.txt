@@ -1,6 +1,7 @@
 numpy
-scikit-image==0.15.0
+scikit-image==0.18.3
 tqdm
 anndata
 astropy
 tifffile
+matplotlib
