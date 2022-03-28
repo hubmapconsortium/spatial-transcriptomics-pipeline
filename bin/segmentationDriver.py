@@ -8,10 +8,11 @@ from glob import glob
 from os import makedirs, path
 from pathlib import Path
 from time import time
-from typing import Set
+from typing import List, Mapping, Set
 
 import numpy as np
 import pandas as pd
+import PIL
 import starfish
 import starfish.data
 from starfish import (
@@ -27,7 +28,26 @@ from starfish.types import Axes, Features, Levels
 from tqdm import tqdm
 
 
-def masksFromRoi(img_stack, roi_set, file_formats):
+def masksFromRoi(
+    img_stack: List[ImageStack], roi_set: Path, file_formats: str
+) -> List[BinaryMaskCollection]:
+    """
+    Return a list of masks from provided RoiSet.zip files.
+
+    Parameters
+    ----------
+    img_stack: list[ImageStack]
+        The images that the masks are to be applied to, provided per FOV.
+    roi_set: Path
+        Directory containing RoiSet files.
+    file_formats: str
+        String that will have .format() applied for each FOV.  Will be appended to roi_set.
+
+    Returns
+    -------
+    list[BinaryMaskCollection]:
+        Binary masks for each FOV.
+    """
     masks = []
     for i in range(len(img_stack)):
         mask_name = ("{}/" + file_formats).format(roi_set, i)
@@ -35,7 +55,26 @@ def masksFromRoi(img_stack, roi_set, file_formats):
     return masks
 
 
-def masksFromLabeledImages(img_stack, labeled_image, file_formats_labeled):
+def masksFromLabeledImages(
+    img_stack: List[ImageStack], labeled_image: Path, file_formats_labeled: str
+) -> List[BinaryMaskCollection]:
+    """
+    Returns a list of masks from the provided labeled images.
+
+    Parameters
+    ----------
+    img_stack: list[ImageStack]
+        The images that the masks will be applied to, provided per FOV.
+    labeled_image: Path
+        Directory of labeled images with image segmentation data, such as from ilastik classification.
+    file_formats_labeled: str
+        Layout for name of each labelled image. Will be formatted with String.format([fov index])
+
+    Returns
+    -------
+    list[BinaryMaskCollection]:
+        Binary masks for each FOV.
+    """
     masks = []
     for i in range(len()):
         label_name = ("{}/" + file_formats_labeled).format(labeled_image, i)
@@ -43,7 +82,35 @@ def masksFromLabeledImages(img_stack, labeled_image, file_formats_labeled):
     return masks
 
 
-def masksFromWatershed(img_stack, img_threshold, min_dist, min_size, max_size, masking_radius):
+def masksFromWatershed(
+    img_stack: List[ImageStack],
+    img_threshold: float,
+    min_dist: int,
+    min_size: int,
+    max_size: int,
+    masking_radius: int,
+) -> List[BinaryMaskCollection]:
+    """
+    Runs a primitive thresholding and watershed pipeline to generate segmentation masks.
+
+    Parameters
+    ----------
+    img_threshold: float
+        Global threshold value for images.
+    min_dist: int
+        Minimum distance (pixels) between distance transformed peaks.
+    min_size: int
+        Minimum size for a cell (in pixels)
+    max_size: int
+        Maxiumum size for a cell (in pixels)
+    masking_radius: int
+        Radius for white tophat noise filter.
+
+    Returns
+    -------
+    list[BinaryMaskCollection]:
+        Binary masks for each FOV.
+    """
     wt_filt = ImgFilter.WhiteTophat(masking_radius, is_volume=False)
     thresh_filt = Binarize.ThresholdBinarize(img_threshold)
     min_dist_label = Filter.MinDistanceLabel(min_dist, 1)
@@ -62,16 +129,38 @@ def masksFromWatershed(img_stack, img_threshold, min_dist, min_size, max_size, m
     return masks
 
 
-# def saveTable(table, savename):
-#    intensities = IntensityTable(table.where(table[Features.PASSES_THRESHOLDS], drop=True))
-#    traces = intensities.stack(traces=(Axes.ROUND.value, Axes.CH.value))
-#    traces = traces.to_features_dataframe()
-#    traces.to_csv(savename)
-
-
 def run(
-    input_loc, exp_loc, output_loc, fov_count, aux_name, roiKwargs, labeledKwargs, watershedKwargs
+    input_loc: Path,
+    exp_loc: Path,
+    output_loc: str,
+    fov_count: int,
+    aux_name: str,
+    roiKwargs: dict,
+    labeledKwargs: dict,
+    watershedKwargs: dict,
 ):
+    """
+    Main class for generating and applying masks then saving output.
+
+    Parameters
+    ----------
+    input_loc: Path
+        Location of input cdf files, as formatted by starfishRunner.cwl
+    exp_loc: Path
+        Directory that contains "experiment.json" file for the experiment.
+    output_loc: str
+        Path to directory where output will be saved.
+    fov_count: int
+        The number of FOVs in the experiment.
+    aux_name: str
+        The name of the auxillary view to look at for image segmentation.
+    roiKwargs: dict
+        Dictionary with arguments for reading in masks from an RoiSet. See masksFromRoi.
+    labeledKwargs: dict
+        Dictionary with arguments for reading in masks from a labeled image. See masksFromLabeledImages.
+    watershedKwargs: dict
+        Dictionary with arguments for running basic watershed pipeline. See masksFromWatershed.
+    """
 
     if not path.isdir(output_dir):
         makedirs(output_dir)
@@ -81,19 +170,23 @@ def run(
 
     # redirecting output to log
     reporter = open(
-        path.join(output_dir, datetime.now().strftime("%Y-%d-%m_%H:%M_starfish_segmenter.log")),
+        path.join(output_dir, datetime.now().strftime("%Y%m%d_%H%M_starfish_segmenter.log")),
         "w",
     )
     sys.stdout = reporter
     sys.stderr = reporter
 
-    if not path.isdir(output_dir + "csv/"):
-        makedirs(output_dir + "csv")
-        print("made " + output_dir + "csv")
+    # if not path.isdir(output_dir + "csv/"):
+    #    makedirs(output_dir + "csv")
+    #    print("made " + output_dir + "csv")
 
-    if not path.isdir(output_dir + "cdf/"):
-        makedirs(output_dir + "cdf")
-        print("made " + output_dir + "cdf")
+    # if not path.isdir(output_dir + "cdf/"):
+    #    makedirs(output_dir + "cdf")
+    #    print("made " + output_dir + "cdf")
+
+    # if not path.isdir(output_dir + "h5ad/"):
+    #    makedirs(output_dir + "h5ad")
+    #    print("made " + output_dir + "h5ad")
 
     # read in netcdfs based on how we saved prev step
     results = []
@@ -105,14 +198,21 @@ def run(
         print("found fov key: " + name)
         keys.append(name)
         print("loaded " + f)
+        if not path.isdir(output_dir + name):
+            makedirs(output_dir + name)
+            print("made " + output_dir + name)
 
     # load in the images we want to look at
     exp = starfish.core.experiment.experiment.Experiment.from_json(
         str(exp_loc / "experiment.json")
     )
+    print("loaded " + str(exp_loc / "experiment.json"))
+
     img_stack = []
     for key in exp.keys():
-        img_stack.append(exp[key].get_image(aux_name))
+        print("looking at " + key + ", " + aux_name)
+        cur_img = exp[key].get_image(aux_name)
+        img_stack.append(cur_img)
 
     # determine how we generate mask, then make it
     if len(roiKwargs.keys()) > 0:
@@ -131,19 +231,26 @@ def run(
         # throw error
         raise Exception("Parameters do not specify means of defining mask.")
 
+    # save masks to tiffs for later processing
+    for i in range(len(masks)):
+        binmask = masks[i].to_label_image().xarray.values
+        while len(binmask.shape) > 2:
+            binmask = np.sum(binmask, axis=0)
+        binmask = binmask > 0
+        PIL.Image.fromarray(binmask).save("{}/{}/mask.tiff".format(output_dir, keys[i]))
+
     # apply mask to tables, save results
     al = AssignTargets.Label()
     for i in range(fov_count):
         labeled = al.run(masks[i], results[i])
-        labeled = labeled[labeled.cell_id != "nan"]
-        labeled.to_decoded_dataframe().save_csv(
-            output_dir + "csv/df_" + keys[i] + "_segmented.csv"
-        )
-        labeled.to_netcdf(output_dir + "cdf/df_" + keys[i] + "_segmented.cdf")
+        # labeled = labeled[labeled.cell_id != "nan"]
+        labeled.to_decoded_dataframe().save_csv(output_dir + keys[i] + "/segmentation.csv")
+        labeled.to_netcdf(output_dir + keys[i] + "/df_segmented.cdf")
         labeled.to_expression_matrix().to_pandas().to_csv(
-            output_dir + "csv/exp_" + keys[i] + "_segmented.csv"
+            output_dir + keys[i] + "/exp_segmented.csv"
         )
-        labeled.to_expression_matrix().save(output_dir + "cdf/exp_" + keys[i] + "_segmented.cdf")
+        labeled.to_expression_matrix().save(output_dir + keys[i] + "/exp_segmented.cdf")
+        labeled.to_expression_matrix().save_anndata(output_dir + keys[i] + "/exp_segmented.h5ad")
         print("saved fov key: {}, index {}".format(keys[i], i))
 
     sys.stdout = sys.__stdout__

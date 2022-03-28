@@ -1,56 +1,35 @@
 #!/usr/bin/env cwl-runner
 class: Workflow
-cwlVersion: v1.1
+cwlVersion: v1.2
+
+requirements:
+   - class: SubworkflowFeatureRequirement
+   - class: InlineJavascriptRequirement
+   - class: StepInputExpressionRequirement
+   - class: MultipleInputFeatureRequirement
 
 inputs:
-# step 1 - align
-  raw_dir:
+
+# pseudochannel sorting vars, if present then it will be assumed that sorting must be performed.
+
+  channel_yml:
+    type: File?
+    doc: PyYML-formatted list containing a dictionary outlining how the truechannels in imaging relate to the pseudochannels in the decoding codebook. The index of each dict within the list is the trueround % (count of pseudorounds). The keys of the dict are the channels within the image and the values are the pseudochannels in the converted notebook.
+
+  cycle_yml:
+    type: File?
+    doc: PyYML-formatted dictionary outlining how the truerounds in imaging relate to the pseudorounds in the decoding codebook. The keys are truerounds and the values are the corresponding pseudorounds.
+
+
+# format of input vars
+# can be read into converter or sorter, followed by string literal input will be used for conversion
+
+  tiffs:
     type: Directory
-    doc: Directory with image files
-
-  fov_count:
-    type: int
-    doc: The number of FoVs
-
-  round_list:
-    type: string[]
-    doc: The names of the rounds
-
-  sigma:
-    type: float
-    doc: Value used for Gaussian blur
-
-  cycle_ref_ind:
-    type: int
-    doc: Which cycle to align to
-
-  channel_DIC_reference:
-    type: string
-    doc: DIC channel for reference cycle
-
-  channel_DIC:
-    type: string
-    doc: DIC channel for (non-reference) decoding cycles (the channel we use for finding alignment parameters)
-
-  cycle_other:
-    type: string[]
-    doc: if there are other data-containing folders which need to be aligned but are not named "CycleXX"
-
-  channel_DIC_other:
-    type: string[]
-    doc: DIC channel for other data-containing folders
-
-  skip_projection:
-    type: boolean?
-    doc: If true, will skip z-axis projection before alignment step.
-
-  skip_align:
-    type: boolean?
-    doc: If true, will skip alignment of images across rounds prior to spacetx conversion
-
-#step 2 - spaceTxConversion
+    doc: The directory containing all .tiff files
 
   codebook:
+  # NOTE: if running psort, this is assumed to be json.
     type:
       - type: record
         name: csv
@@ -76,6 +55,10 @@ inputs:
   channel_count:
     type: int
     doc: The number of total channels per imaging round
+
+  fov_count:
+    type: int
+    doc: The number of FOVs that are included in this experiment
 
   round_offset:
     type: int?
@@ -118,9 +101,15 @@ inputs:
         aux_cache_read_order:
           type: string[]?
           doc: Order of non x,y dimensions within each image. One entry per aux_name, with semicolon-delimited vars.
-        aux_fixed_channel:
+        aux_channel_count:
+          type: float[]?
+          doc: Count of channels in each aux image.
+        aux_channel_slope:
+          type: float[]?
+          doc: Used to convert 0-indexed channel IDs to the channel index within the image.  Calculated as (image index) = int(index*slope) + intercept
+        aux_channel_intercept:
           type: int[]?
-          doc: Which channel to refer to in aux images.
+          doc: Used to convert 0-indexed channel IDs to the channel index within the image.  Calculated as (image index) = int(index*slope) + intercept
 
   fov_positioning:
     - 'null'
@@ -154,40 +143,43 @@ inputs:
           type: float
           doc: size of voxels in the z-axis
 
-# step 3 - starfishRunner
+# image processing
 
-  flatten_axes:
-    type: string[]?
-    doc: Which axes, if any, to compress in the image preprocessing steps.
-
-  clip_img:
+  skip_processing:
     type: boolean?
-    doc: Whether to rescale and clip images across rounds.
+    doc: If true, image processing step will be skipped.
+    default: false
+
+  clip_min:
+    type: float?
+    doc: Pixels below this percentile are set to 0.
+
+  opening_size:
+    type: int?
+    doc: Size of the morphological opening filter to be applied to the image
+
+  register_aux_view:
+    type: string?
+    doc: The name of the auxillary view to be used for image registration.
+
+# starfishRunner
 
   use_ref_img:
     type: boolean?
     doc: Whether to generate a reference image and use it alongside spot detection.
-
-  gaussian_lowpass:
-    type: float?
-    doc: If included, standard deviation for gaussian kernel in lowpass filter
-
-  zero_by_magnitude:
-    type: float?
-    doc: If included, pixels in each round that have a L2 norm across channels below this threshold are set to 0.
 
   decoding:
     type:
       - type: record
         name: blob
         fields:
-          min_sigma_blob:
+          min_sigma:
             type: float[]?
             doc: Minimum sigma tuple to be passed to blob detector
-          max_sigma_blob:
+          max_sigma:
             type: float[]?
             doc: Maximum sigma tuple to be passed to blob detector
-          num_sigma_blob:
+          num_sigma:
             type: int?
             doc: The number of sigma values to be tested, passed to blob detector
           threshold:
@@ -269,7 +261,7 @@ inputs:
             type: int?
             doc: Order of L_p norm to apply to intensities and codes when using metric_decode to pair each intensities to its closest target (default = 2)
 
-# 4 - Segmentation
+# segmentation
 
   aux_name:
     type: string
@@ -314,53 +306,54 @@ inputs:
             type: int
             doc: Radius for white tophat noise filter
 
+# QC
+  skip_baysor:
+    type: boolean?
+    doc: If true, the baysor step will be skipped.
+    default: false
+
+  find_ripley:
+    type: boolean?
+    doc: If true, will run ripley K estimates to find spatial density measures.  Can be slow.
+    default: False
+  save_pdf:
+    type: boolean?
+    doc: If true, will save graphical output to a pdf. Currently pdfs are bugged.
+    default: False
+
 outputs:
-  1_Projected:
+  1_Pseudosort:
     type: Directory
-    outputSource: align/projected
-  2_Registered:
-    type: Directory
-    outputSource: align/registered
-  2_Registered_log:
-    type: File
-    outputSource: align/tool_out
-  3_tx_converted:
+    outputSource: sorter/pseudosorted_dir
+  2_tx_converted:
     type: Directory
     outputSource: spaceTxConversion/spaceTx_converted
+  3_Processed:
+    type: Directory
+    outputSource: processing/processed_exp
   4_Decoded:
     type: Directory
     outputSource: starfishRunner/decoded
   5_Segmented:
     type: Directory
     outputSource: segmentation/segmented
+  6_Baysor:
+    type: Directory
+    outputSource: baysorStaged/baysor
+  7_QC:
+    type: Directory
+    outputSource: qc/qc_metrics
 
 steps:
-  align:
-    run: steps/aligner.cwl
-    in:
-      raw_dir: raw_dir
-      fov_count: fov_count
-      round_list: round_list
-      sigma: sigma
-      cycle_ref_ind: cycle_ref_ind
-      channel_DIC_reference: channel_DIC_reference
-      channel_DIC: channel_DIC
-      cycle_other: cycle_other
-      channel_DIC_other: channel_DIC_other
-      skip_projection: skip_projection
-      skip_align: skip_align
-    out: [projected, registered, tool_out]
 
-  spaceTxConversion:
-    run: steps/spaceTxConversion.cwl
+  sorter:
+    run: steps/sorter.cwl
     in:
-      tiffs: align/registered
+      channel_yml: channel_yml
+      cycle_yml: cycle_yml
+      input_dir: tiffs
       codebook: codebook
-#        csv: codebook_csv
-#        json: codebook_json
       round_count: round_count
-      zplane_count: zplane_count
-      channel_count: channel_count
       fov_count: fov_count
       round_offset: round_offset
       fov_offset: fov_offset
@@ -369,17 +362,115 @@ steps:
       file_vars: file_vars
       cache_read_order: cache_read_order
       aux_tilesets: aux_tilesets
+    when: $(inputs.channel_yml != null)
+    out: [pseudosorted_dir]
+
+  stagedSorted:
+    run: steps/psortedDefaultParams.cwl
+    in:
+      channel_yml: channel_yml
+      exp_dir: sorter/pseudosorted_dir
+      aux_names:
+        source: aux_tilesets
+        valueFrom: |
+          ${
+            return self.aux_names;
+          }
+      cache_read_order: cache_read_order
+      aux_cache_read_order:
+        source: aux_tilesets
+        valueFrom: |
+          ${
+            return self.aux_cache_read_order
+          }
+    when: $(inputs.channel_yml != null)
+    out: [codebook, round_offset, fov_offset, channel_offset, zplane_offset, file_format, file_vars, cache_read_order, aux_names, aux_file_formats, aux_file_vars, aux_cache_read_order, aux_channel_slope, aux_channel_intercept]
+
+  spaceTxConversion:
+    run: steps/spaceTxConversion.cwl
+    in:
+      tiffs:
+        source: [sorter/pseudosorted_dir, tiffs]
+        pickValue: first_non_null
+      codebook:
+        source: [stagedSorted/codebook, codebook]
+        linkMerge: merge_flattened
+        valueFrom: |
+          ${
+            if(!self[0]){
+              return self[1];
+            }
+            return {json: self[0]};
+          }
+      round_count: round_count
+      zplane_count: zplane_count
+      channel_count: channel_count
+      fov_count: fov_count
+      round_offset:
+        source: [stagedSorted/round_offset, round_offset]
+        pickValue: first_non_null
+      fov_offset:
+        source: [stagedSorted/fov_offset, fov_offset]
+        pickValue: first_non_null
+      channel_offset:
+        source: [stagedSorted/channel_offset, channel_offset]
+        pickValue: first_non_null
+      file_format:
+        source: [stagedSorted/file_format, file_format]
+        pickValue: first_non_null
+      file_vars:
+        source: [stagedSorted/file_vars, file_vars]
+        pickValue: first_non_null
+      cache_read_order:
+        source: [stagedSorted/cache_read_order, cache_read_order]
+        pickValue: first_non_null
+      aux_tilesets:
+        source: [aux_tilesets, stagedSorted/aux_names, stagedSorted/aux_file_formats, stagedSorted/aux_file_vars, stagedSorted/aux_cache_read_order, stagedSorted/aux_channel_slope, stagedSorted/aux_channel_intercept]
+        valueFrom: |
+          ${
+            if(!self[1]){
+              return {
+                  aux_names: self[0].aux_names,
+                  aux_file_formats: self[0].aux_file_formats,
+                  aux_file_vars: self[0].aux_file_vars,
+                  aux_cache_read_order: self[0].aux_cache_read_order,
+                  aux_channel_count: self[0].aux_channel_count,
+                  aux_channel_slope: self[0].aux_channel_slope,
+                  aux_channel_intercept: self[0].aux_channel_intercept
+              };
+            } else {
+              return {
+                  aux_names: self[1],
+                  aux_file_formats: self[2],
+                  aux_file_vars: self[3],
+                  aux_cache_read_order: self[4],
+                  aux_channel_count: self[0].aux_channel_count,
+                  aux_channel_slope: self[5],
+                  aux_channel_intercept: self[6]
+              };
+            };
+          }
     out: [spaceTx_converted]
+
+  processing:
+    run: steps/processing.cwl
+    in:
+      skip_processing: skip_processing
+      input_dir: spaceTxConversion/spaceTx_converted
+      clip_min: clip_min
+      opening_size: opening_size
+      register_aux_view: register_aux_view
+    when: $(inputs.skip_processing == false)
+    out:
+      [processed_exp]
 
   starfishRunner:
     run: steps/starfishRunner.cwl
     in:
-      exp_loc: spaceTxConversion/spaceTx_converted
-      flatten_axes: flatten_axes
-      clip_img: clip_img
+      exp_loc:
+        source: [processing/processed_exp, spaceTxConversion/spaceTx_converted]
+        pickValue: first_non_null
       use_ref_img: use_ref_img
-      gaussian_lowpass: gaussian_lowpass
-      zero_by_magnitude: zero_by_magnitude
       decoding: decoding
     out:
       [decoded]
@@ -387,6 +478,7 @@ steps:
   segmentation:
     run: steps/segmentation.cwl
     in:
+      skip_baysor: skip_baysor
       decoded_loc: starfishRunner/decoded
       exp_loc: spaceTxConversion/spaceTx_converted
       aux_name: aux_name
@@ -394,3 +486,49 @@ steps:
       binary_mask: binary_mask
     out:
       [segmented]
+
+  baysorStaged:
+    run: steps/baysorStaged.cwl
+    in:
+      segmented: segmentation/segmented
+    when: $(inputs.skip_baysor == false)
+    out:
+      [baysor]
+
+  qc:
+    run: steps/qc.cwl
+    in:
+      codebook:
+        source: [sorter/pseudosorted_dir, spaceTxConversion/spaceTx_converted]
+        pickValue: first_non_null
+        valueFrom: |
+          ${
+            return {exp: self};
+          }
+      segmentation_loc:
+        source: [baysorStaged/baysor, segmentation/segmented]
+        pickValue: first_non_null
+      imagesize:
+        source: fov_positioning
+        valueFrom: |
+          ${
+            return {
+              "x-size": self['x-shape'],
+              "y-size": self['y-shape'],
+              "z-size": self['z-shape']
+            };
+          }
+      find_ripley: find_ripley
+      save_pdf: save_pdf
+      data:
+        source: [starfishRunner/decoded, decoding]
+        linkMerge: merge_flattened
+        valueFrom: |
+          ${
+            return {
+              exp: self[0],
+              has_spots: typeof self[1].decode_method != 'undefined'
+            };
+          }
+    out:
+      [qc_metrics]

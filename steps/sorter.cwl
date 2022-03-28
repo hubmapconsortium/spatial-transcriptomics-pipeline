@@ -2,18 +2,18 @@
 
 class: CommandLineTool
 cwlVersion: v1.1
-baseCommand: /opt/spaceTxConverter.py
+baseCommand: /opt/pseudoSort.py
 
 requirements:
   DockerRequirement:
     dockerPull: docker.pkg.github.com/hubmapconsortium/spatial-transcriptomics-pipeline/starfish-custom:latest
 
 inputs:
-  tiffs:
+  input_dir:
     type: Directory
     inputBinding:
       prefix: --input-dir
-    doc: The directory containing all .tiff files
+    doc: The root directory containing all images.
 
   codebook:
     type:
@@ -34,59 +34,23 @@ inputs:
               prefix: --codebook-json
             doc: The codebook for this experiment, already formatted in the spaceTx defined .json format.
 
-  round_count:
-    type: int
+  channel_yml:
+    type: File
     inputBinding:
-      prefix: --round-count
-    doc: The number of imaging rounds in the experiment
+      prefix: --channel-yml
+    doc: PyYML-formatted list containing a dictionary outlining how the truechannels in imaging relate to the pseudochannels in the decoding codebook. The index of each dict within the list is the trueround % (count of pseudorounds). The keys of the dict are the channels within the image and the values are the pseudochannels in the converted notebook.
 
-  zplane_count:
-    type: int
+  cycle_yml:
+    type: File
     inputBinding:
-      prefix: --zplane-count
-    doc: The number of z-planes in each image
-
-  channel_count:
-    type: int
-    inputBinding:
-      prefix: --channel-count
-    doc: The number of total channels per imaging round
-
-  fov_count:
-    type: int
-    inputBinding:
-      prefix: --fov-count
-    doc: The number of FOVs that are included in this experiment
-
-  round_offset:
-    type: int?
-    inputBinding:
-      prefix: --round-offset
-    doc: The index of the first round (for file names).
-
-  fov_offset:
-    type: int?
-    inputBinding:
-      prefix: --fov-offset
-    doc: The index of the first FOV (for file names).
-
-  channel_offset:
-    type: int?
-    inputBinding:
-      prefix: --channel-offset
-    doc: The index of the first channel (for file names).
-
-  zplane_offset:
-    type: int?
-    inputBinding:
-      prefix: --zplane-offset
-    doc: The index of the first zplane (for file names).
+      prefix: --cycle-yml
+    doc: PyYML-formatted dictionary outlining how the truerounds in imaging relate to the pseudorounds in the decoding codebook. The keys are truerounds and the values are the corresponding pseudorounds.
 
   file_format:
     type: string
     inputBinding:
       prefix: --file-format
-    doc: String with layout for .tiff files
+    doc: String with layout for .tiff files. Will be formatted via str.format().
 
   file_vars:
     type: string[]
@@ -98,7 +62,37 @@ inputs:
     type: string[]
     inputBinding:
       prefix: --cache-read-order
-    doc: Order of non x,y dimensions within each image.
+    doc: Order of x,y,z,ch dimensions within each image.
+
+  fov_count:
+    type: int
+    inputBinding:
+      prefix: --fov-count
+    doc: The number of FOVs that are included in this experiment
+
+  round_offset:
+    type: int?
+    inputBinding:
+      prefix: --round-offset
+    default: 0
+    doc: The index of the first round (for file names).
+
+  fov_offset:
+    type: int?
+    inputBinding:
+      prefix: --fov-offset
+    default: 0
+    doc: The index of the first FOV (for file names).
+
+  channel_offset:
+    type: int?
+    inputBinding:
+      prefix: --channel-offset
+    default: 0
+    doc: The index of the first channel (for file names).
+
+  channel_slope:
+    type: float?
 
   aux_tilesets:
     type:
@@ -141,59 +135,11 @@ inputs:
             prefix: --aux-channel-intercept
           doc: Used to convert 0-indexed channel IDs to the channel index within the image.  Calculated as (image index) = int(index*slope) + intercept
 
-  fov_positioning:
-    - 'null'
-    - type: record
-      fields:
-        - name: x-locs
-          type: string
-          inputBinding:
-            prefix: --x-pos-locs
-          doc: list of x-axis start locations per fov index
-        - name: x-shape
-          type: int
-          inputBinding:
-            prefix: --x-pos-shape
-          doc: shape of each fov item in the x-axis
-        - name: x-voxel
-          type: float
-          inputBinding:
-            prefix: --x-pos-voxel
-          doc: size of voxels in the x-axis
-        - name: y-locs
-          type: string
-          inputBinding:
-            prefix: --y-pos-locs
-          doc: list of y-axis start locations per fov index
-        - name: y-shape
-          type: int
-          inputBinding:
-            prefix: --y-pos-shape
-          doc: shape of each fov item in the y-axis
-        - name: y-voxel
-          type: float
-          inputBinding:
-            prefix: --y-pos-voxel
-          doc: size of voxels in the y-axis
-        - name: z-locs
-          type: string
-          inputBinding:
-            prefix: --z-pos-locs
-          doc: list of z-axis start locations per fov index
-        - name: z-shape
-          type: int
-          inputBinding:
-            prefix: --z-pos-shape
-          doc: shape of each fov item in the z-axis
-        - name: z-voxel
-          type: float
-          inputBinding:
-            prefix: --z-pos-voxel
-          doc: size of voxels in the z-axis
-
 outputs:
-  spaceTx_converted:
+  pseudosorted_dir:
     type: Directory
     outputBinding:
-      glob: "2_tx_converted/"
+      glob: "1_pseudosort/"
 
+  log:
+    type: stdout

@@ -6,7 +6,7 @@ baseCommand: /opt/starfishDriver.py
 
 requirements:
   DockerRequirement:
-    dockerPull: docker.pkg.github.com/hubmapconsortium/spatial-transcriptomics-pipeline/starfish:1.01
+    dockerPull: docker.pkg.github.com/hubmapconsortium/spatial-transcriptomics-pipeline/starfish-custom:latest
 
 inputs:
   exp_loc:
@@ -15,35 +15,11 @@ inputs:
       prefix: --exp-loc
     doc: Location of directory containing starfish experiment.json file
 
-  flatten_axes:
-    type: string[]?
-    inputBinding:
-      prefix: --flatten-axes
-    doc: Which axes, if any, to compress in the image preprocessing steps.
-
-  clip_img:
-    type: boolean?
-    inputBinding:
-      prefix: --clip-img
-    doc: Whether to rescale and clip images across rounds.
-
   use_ref_img:
     type: boolean?
     inputBinding:
       prefix: --use-ref-img
     doc: Whether to generate a reference image and use it alongside spot detection.
-
-  gaussian_lowpass:
-    type: float?
-    inputBinding:
-      prefix: --gaussian-lowpass
-    doc: If included, standard deviation for gaussian kernel in lowpass filter
-
-  zero_by_magnitude:
-    type: float?
-    inputBinding:
-      prefix: --zero-by-magnitude
-    doc: If included, pixels in each round that have a L2 norm across channels below this threshold are set to 0.
 
   decoding:
     type:
@@ -80,6 +56,11 @@ inputs:
             inputBinding:
               prefix: --overlap
             doc: Amount of overlap allowed between blobs, passed to blob detector
+          detector_method:
+            type: string?
+            inputBinding:
+              prefix: --detector-method
+            doc: Name of the scikit-image spot detection method to use
           decode_method:
             type: string
             inputBinding:
@@ -153,6 +134,24 @@ inputs:
                     inputBinding:
                       prefix: --search-radius
                     doc: Distance to search for matching spots.
+              - type: record
+                name: check_all
+                fields:
+                  search_radius:
+                    type: int?
+                    inputBinding:
+                      prefix: --search-radius
+                    doc: Distance to search for matching spots.
+                  filter_rounds:
+                    type: int?
+                    inputBinding:
+                      prefix: --filter-rounds
+                    doc: The number of rounds that a barcode must be identified in to pass filters. Defaults to (number of rounds) - 1 or (number of rounds - error rounds), if error_rounds > 0.
+                  error_rounds:
+                    type: int?
+                    inputBinding:
+                      prefix: --error-rounds
+                    doc: Maximum hamming distance a barcode can be from its target and still be uniquely identified.
 
       - type: record
         name: pixel
