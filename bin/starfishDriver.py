@@ -411,7 +411,7 @@ if __name__ == "__main__":
                 raise Exception("TraceBuildingStrategies " + str(trace_strat) + " is not valid.")
             decodeKwargs["trace_building_strategy"] = trace_strat
 
-    addKwarg(args, decodeKwargs, "filter_rounds")
+    addKwarg(args, decodeKwargs, "filtered_results")
     addKwarg(args, decodeKwargs, "error_rounds")
     addKwarg(args, decodeKwargs, "max_distance")
     addKwarg(args, decodeKwargs, "min_intensity")

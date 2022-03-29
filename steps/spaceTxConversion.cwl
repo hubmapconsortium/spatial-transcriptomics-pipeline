@@ -191,6 +191,12 @@ inputs:
             prefix: --z-pos-voxel
           doc: size of voxels in the z-axis
 
+  add_blanks:
+    type: boolean?
+    inputBinding:
+      prefix: --add-blanks
+    doc: If true, will add blanks with a hamming distance 1 from the existing codes.
+
 outputs:
   spaceTx_converted:
     type: Directory
