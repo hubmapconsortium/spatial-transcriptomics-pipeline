@@ -2,6 +2,7 @@
 
 import functools
 import os
+import random
 import sys
 from argparse import ArgumentParser
 from datetime import datetime
@@ -15,6 +16,7 @@ import numpy as np
 import pandas as pd
 import skimage.io
 import starfish
+import xarray as xr
 from slicedimage import ImageFormat
 from starfish import Codebook
 from starfish.experiment.builder import FetchedTile, TileFetcher, write_experiment_json
@@ -671,6 +673,140 @@ def cli(
     return 0
 
 
+def barcodeConv(lis, chs):
+    barcode = np.zeros((len(lis), chs))
+    for i in range(len(lis)):
+        barcode[i][lis[i]] = 1
+    return barcode
+
+
+def incrBarcode(lis, chs):
+    currInd = len(lis) - 1
+    lis[currInd] += 1
+    while lis[currInd] == chs:
+        lis[currInd] = 0
+        currInd -= 1
+        lis[currInd] += 1
+    return lis
+
+
+def _view_row_as_element(array: np.ndarray) -> np.ndarray:
+    nrows, ncols = array.shape
+    dtype = {"names": ["f{}".format(i) for i in range(ncols)], "formats": ncols * [array.dtype]}
+    return array.view(dtype)
+
+
+def blank_codebook(real_codebook, num_blanks):
+    """
+    From a codebook of real codes, creates a codebook of those original codes plus a set of blank codes that
+    follow the hamming distance > 1 rule. Resulting codebook will have num_blanks blank codes in addition to all
+    the original real codes. If num_blanks is greater than the total number of blank codes found then all blanks
+    will be added.
+    """
+
+    # Extract dimensions and create empty xarray for barcodes
+    roundsN = len(codebook["r"])
+    channelsN = len(codebook["c"])
+    allCombo = xr.zeros_like(
+        xr.DataArray(
+            np.zeros((channelsN ** roundsN, roundsN, channelsN)), dims=["target", "r", "c"]
+        )
+    )
+
+    # Start from set of all possible codes
+    barcode = [0] * roundsN
+    for i in range(np.shape(allCombo)[0]):
+        allCombo[i] = barcodeConv(barcode, channelsN)
+        barcode = incrBarcode(barcode, channelsN)
+
+    # Remove codes that have hamming distance <= 1 to any code in the real codebook
+    cb_codes = real_codebook.argmax(Axes.CH.value)
+    drop_cb_codes = {}
+    rounds = [True] * roundsN
+    for r in range(roundsN):
+        rounds[r] = False
+        drop_codes = cb_codes.sel(r=rounds)
+        drop_codes.values = np.ascontiguousarray(drop_codes.values)
+        drop_codes = _view_row_as_element(drop_codes.values.reshape(drop_codes.shape[0], -1))
+        drop_cb_codes[r] = drop_codes
+        rounds[r] = True
+
+    drop_combos = {}
+    rounds = [True] * roundsN
+    for r in range(roundsN):
+        rounds[r] = False
+        combo_codes = allCombo.argmax(Axes.CH.value)
+        combo_codes = combo_codes.sel(r=rounds)
+        combo_codes.values = np.ascontiguousarray(combo_codes.values)
+        combo_codes = _view_row_as_element(combo_codes.values.reshape(combo_codes.shape[0], -1))
+        drop_combos[r] = combo_codes
+        rounds[r] = True
+    combo_codes = allCombo.argmax(Axes.CH.value)
+    combo_codes.values = np.ascontiguousarray(combo_codes.values)
+    combo_codes = _view_row_as_element(combo_codes.values.reshape(combo_codes.shape[0], -1))
+
+    drop = []
+    for i in range(len(combo_codes)):
+        for r in range(roundsN):
+            if np.any(drop_combos[r][i] == drop_cb_codes[r]):
+                drop.append(i)
+                break
+
+    drop = set(drop)
+    allCombo = allCombo[[x for x in range(len(combo_codes)) if x not in drop]]
+
+    # Find set of codes that all have hamming distance of more than 1 to each other
+
+    # Creates set of codebooks each with a different dropped round, can determine if two codes are 1 or fewer hamming
+    # distances from each other by seeing if they match exactly when the same round is dropped for each code
+    drop_combos = {}
+    rounds = [True] * roundsN
+    for r in range(roundsN):
+        rounds[r] = False
+        combo_codes = allCombo.argmax(Axes.CH.value)
+        combo_codes = combo_codes.sel(r=rounds)
+        combo_codes.values = np.ascontiguousarray(combo_codes.values)
+        combo_codes = _view_row_as_element(combo_codes.values.reshape(combo_codes.shape[0], -1))
+        drop_combos[r] = combo_codes
+        rounds[r] = True
+    combo_codes = allCombo.argmax(Axes.CH.value)
+    combo_codes.values = np.ascontiguousarray(combo_codes.values)
+    combo_codes = _view_row_as_element(combo_codes.values.reshape(combo_codes.shape[0], -1))
+
+    i = 0
+    while i < len(combo_codes):
+        drop = set()
+        for r in range(roundsN):
+            drop.update([x for x in np.nonzero(drop_combos[r][i] == drop_combos[r])[0]])
+        drop.remove(i)
+        inds = [x for x in range(len(combo_codes)) if x not in drop]
+        combo_codes = combo_codes[inds]
+        for r in range(roundsN):
+            drop_combos[r] = drop_combos[r][inds]
+        i += 1
+
+    # Create Codebook object with blanks
+    blanks = np.zeros((len(combo_codes), roundsN, channelsN))
+    for i, code in enumerate(combo_codes):
+        for j, x in enumerate(code[0]):
+            blanks[i][j][x] = 1
+
+    blank_codebook = Codebook.from_numpy(
+        code_names=["blank" + str(x) for x in range(len(blanks))],
+        n_round=roundsN,
+        n_channel=channelsN,
+        data=blanks,
+    )
+
+    # Combine correct number of blank codes with real codebook and return combined codebook
+    if num_blanks > len(blanks):
+        num_blanks = len(blanks)
+    rand_sample = random.sample(range(len(blanks)), num_blanks)
+    combined = xr.concat([real_codebook, blank_codebook[rand_sample]], "target")
+
+    return combined
+
+
 if __name__ == "__main__":
     p = ArgumentParser()
     p.add_argument("--input-dir", type=Path)
@@ -703,6 +839,8 @@ if __name__ == "__main__":
     p.add_argument("--z-pos-locs", type=str, nargs="?")
     p.add_argument("--z-pos-shape", type=int, nargs="?")
     p.add_argument("--z-pos-voxel", type=float, nargs="?")
+    p.add_argument("--add-blanks", dest="add_blanks", action="store_true")
+    p.set_defaults(add_blanks=False)
 
     args = p.parse_args()
 
@@ -801,6 +939,8 @@ if __name__ == "__main__":
     # a placeholder.
     if args.codebook_csv:
         codebook = parse_codebook(args.codebook_csv)
-        codebook.to_json(output_dir + "codebook.json")
     if args.codebook_json:
-        copyfile(args.codebook_json, output_dir + "codebook.json")
+        codebook = Codebook.open_json(args.codebook_json)
+    if args.add_blanks:
+        codebook = blank_codebook(codebook, len(codebook))
+    codebook.to_json(output_dir + "codebook.json")

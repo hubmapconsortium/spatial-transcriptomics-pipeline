@@ -6,7 +6,7 @@ baseCommand: /opt/pseudoSort.py
 
 requirements:
   DockerRequirement:
-    dockerPull: docker.pkg.github.com/hubmapconsortium/spatial-transcriptomics-pipeline/starfish-custom:2.0
+    dockerPull: docker.pkg.github.com/hubmapconsortium/spatial-transcriptomics-pipeline/starfish-custom:latest
 
 inputs:
   input_dir:
