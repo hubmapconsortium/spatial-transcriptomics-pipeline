@@ -185,12 +185,12 @@ def histoMatchImage(img: ImageStack):
     min_rch = sorted(meds.items(), key=lambda item: item[1])[0][0]
 
     # Use min image as reference for histogram matching (need to convert to ints or it takes a VERY long time)
-    reference = np.rint(img.xarray.data[min_rch[0], min_rch[1]] * 2 ** 16)
+    reference = np.rint(img.xarray.data[min_rch[0], min_rch[1]] * 2**16)
     for r in range(img.num_rounds):
         for ch in range(img.num_chs):
-            data = np.rint(img.xarray.data[r, ch] * 2 ** 16)
+            data = np.rint(img.xarray.data[r, ch] * 2**16)
             matched = hist_match(data, reference)
-            matched /= 2 ** 16
+            matched /= 2**16
             img.xarray.data[r, ch] = deepcopy(matched)
 
 
