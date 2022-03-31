@@ -98,7 +98,7 @@ inputs:
     type: boolean?
     inputBinding:
       prefix: --save-pdf
-    doc: If true, will save graphical output to a pdf. Currently pdfs are bugged.
+    doc: If true, will save graphical output to a pdf.
 
 outputs:
   qc_metrics:

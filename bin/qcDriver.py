@@ -374,7 +374,7 @@ def getTranscriptsPerCell(segmented, pdf=False):
 
     if pdf:
         fig = plt.figure()
-        plt.bar(list(range(max(cells))), counts)
+        plt.bar(list(range(len(counts))), counts)
         plt.axhline(
             y=mid - iqr_scale * (q3 - q1), dashes=(1, 1), color="gray", label="Outlier Threshold"
         )
@@ -516,6 +516,9 @@ def runFOV(
 
     t = time()
     print("\nFOV Analysis complete\n\ttotal time elapsed " + str(t - t0))
+
+    if savePdf:
+        pdf.close()
 
     return results
 

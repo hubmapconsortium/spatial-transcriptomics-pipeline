@@ -333,8 +333,8 @@ inputs:
     default: False
   save_pdf:
     type: boolean?
-    doc: If true, will save graphical output to a pdf. Currently pdfs are bugged.
-    default: False
+    doc: If true, will save graphical output to a pdf.
+    default: True
 
 outputs:
   1_Pseudosort:
