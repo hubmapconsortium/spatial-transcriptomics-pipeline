@@ -142,16 +142,22 @@ inputs:
                     inputBinding:
                       prefix: --search-radius
                     doc: Distance to search for matching spots.
-                  filter_rounds:
-                    type: int?
-                    inputBinding:
-                      prefix: --filter-rounds
-                    doc: The number of rounds that a barcode must be identified in to pass filters. Defaults to (number of rounds) - 1 or (number of rounds - error rounds), if error_rounds > 0.
                   error_rounds:
                     type: int?
                     inputBinding:
                       prefix: --error-rounds
                     doc: Maximum hamming distance a barcode can be from its target and still be uniquely identified.
+                  mode:
+                    type: string?
+                    inputBinding:
+                      prefix: --mode
+                    doc: Accuracy mode to run in.  Can be 'high', 'med', or 'low'.
+                  physical_coords:
+                    type: boolean?
+                    inputBinding:
+                      prefix: --physical-coords
+                    doc: Whether to use physical coordinates or pixel coordinates 
+
 
       - type: record
         name: pixel

@@ -342,8 +342,9 @@ if __name__ == "__main__":
     p.set_defaults(filtered_results=False)
 
     ## CheckAll
-    p.add_argument("--filter-rounds", type=int, nargs="?")
     p.add_argument("--error-rounds", type=int, nargs="?")
+    p.add_argument("--mode", type=str, nargs="?")
+    p.add_argument("--physical-coords", dest="physical_coords", action="store_true")
 
     # pixelRunner kwargs
     p.add_argument("--distance-threshold", type=float, nargs="?")
@@ -413,6 +414,8 @@ if __name__ == "__main__":
 
     addKwarg(args, decodeKwargs, "filtered_results")
     addKwarg(args, decodeKwargs, "error_rounds")
+    addKwarg(args, decodeKwargs, "mode")
+    addKwarg(args, decodeKwargs, "physical_coords")
     addKwarg(args, decodeKwargs, "max_distance")
     addKwarg(args, decodeKwargs, "min_intensity")
     addKwarg(args, decodeKwargs, "metric")

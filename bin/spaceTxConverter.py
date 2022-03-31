@@ -127,11 +127,11 @@ class FISHTile(FetchedTile):
                 ),
             }
         else:
-            # no defined location, retrun dummy
+            # no defined location, return dummy
             return {
                 Coordinates.X: (0.0, 1.0),
                 Coordinates.Y: (0.0, 1.0),
-                Coordinates.Z: (0.0, 0.1),
+                Coordinates.Z: (0.0, 1.0),
             }
 
     @property

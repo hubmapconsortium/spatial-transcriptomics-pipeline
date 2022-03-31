@@ -238,6 +238,21 @@ inputs:
                   search_radius:
                     type: int?
                     doc: Distance to search for matching spots.
+              - type: record
+                name: check_all
+                fields:
+                  search_radius:
+                    type: int?
+                    doc: Distance to search for matching spots.
+                  error_rounds:
+                    type: int?
+                    doc: Maximum hamming distance a barcode can be from its target and still be uniquely identified.
+                  mode:
+                    type: string
+                    doc: Accuracy mode to run in.  Can be 'high', 'med', or 'low'.
+                  physical_coords:
+                    type: boolean?
+                    doc: Whether to use physical coordinates or pixel coordinates
 
       - type: record
         name: pixel
