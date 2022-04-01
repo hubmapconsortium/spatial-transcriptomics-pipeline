@@ -705,8 +705,8 @@ def blank_codebook(real_codebook, num_blanks):
     """
 
     # Extract dimensions and create empty xarray for barcodes
-    roundsN = len(codebook["r"])
-    channelsN = len(codebook["c"])
+    roundsN = len(real_codebook["r"])
+    channelsN = len(real_codebook["c"])
     allCombo = xr.zeros_like(
         xr.DataArray(
             np.zeros((channelsN**roundsN, roundsN, channelsN)), dims=["target", "r", "c"]
