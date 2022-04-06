@@ -143,6 +143,10 @@ inputs:
           type: float
           doc: size of voxels in the z-axis
 
+  add_blanks:
+    type: boolean?
+    doc: If true, will add blanks with a hamming distance 1 from existing codes.
+
 # image processing
 
   skip_processing:
@@ -465,6 +469,7 @@ steps:
               };
             };
           }
+      add_blanks: add_blanks
     out: [spaceTx_converted]
 
   processing:
