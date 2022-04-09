@@ -93,7 +93,7 @@ def saveExp(source_dir: str, save_dir: str, exp: Experiment = None):
                 saveImg(save_dir, prefix, img)
 
     # copy the non-tiff files to the new directory
-    cp_files = [x for x in os.listdir(source_dir) if x[-5:] != ".tiff"]
+    cp_files = [x for x in os.listdir(source_dir) if x[-5:] != ".tiff" and x[-4:] != ".log"]
     for file in cp_files:
         if "fov" in file:
             # if file contains images, we need to update sha's
