@@ -35,8 +35,8 @@ from tqdm import tqdm
 def blobRunner(
     img: ImageStack,
     ref_img: ImageStack = None,
-    min_sigma: Tuple[float, float, float] = (0.5, 0.5, 0.5),
-    max_sigma: Tuple[float, float, float] = (8, 8, 8),
+    min_sigma: Tuple[float, float, float] = (0.5, 0.5),
+    max_sigma: Tuple[float, float, float] = (8, 8),
     num_sigma: int = 10,
     threshold: float = 0.1,
     is_volume: bool = False,
@@ -70,8 +70,8 @@ def blobRunner(
         overlap=overlap,
     )
     results = None
-    print(vars(bd))
-    print(vars(img))
+    # print(vars(bd))
+    # print(vars(img))
     if ref_img:
         results = bd.run(image_stack=img, reference_image=ref_img)
     else:
@@ -121,6 +121,7 @@ def blobDriver(
     codebook: Codebook,
     blobRunnerKwargs: dict,
     decodeRunnerKwargs: dict,
+    output_dir: str,
 ) -> Tuple[Mapping[str, SpotFindingResults], Mapping[str, DecodedIntensityTable]]:
     """
     Method to handle the blob-based version of the detection and decoding steps.
@@ -137,6 +138,8 @@ def blobDriver(
         A dictionary of optional parameters to be used for spot detection. Refer to blobRunner for specifics.
     decodeRunnerKwargs : dict
         A dictionary of optional parameters to be used in decoding. Refer to decodeRunner for specifics.
+    output_dir: str
+        The root location of the scripts output, to save blobs before they are put through the decoder.  Will not be saved if this is not passed.
 
     Returns
     -------
@@ -153,6 +156,9 @@ def blobDriver(
         blob = blobRunner(imgs[fov], ref_img=ref_img[fov] if ref_img else None, **blobRunnerKwargs)
         blobs[fov] = blob
         print("found total spots {}".format(blob.count_total_spots()))
+        if output_dir:
+            blob.save(output_dir + "spots/" + fov + "_")
+            print("spots saved.")
         decoded[fov] = decodeRunner(blob, codebook, **decodeRunnerKwargs)
     return blobs, decoded
 
@@ -276,7 +282,7 @@ def run(
     decoded = {}
     if blob_based:
         blobs, decoded = blobDriver(
-            imgs, ref_imgs, experiment.codebook, blobRunnerKwargs, decodeRunnerKwargs
+            imgs, ref_imgs, experiment.codebook, blobRunnerKwargs, decodeRunnerKwargs, output_dir
         )
     else:
         decoded = pixelDriver(imgs, experiment.codebook, pixelRunnerKwargs)
@@ -286,8 +292,6 @@ def run(
         saveTable(decoded[fov], output_dir + "csv/" + fov + "_decoded.csv")
         # decoded[fov].to_decoded_dataframe().save_csv(output_dir+fov+"_decoded.csv")
         decoded[fov].to_netcdf(output_dir + "cdf/" + fov + "_decoded.cdf")
-        if blob_based:
-            blobs[fov].save(output_dir + "spots/" + fov + "_")
 
     sys.stdout = sys.__stdout__
     return 0
@@ -386,6 +390,29 @@ if __name__ == "__main__":
     method = args.decode_spots_method
     blob_based = args.distance_threshold is None
     if blob_based:
+
+        # checking dims on sigma, because scipy throws an unhelpful error
+        # in the event of a mismatch.
+        if args.min_sigma:
+            minlen = len(tuple(args.min_sigma))
+        else:
+            minlen = 2
+
+        if args.max_sigma:
+            maxlen = len(tuple(args.max_sigma))
+        else:
+            maxlen = 2
+
+        if args.is_volume:
+            vol = args.is_volume
+        else:
+            vol = False
+
+        if not (vol + 2 == minlen and vol + 2 == maxlen):
+            raise Exception(
+                f"is_volume is set to {vol}, but sigma dimensions are of length {minlen} and {maxlen}"
+            )
+
         if method == "PerRoundMaxChannel":
             method = starfish.spots.DecodeSpots.PerRoundMaxChannel
         elif method == "MetricDistance":
