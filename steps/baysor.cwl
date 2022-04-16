@@ -8,7 +8,7 @@ requirements:
   DockerRequirement:
     #dockerPull: vpetukhov/baysor:v0.5.0
     #dockerPull: waltsbaysor:latest
-    dockerPull: docker.pkg.github.com/hubmapconsortium/spatial-transcriptomics-pipeline/baysor:latest
+    dockerPull: docker.pkg.github.com/hubmapconsortium/spatial-transcriptomics-pipeline/baysor:2.02
 
 inputs:
   csv:
