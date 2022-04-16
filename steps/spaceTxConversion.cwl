@@ -145,47 +145,47 @@ inputs:
     - 'null'
     - type: record
       fields:
-        - name: x-locs
+        - name: x_locs
           type: string
           inputBinding:
             prefix: --x-pos-locs
           doc: list of x-axis start locations per fov index
-        - name: x-shape
+        - name: x_shape
           type: int
           inputBinding:
             prefix: --x-pos-shape
           doc: shape of each fov item in the x-axis
-        - name: x-voxel
+        - name: x_voxel
           type: float
           inputBinding:
             prefix: --x-pos-voxel
           doc: size of voxels in the x-axis
-        - name: y-locs
+        - name: y_locs
           type: string
           inputBinding:
             prefix: --y-pos-locs
           doc: list of y-axis start locations per fov index
-        - name: y-shape
+        - name: y_shape
           type: int
           inputBinding:
             prefix: --y-pos-shape
           doc: shape of each fov item in the y-axis
-        - name: y-voxel
+        - name: y_voxel
           type: float
           inputBinding:
             prefix: --y-pos-voxel
           doc: size of voxels in the y-axis
-        - name: z-locs
+        - name: z_locs
           type: string
           inputBinding:
             prefix: --z-pos-locs
           doc: list of z-axis start locations per fov index
-        - name: z-shape
+        - name: z_shape
           type: int
           inputBinding:
             prefix: --z-pos-shape
           doc: shape of each fov item in the z-axis
-        - name: z-voxel
+        - name: z_voxel
           type: float
           inputBinding:
             prefix: --z-pos-voxel

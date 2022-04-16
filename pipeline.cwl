@@ -115,31 +115,31 @@ inputs:
     - 'null'
     - type: record
       fields:
-        - name: x-locs
+        - name: x_locs
           type: string
           doc: list of x-axis start locations per fov index
-        - name: x-shape
+        - name: x_shape
           type: int
           doc: shape of each fov item in the x-axis
-        - name: x-voxel
+        - name: x_voxel
           type: float
           doc: size of voxels in the x-axis
-        - name: y-locs
+        - name: y_locs
           type: string
           doc: list of y-axis start locations per fov index
-        - name: y-shape
+        - name: y_shape
           type: int
           doc: shape of each fov item in the y-axis
-        - name: y-voxel
+        - name: y_voxel
           type: float
           doc: size of voxels in the y-axis
-        - name: z-locs
+        - name: z_locs
           type: string
           doc: list of z-axis start locations per fov index
-        - name: z-shape
+        - name: z_shape
           type: int
           doc: shape of each fov item in the z-axis
-        - name: z-voxel
+        - name: z_voxel
           type: float
           doc: size of voxels in the z-axis
 
