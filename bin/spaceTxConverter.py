@@ -127,11 +127,11 @@ class FISHTile(FetchedTile):
                 ),
             }
         else:
-            # no defined location, retrun dummy
+            # no defined location, return dummy
             return {
                 Coordinates.X: (0.0, 1.0),
                 Coordinates.Y: (0.0, 1.0),
-                Coordinates.Z: (0.0, 0.1),
+                Coordinates.Z: (0.0, 1.0),
             }
 
     @property
@@ -705,11 +705,11 @@ def blank_codebook(real_codebook, num_blanks):
     """
 
     # Extract dimensions and create empty xarray for barcodes
-    roundsN = len(codebook["r"])
-    channelsN = len(codebook["c"])
+    roundsN = len(real_codebook["r"])
+    channelsN = len(real_codebook["c"])
     allCombo = xr.zeros_like(
         xr.DataArray(
-            np.zeros((channelsN ** roundsN, roundsN, channelsN)), dims=["target", "r", "c"]
+            np.zeros((channelsN**roundsN, roundsN, channelsN)), dims=["target", "r", "c"]
         )
     )
 

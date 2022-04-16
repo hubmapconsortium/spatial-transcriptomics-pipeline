@@ -6,7 +6,7 @@ baseCommand: /opt/qcDriver.py
 
 requirements:
   DockerRequirement:
-    dockerPull: docker.pkg.github.com/hubmapconsortium/spatial-transcriptomics-pipeline/starfish-custom:2.01
+    dockerPull: docker.pkg.github.com/hubmapconsortium/spatial-transcriptomics-pipeline/starfish-custom:latest
 
 inputs:
   codebook:
@@ -64,7 +64,7 @@ inputs:
 
   roi:
     type: File?
-    inputBinding:
+    inputBinding: 
       prefix: --roi
     doc: The location of the RoiSet.zip, if applicable.
 
@@ -93,12 +93,12 @@ inputs:
     inputBinding:
       prefix: --run-ripley
     doc: If true, will run ripley K estimates to find spatial density measures.  Can be slow.
-
+  
   save_pdf:
     type: boolean?
     inputBinding:
       prefix: --save-pdf
-    doc: If true, will save graphical output to a pdf. Currently pdfs are bugged.
+    doc: If true, will save graphical output to a pdf.
 
 outputs:
   qc_metrics:

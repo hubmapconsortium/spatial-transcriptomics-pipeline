@@ -374,7 +374,7 @@ def getTranscriptsPerCell(segmented, pdf=False):
 
     if pdf:
         fig = plt.figure()
-        plt.bar(list(range(max(cells))), counts)
+        plt.bar(list(range(len(counts))), counts)
         plt.axhline(
             y=mid - iqr_scale * (q3 - q1), dashes=(1, 1), color="gray", label="Outlier Threshold"
         )
@@ -433,6 +433,64 @@ def getTranscriptChannelDist(transcripts, pdf=False):
         pdf.savefig(fig)
         plt.close()
     return counts, std, skw
+
+
+def getFPR(segmentation, pdf=False):
+    # remove unassigned transcripts, if the columns to do so are present.
+    if "cell" in segmentation.keys():
+        transcripts = segmentation[segmentation["cell"] != "nan"]
+    elif "cell_id" in segmentation.keys():
+        transcripts = segmentation[segmentation["cell_id"] != "nan"]
+
+    blank_counts_full = segmentation[[col for col in segmentation.columns if "blank" in col]]
+    real_counts_full = segmentation[[col for col in segmentation.columns if "blank" not in col]]
+
+    real_per_cell_full = real_counts_full.sum(axis=1)
+    blank_per_cell_full = blank_counts_full.sum(axis=1)
+    sorted_reals_full = real_per_cell_full.sort_values(ascending=False)
+    sorted_blanks_full = blank_per_cell_full[sorted_reals_full.index]
+
+    results = {
+        "FP": sum(blank_per_cell_full),
+        "TP": sum(real_per_cell_full),
+        "FPR": sum(blank_per_cell_full) / (sum(blank_per_cell_full) + sum(real_per_cell_full)),
+    }
+
+    if pdf:
+        fig = plt.figure()
+
+        plt.bar(
+            range(len(real_per_cell_full)),
+            sorted_reals_full,
+            color="blue",
+            width=1,
+            label="On-target",
+        )
+        plt.bar(
+            range(len(blank_per_cell_full)),
+            sorted_blanks_full,
+            color="red",
+            width=1,
+            label="Off-target",
+        )
+        plt.plot(
+            [0, len(real_per_cell_full)],
+            [np.median(real_per_cell_full), np.median(real_per_cell_full)],
+            color="black",
+            linewidth=3,
+        )
+        plt.xlabel("Cells")
+        plt.ylabel("Total barcodes per cell")
+        plt.xlim([0, len(real_per_cell_full)])
+        plt.ylim([0, max(max(real_per_cell_full), max(blank_per_cell_full)) * 1.1])
+        plt.title("True positives vs False positives")
+
+        plt.legend()
+
+        pdf.savefig(fig)
+        plt.close()
+
+    return results
 
 
 def runFOV(
@@ -504,6 +562,7 @@ def runFOV(
     print("\nstarting transcript metrics")
     if segmentation is not None:
         trRes["per_cell"] = getTranscriptsPerCell(segmentation, pdf)
+        trRes["FPR"] = getFPR(segmentation, pdf)
     trRes["density"] = getTranscriptDensity(transcripts, codebook)
     if spots is not None:
         trRes["fraction_spots_used"] = getFractionSpotsUsed(relevSpots, transcripts)
@@ -516,6 +575,9 @@ def runFOV(
 
     t = time()
     print("\nFOV Analysis complete\n\ttotal time elapsed " + str(t - t0))
+
+    if savePdf:
+        pdf.close()
 
     return results
 

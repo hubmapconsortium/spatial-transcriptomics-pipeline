@@ -143,6 +143,10 @@ inputs:
           type: float
           doc: size of voxels in the z-axis
 
+  add_blanks:
+    type: boolean?
+    doc: If true, will add blanks with a hamming distance 1 from existing codes.
+
 # image processing
 
   skip_processing:
@@ -238,6 +242,21 @@ inputs:
                   search_radius:
                     type: int?
                     doc: Distance to search for matching spots.
+              - type: record
+                name: check_all
+                fields:
+                  search_radius:
+                    type: int?
+                    doc: Distance to search for matching spots.
+                  error_rounds:
+                    type: int?
+                    doc: Maximum hamming distance a barcode can be from its target and still be uniquely identified.
+                  mode:
+                    type: string
+                    doc: Accuracy mode to run in.  Can be 'high', 'med', or 'low'.
+                  physical_coords:
+                    type: boolean?
+                    doc: Whether to use physical coordinates or pixel coordinates
 
       - type: record
         name: pixel
@@ -318,8 +337,8 @@ inputs:
     default: False
   save_pdf:
     type: boolean?
-    doc: If true, will save graphical output to a pdf. Currently pdfs are bugged.
-    default: False
+    doc: If true, will save graphical output to a pdf.
+    default: True
 
 outputs:
   1_Pseudosort:
@@ -450,6 +469,7 @@ steps:
               };
             };
           }
+      add_blanks: add_blanks
     out: [spaceTx_converted]
 
   processing:

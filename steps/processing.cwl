@@ -6,7 +6,7 @@ baseCommand: /opt/imgProcessing.py
 
 requirements:
   DockerRequirement:
-      dockerPull: docker.pkg.github.com/hubmapconsortium/spatial-transcriptomics-pipeline/starfish-custom:2.01
+      dockerPull: docker.pkg.github.com/hubmapconsortium/spatial-transcriptomics-pipeline/starfish-custom:latest
 
 inputs:
   input_dir:

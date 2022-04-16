@@ -93,7 +93,7 @@ def saveExp(source_dir: str, save_dir: str, exp: Experiment = None):
                 saveImg(save_dir, prefix, img)
 
     # copy the non-tiff files to the new directory
-    cp_files = [x for x in os.listdir(source_dir) if x[-5:] != ".tiff"]
+    cp_files = [x for x in os.listdir(source_dir) if x[-5:] != ".tiff" and x[-4:] != ".log"]
     for file in cp_files:
         if "fov" in file:
             # if file contains images, we need to update sha's
@@ -185,12 +185,12 @@ def histoMatchImage(img: ImageStack):
     min_rch = sorted(meds.items(), key=lambda item: item[1])[0][0]
 
     # Use min image as reference for histogram matching (need to convert to ints or it takes a VERY long time)
-    reference = np.rint(img.xarray.data[min_rch[0], min_rch[1]] * 2 ** 16)
+    reference = np.rint(img.xarray.data[min_rch[0], min_rch[1]] * 2**16)
     for r in range(img.num_rounds):
         for ch in range(img.num_chs):
-            data = np.rint(img.xarray.data[r, ch] * 2 ** 16)
+            data = np.rint(img.xarray.data[r, ch] * 2**16)
             matched = hist_match(data, reference)
-            matched /= 2 ** 16
+            matched /= 2**16
             img.xarray.data[r, ch] = deepcopy(matched)
 
 
