@@ -19,7 +19,7 @@ from starfish import (
     ImageStack,
     IntensityTable,
 )
-from starfish.core.types import SpotFindingResults
+from starfish.core.types import SpotAttributes, SpotFindingResults
 from starfish.spots import AssignTargets
 from starfish.types import (
     Axes,
@@ -154,8 +154,20 @@ def blobDriver(
     decoded = {}
     for fov in fovs:
         blob = blobRunner(imgs[fov], ref_img=ref_img[fov] if ref_img else None, **blobRunnerKwargs)
-        blobs[fov] = blob
         print("found total spots {}".format(blob.count_total_spots()))
+        if ref_img:
+            # Starfish doesn't apply threshold correctly when a ref image is used
+            # so go through results and manually apply it.
+            if blobRunnerKwargs["threshold"]:
+                thresh = blobRunnerKwargs["threshold"]
+            else:
+                thresh = 0.1
+            for k, v in blob.items():
+                data = v.spot_attrs.data
+                high = data[data["intensity"] > thresh]
+                v.spot_attrs = SpotAttributes(high)
+            print(f"removed spots below threshold, now {blob.count_total_spots()} total spots")
+        blobs[fov] = blob
         if output_dir:
             blob.save(output_dir + "spots/" + fov + "_")
             print("spots saved.")
