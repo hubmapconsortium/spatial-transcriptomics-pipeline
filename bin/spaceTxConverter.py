@@ -42,8 +42,8 @@ class FISHTile(FetchedTile):
         rnd: int,
         cache_read_order: list,
         locs: Mapping[Axes, float] = None,
-        voxel: Mapping[Axes, float] = None,
         shape: Mapping[Axes, int] = None,
+        voxel: Mapping[Axes, float] = None,
     ):
         """
         Tile class generalized for most FISH experiments.
@@ -197,8 +197,8 @@ class PrimaryTileFetcher(TileFetcher):
         round_offset: int = 0,
         channel_offset: int = 0,
         locs: List[Mapping[Axes, float]] = None,
-        voxel: Mapping[Axes, float] = None,
         shape: Mapping[Axes, int] = None,
+        voxel: Mapping[Axes, float] = None,
     ) -> None:
         """
         Implement a TileFetcher for a single Field of View.
@@ -298,6 +298,7 @@ class PrimaryTileFetcher(TileFetcher):
         file_path = os.path.join(
             self.input_dir, self.file_format.format(*[varTable[arg] for arg in self.file_vars])
         )
+
         if self.locs:
             return FISHTile(
                 file_path,
@@ -306,8 +307,8 @@ class PrimaryTileFetcher(TileFetcher):
                 round_label,
                 self.cache_read_order,
                 self.locs[fov_id],
-                self.voxel,
                 self.img_shape,
+                self.voxel,
             )
         else:
             return FISHTile(file_path, zplane_label, ch_label, round_label, self.cache_read_order)
@@ -331,10 +332,9 @@ class AuxTileFetcher(TileFetcher):
         fov_offset: int = 0,
         round_offset: int = 0,
         channel_offset: int = 0,
-        fixed_channel: int = 0,
         locs: List[Mapping[Axes, float]] = None,
-        voxel: Mapping[Axes, float] = None,
         shape: Mapping[Axes, int] = None,
+        voxel: Mapping[Axes, float] = None,
     ) -> None:
         """
         Implement a TileFetcher for a single Field of View with a single channel.
@@ -377,9 +377,6 @@ class AuxTileFetcher(TileFetcher):
             Integer to be added to the round count when looking for external file names, equal to the number of the first index.
         channel_offset: int
             Integer to be added to channels when looking for external file names, equal to the number of the first index.
-        fixed_channel: int
-            The single channel to look at for this tile.
-
             The following parameters are optional, and are only used if .coordinates() is called.  They may be used further downstream in analysis, in particular if there are multiple FOVs.
         For further details, see FISHTile.coordinates()
 
@@ -400,7 +397,6 @@ class AuxTileFetcher(TileFetcher):
         self.fov_offset = fov_offset
         self.round_offset = round_offset
         self.channel_offset = channel_offset
-        self.fixed_channel = fixed_channel
         self.locs = locs
         self.voxel = voxel
         self.img_shape = shape
@@ -459,8 +455,8 @@ class AuxTileFetcher(TileFetcher):
                 round_label,
                 self.cache_read_order,
                 self.locs[fov_id],
-                self.voxel,
                 self.img_shape,
+                self.voxel,
             )
         else:
             return FISHTile(
@@ -889,7 +885,7 @@ if __name__ == "__main__":
             if pos_locs[ax]:
                 pos_locs[ax] = pos_locs[ax].split(",")
                 if len(pos_locs[ax]) != args.fov_count:
-                    raise Exception("Specified FOV locations must match fov_count.")
+                    raise Exception("Number of specified FOV locations must match fov_count.")
 
         for i in range(args.fov_count):
             this_loc = {}
