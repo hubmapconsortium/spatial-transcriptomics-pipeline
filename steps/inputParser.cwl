@@ -1,0 +1,158 @@
+#!/usr/bin/env cwl-runner
+cwlVersion: v1.0
+class: ExpressionTool
+
+requirements:
+  - class: InlineJavascriptRequirement
+
+inputs:
+  datafile:
+    type: File
+    inputBinding:
+      loadContents: true
+
+  schema:
+    type: File
+    inputBinding:
+      loadContents: true
+
+outputs:
+  round_count: int
+  zplane_count: int
+  channel_count: int
+  fov_count: int
+  round_offset: int
+  fov_offset: int
+  zplane_offset: int
+  channel_offset: int
+  channel_slope: float
+  file_format: string
+  file_vars: string[]
+  cache_read_order: string[]
+  aux_tilesets_aux_names: string[]
+  aux_tilesets_aux_file_formats: string[]
+  aux_tilesets_aux_file_vars: string[]
+  aux_tilesets_aux_cache_read_order: string[]
+  aux_tilesets_aux_channel_count: float[]
+  aux_tilesets_aux_channel_slope: float[]
+  aux_tilesets_aux_channel_intercept: int[]
+  fov_positioning_x_locs: string
+  fov_positioning_x_shape: int
+  fov_positioning_x_voxel: float
+  fov_positioning_y_locs: string
+  fov_positioning_y_shape: int
+  fov_positioning_y_voxel: float
+  fov_positioning_z_locs: string
+  fov_positioning_z_shape: int
+  fov_positioning_z_voxel: float
+  add_blanks: boolean
+  skip_processing: boolean
+  clip_min: float
+  opening_size: int
+  register_aux_view: string
+  use_ref_img: boolean
+  decoding_min_sigma: float[]
+  decoding_max_sigma: float[]
+  decoding_num_sigma: int
+  decoding_threshold: float
+  decoding_is_volume: boolean
+  decoding_overlap: float
+  decoding_decode_method: string
+  decoding_filtered_results: boolean
+  decoding_decoder_trace_building_strategy: string
+  decoding_decoder_max_distance: float
+  decoding_decoder_min_intensity: float
+  decoding_decoder_metric: string
+  decoding_decoder_norm_order: int
+  decoding_decoder_anchor_round: int
+  decoding_decoder_search_radius: int
+  decoding_decoder_return_original_intensities: boolean
+  decoding_decoder_error_rounds: int
+  decoding_decoder_mode: string
+  decoding_decoder_physical_coords: boolean
+  decoding_metric: string
+  decoding_distance_threshold: float
+  decoding_magnitude_threshold: float
+  decoding_min_area: int
+  decoding_max_area: int
+  decoding_norm_order: int
+  aux_name: string
+  binary_mask_img_threshold: float
+  binary_mask_min_dist: int
+  binary_mask_min_allowed_size: int
+  binary_mask_max_allowed_size: int
+  binary_mask_masking_radius: int
+  skip_baysor: boolean
+  find_ripley: boolean
+  save_pdf: boolean
+
+expression: |
+  ${   var data = JSON.parse(inputs.datafile.contents);
+       var schema = JSON.parse(inputs.schema.contents);
+       function enforce_record(data, key, items, output_dict){
+           if(Array.isArray(items[0])){
+                // Record where one of a mutually exclusive set of sublists is defined
+                // Find closest match and enforce that
+                var subind = 0;
+                var coverage = 0.0;
+                for(var i=0;i<items.length;i++){
+                        var tally = 0.0;
+                        for(var j=0;j<items[i].length;j++){
+                                if(items[i][j].length > 0){
+                                        var subkey = items[i][j].replace("?","");
+                                        if(subkey in data){
+                                                tally++;
+                                        }
+                                        // we want to define this key as null so that
+                                        // all possible outputs from schema are accounted for,
+                                        // even for non-selected schemas
+                                        output_dict[key + "_" + subkey] = null;
+                                }
+                        }
+                        var new_coverage = tally / items[i].length;
+                        if(new_coverage > coverage){
+                                coverage = new_coverage;
+                                subind = i;
+                        }
+                }
+                enforce_record(data, key, items[subind], output_dict);
+           } else {
+                   for(var i=0;i<items.length;i++){
+                        if(items[i].constructor == Object){
+                                // Record within a record, make recursive call
+                                var subkey = Object.keys(items[i])[0];
+                                enforce_record(data[subkey], key+"_"+subkey, items[i][subkey], output_dict);
+                        } else {
+                                // If not present, throw an error unless marked with "?"
+                                var item_comp = items[i].replace("?","")
+                                if(!(item_comp in data)){
+                                        if(!items[i].includes("?")){
+                                                throw 'If '+key+' is defined, then all of '+items+' must be defined.';
+                                        }
+                                } else {
+                                // Add val to output dict
+                                        output_dict[key + '_' + item_comp] = data[item_comp];
+                                }
+                        }
+                   }
+                   return output_dict;
+           }
+       }
+
+       var values_dict = {};
+       for(var i=0;i<schema.length;i++){
+           if(schema[i].constructor == Object){
+                var key = Object.keys(schema[i])[0];
+                var lis = schema[i][key];
+                enforce_record(data[key], key, lis, values_dict);
+           } else {
+                var sch = schema[i].replace("?","")
+                if(sch in data){
+                     values_dict[sch] = data[sch];
+                } else {
+                     values_dict[sch] = null;
+                }
+           }
+       }
+       return values_dict;
+  }

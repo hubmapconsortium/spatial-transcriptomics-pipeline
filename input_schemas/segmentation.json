@@ -1,0 +1,13 @@
+[
+	"aux_name",
+	"fov_count",
+	{
+		"binary_mask":[
+			"img_threshold",
+			"min_dist",
+			"min_allowed_size",
+			"max_allowed_size",
+			"masking_radius"
+		]
+	}
+]

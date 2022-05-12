@@ -1,0 +1,22 @@
+[
+	"round_count",
+	"fov_count",
+	"round_offset?",
+	"fov_offset?",
+	"channel_offset?",
+	"channel_slope?",
+	"file_format",
+	"file_vars",
+	"cache_read_order",
+	{
+		"aux_tilesets":[
+			"aux_names?",
+			"aux_file_formats?",
+			"aux_file_vars?",
+			"aux_cache_read_order?",
+			"aux_channel_count?",
+			"aux_channel_slope?",
+			"aux_intercept?"
+		]
+	}
+]
