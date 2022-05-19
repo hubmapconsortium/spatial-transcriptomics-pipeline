@@ -45,9 +45,10 @@ inputs:
         exp:
           type: Directory
           doc: The location of output of starfish runner step, 4_Decoded. Contains spots (if applicable) and netcdfs containing the DecodedIntensityTable.
-        has_spots:
-          type: boolean?
-          doc: If true, will look for spots within the experiment field.
+
+  has_spots:
+    type: boolean?
+    doc: If true, will look for spots within the experiment field.
 
   roi:
     type: File?
@@ -99,7 +100,7 @@ steps:
               "location": "../input_schemas/qc.json"
             };
           }
-    out: [find_ripley, save_pdf, fov_positioning_x_shape, fov_positioning_y_shape, fov_positioning_z_shape]
+    out: [find_ripley, save_pdf, fov_positioning_x_shape, fov_positioning_y_shape, fov_positioning_z_shape, decoding_decode_method]
     when: $(inputs.datafile != null)
 
   execute_qc:
@@ -154,10 +155,11 @@ steps:
                 type: Directory
                 inputBinding:
                   prefix: --exp-output
-              has_spots:
-                type: boolean?
-                inputBinding:
-                  prefix: --has-spots
+
+        has_spots:
+          type: boolean?
+          inputBinding:
+            prefix: --has-spots
 
         roi:
           type: File?
@@ -199,6 +201,16 @@ steps:
     in:
       codebook: codebook
       segmentation_loc: segmentation_loc
+      has_spots:
+        source: [stage_qc/decoding_decode_method, has_spots]
+        valueFrom: |
+          ${
+             if(self[0] || self[1]){
+               return true;
+             } else {
+               return false;
+             }
+          }
       data: data
       roi: roi
       imagesize:

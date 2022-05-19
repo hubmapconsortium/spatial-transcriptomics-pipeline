@@ -284,15 +284,13 @@ steps:
               return self[0];
             } else {
               return {
-                aux_tilesets: {
-                  aux_names: self[1],
-                  aux_file_formats: self[2],
-                  aux_file_vars: self[3],
-                  aux_cache_read_order: self[4],
-                  aux_channel_count: self[5],
-                  aux_channel_slope: self[6],
-                  aux_channel_intercept: self[7]
-                }
+                aux_names: self[1],
+                aux_file_formats: self[2],
+                aux_file_vars: self[3],
+                aux_cache_read_order: self[4],
+                aux_channel_count: self[5],
+                aux_channel_slope: self[6],
+                aux_channel_intercept: self[7]
               };
             }
           }

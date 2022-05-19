@@ -90,6 +90,7 @@ inputs:
   aux_tilesets:
     - 'null'
     - type: record
+      name: aux_tilesets
       fields:
         aux_names:
           type: string[]?
@@ -175,113 +176,116 @@ inputs:
     doc: Whether to generate a reference image and use it alongside spot detection.
 
   decoding:
-    - 'null'
-    - type: record
-      fields:
-        min_sigma:
-          type: float[]?
-          doc: Minimum sigma tuple to be passed to blob detector
-        max_sigma:
-          type: float[]?
-          doc: Maximum sigma tuple to be passed to blob detector
-        num_sigma:
-          type: int?
-          doc: The number of sigma values to be tested, passed to blob detector
-        threshold:
-          type: float?
-          doc: Threshold of blob detection
-        is_volume:
-          type: boolean?
-          doc: If True, passes 3d volumes to func, else pass 2d tiles to func.
-        overlap:
-          type: float?
-          doc: Amount of overlap allowed between blobs, passed to blob detector
-        detector_method:
-          type: string?
-          doc: Name of the scikit-image spot detection method to use
-        decode_method:
-          type: string
-          doc: Method name for spot decoding. Refer to starfish documentation.
-        filtered_results:
-          type: boolean?
-          doc: Automatically remove genes that do not match a target and do not meet criteria.
-        decoder:
-          type:
-            - type: record
-              name: metric_distance
-              fields:
-                trace_building_strategy:
-                  type: string
-                  doc: Which tracing strategy to use.  See starfish docs.
-                max_distance:
-                  type: float
-                  doc: Maximum distance between spots.
-                min_intensity:
-                  type: float
-                  doc: Minimum intensity of spots.
-                metric:
-                  type: string?
-                  doc: Metric name to be used for determining distance.
-                norm_order:
-                  type: int?
-                  doc: Refer to starfish documentation for metric_distance
-                anchor_round:
-                  type: int?
-                  doc: Anchor round for comparison.
-                search_radius:
-                  type: int?
-                  doc: Distance to search for matching spots.
-                return_original_intensities:
-                  type: boolean?
-                  doc: Return original intensities instead of normalized ones.
-            - type: record
-              name: per_round_max
-              fields:
-                trace_building_strategy:
-                  type: string
-                  doc: Which tracing strategy to use.  See starfish docs.
-                anchor_round:
-                  type: int?
-                  doc: Round to refer to.  Required for nearest_neighbor.
-                search_radius:
-                  type: int?
-                  doc: Distance to search for matching spots.
-            - type: record
-              name: check_all
-              fields:
-                search_radius:
-                  type: int?
-                  doc: Distance to search for matching spots.
-                error_rounds:
-                  type: int?
-                  doc: Maximum hamming distance a barcode can be from its target and still be uniquely identified.
-                mode:
-                  type: string?
-                  doc: Accuracy mode to run in.  Can be 'high', 'med', or 'low'.
-                physical_coords:
-                  type: boolean?
-                  doc: Whether to use physical coordinates or pixel coordinates
+    type:
+      - 'null'
+      - type: record
+        name: blob
+        fields:
+          min_sigma:
+            type: float[]?
+            doc: Minimum sigma tuple to be passed to blob detector
+          max_sigma:
+            type: float[]?
+            doc: Maximum sigma tuple to be passed to blob detector
+          num_sigma:
+            type: int?
+            doc: The number of sigma values to be tested, passed to blob detector
+          threshold:
+            type: float?
+            doc: Threshold of blob detection
+          is_volume:
+            type: boolean?
+            doc: If True, passes 3d volumes to func, else pass 2d tiles to func.
+          overlap:
+            type: float?
+            doc: Amount of overlap allowed between blobs, passed to blob detector
+          detector_method:
+            type: string?
+            doc: Name of the scikit-image spot detection method to use
+          decode_method:
+            type: string
+            doc: Method name for spot decoding. Refer to starfish documentation.
+          filtered_results:
+            type: boolean?
+            doc: Automatically remove genes that do not match a target and do not meet criteria.
+          decoder:
+            type:
+              - type: record
+                name: metric_distance
+                fields:
+                  trace_building_strategy:
+                    type: string
+                    doc: Which tracing strategy to use.  See starfish docs.
+                  max_distance:
+                    type: float
+                    doc: Maximum distance between spots.
+                  min_intensity:
+                    type: float
+                    doc: Minimum intensity of spots.
+                  metric:
+                    type: string?
+                    doc: Metric name to be used for determining distance.
+                  norm_order:
+                    type: int?
+                    doc: Refer to starfish documentation for metric_distance
+                  anchor_round:
+                    type: int?
+                    doc: Anchor round for comparison.
+                  search_radius:
+                    type: int?
+                    doc: Distance to search for matching spots.
+                  return_original_intensities:
+                    type: boolean?
+                    doc: Return original intensities instead of normalized ones.
+              - type: record
+                name: per_round_max
+                fields:
+                  trace_building_strategy:
+                    type: string
+                    doc: Which tracing strategy to use.  See starfish docs.
+                  anchor_round:
+                    type: int?
+                    doc: Round to refer to.  Required for nearest_neighbor.
+                  search_radius:
+                    type: int?
+                    doc: Distance to search for matching spots.
+              - type: record
+                name: check_all
+                fields:
+                  search_radius:
+                    type: int?
+                    doc: Distance to search for matching spots.
+                  error_rounds:
+                    type: int?
+                    doc: Maximum hamming distance a barcode can be from its target and still be uniquely identified.
+                  mode:
+                    type: string?
+                    doc: Accuracy mode to run in.  Can be 'high', 'med', or 'low'.
+                  physical_coords:
+                    type: boolean?
+                    doc: Whether to use physical coordinates or pixel coordinates
 
-    - type: record
-      fields:
-        metric:
-          type: string
-          doc: The sklearn metric string to pass to NearestNeighbors
-        distance_threshold:
-          type: float
-          doc: Spots whose codewords are more than this metric distance from an expected code are filtered
-        magnitude_threshold:
-          type: float
-          doc: spots with intensity less than this value are filtered.
-        min_area:
-          type: int
-          doc: Spots with total area less than this value are filtered
-        max_area:
-          type: int
-          doc: Spots with total area greater than this value are filtered
-        norm_order:
-          type: int?
-          doc: Order of L_p norm to apply to intensities and codes when using metric_decode to pair each intensities to its closest target (default = 2)
+      - type: record
+        name: pixel
+        fields:
+          metric:
+            type: string
+            doc: The sklearn metric string to pass to NearestNeighbors
+          distance_threshold:
+            type: float
+            doc: Spots whose codewords are more than this metric distance from an expected code are filtered
+          magnitude_threshold:
+            type: float
+            doc: spots with intensity less than this value are filtered.
+          min_area:
+            type: int
+            doc: Spots with total area less than this value are filtered
+          max_area:
+            type: int
+            doc: Spots with total area greater than this value are filtered
+          norm_order:
+            type: int?
+            doc: Order of L_p norm to apply to intensities and codes when using metric_decode to pair each intensities to its closest target (default = 2)
 
 
 # segmentation
@@ -293,6 +297,7 @@ inputs:
   binary_mask:
     - 'null'
     - type: record
+      name: roi_set
       fields:
         roi_set:
           type: Directory
@@ -301,6 +306,7 @@ inputs:
           type: string
           doc: Layout for name of each RoiSet.zip, per fov. Will be formatted with String.format([fov index]).
     - type: record
+      name: labeled_image
       fields:
         labeled_image:
           type: Directory
@@ -309,6 +315,7 @@ inputs:
           type: string
           doc: Layout for name of each labelled image. Will be formatted with String.format([fov index])
     - type: record
+      name: basic_watershed
       fields:
         img_threshold:
           type: float
@@ -407,21 +414,31 @@ steps:
     in:
       channel_yml: channel_yml
       exp_dir: sorter/pseudosorted_dir
+      parameter_json: parameter_json
+      input_dir: tiffs
       aux_names:
         source: aux_tilesets
         valueFrom: |
           ${
-            return self.aux_names;
+            if(self){
+                return self.aux_names;
+            } else {
+                return null;
+            }
           }
       cache_read_order: cache_read_order
       aux_cache_read_order:
         source: aux_tilesets
         valueFrom: |
           ${
-            return self.aux_cache_read_order
+            if(self) {
+                return self.aux_cache_read_order;
+            } else {
+                return null;
+            }
           }
     when: $(inputs.channel_yml != null)
-    out: [codebook, round_offset, fov_offset, channel_offset, zplane_offset, file_format, file_vars, cache_read_order, aux_names, aux_file_formats, aux_file_vars, aux_cache_read_order, aux_channel_slope, aux_channel_intercept]
+    out: [codebook, round_count, fov_count, channel_count, zplane_count, round_offset, fov_offset, channel_offset, zplane_offset, file_format, file_vars, cache_read_order, aux_names, aux_file_formats, aux_file_vars, aux_cache_read_order, aux_channel_count, aux_channel_slope, aux_channel_intercept]
 
   spaceTxConversion:
     run: steps/spaceTxConversion.cwl
@@ -439,34 +456,141 @@ steps:
             }
             return {json: self[0]};
           }
-      parameter_json: parameter_json
-      round_count: round_count
-      zplane_count: zplane_count
-      channel_count: channel_count
-      fov_count: fov_count
-      round_offset:
-        source: [stagedSorted/round_offset, round_offset]
-        pickValue: first_non_null
-      fov_offset:
-        source: [stagedSorted/fov_offset, fov_offset]
-        pickValue: first_non_null
-      channel_offset:
-        source: [stagedSorted/channel_offset, channel_offset]
-        pickValue: first_non_null
-      file_format:
-        source: [stagedSorted/file_format, file_format]
-        pickValue: first_non_null
-      file_vars:
-        source: [stagedSorted/file_vars, file_vars]
-        pickValue: first_non_null
-      cache_read_order:
-        source: [stagedSorted/cache_read_order, cache_read_order]
-        pickValue: first_non_null
-      aux_tilesets:
-        source: [aux_tilesets, stagedSorted/aux_names, stagedSorted/aux_file_formats, stagedSorted/aux_file_vars, stagedSorted/aux_cache_read_order, stagedSorted/aux_channel_slope, stagedSorted/aux_channel_intercept]
+      parameter_json:
+        source: [parameter_json, sorter/pseudosorted_dir]
         valueFrom: |
           ${
-            if(!self[1]){
+            if(self[1]){
+              return null;
+            } else {
+              return self[0];
+            }
+          }
+      round_count:
+        source: [stagedSorted/round_count, round_count]
+        valueFrom: |
+          ${
+            if(self[0]){
+              return self[0];
+            } else if (self[1]){
+              return self[1];
+            } else {
+              return null;
+            }
+          }
+      zplane_count:
+        source: [stagedSorted/zplane_count, zplane_count]
+        valueFrom: |
+          ${
+            if(self[0]){
+              return self[0];
+            } else if (self[1]){
+              return self[1];
+            } else {
+              return null;
+            }
+          }
+      channel_count:
+        source: [stagedSorted/channel_count, channel_count]
+        valueFrom: |
+          ${
+            if(self[0]){
+              return self[0];
+            } else if (self[1]){
+              return self[1];
+            } else {
+              return null;
+            }
+          }
+      fov_count:
+        source: [stagedSorted/fov_count, fov_count]
+        valueFrom: |
+          ${
+            if(self[0]){
+              return self[0];
+            } else if (self[1]){
+              return self[1];
+            } else {
+              return null;
+            }
+          }
+      round_offset:
+        source: [stagedSorted/round_offset, round_offset]
+        valueFrom: |
+          ${
+            if(self[0]){
+              return self[0];
+            } else if (self[1]){
+              return self[1];
+            } else {
+              return null;
+            }
+          }
+      fov_offset:
+        source: [stagedSorted/fov_offset, fov_offset]
+        valueFrom: |
+          ${
+            if(self[0]){
+              return self[0];
+            } else if (self[1]){
+              return self[1];
+            } else {
+              return null;
+            }
+          }
+      channel_offset:
+        source: [stagedSorted/channel_offset, channel_offset]
+        valueFrom: |
+          ${
+            if(self[0]){
+              return self[0];
+            } else if (self[1]){
+              return self[1];
+            } else {
+              return null;
+            }
+          }
+      file_format:
+        source: [stagedSorted/file_format, file_format]
+        valueFrom: |
+          ${
+            if(self[0]){
+              return self[0];
+            } else if (self[1]){
+              return self[1];
+            } else {
+              return null;
+            }
+          }
+      file_vars:
+        source: [stagedSorted/file_vars, file_vars]
+        valueFrom: |
+          ${
+            if(self[0]){
+              return self[0];
+            } else if (self[1]){
+              return self[1];
+            } else {
+              return null;
+            }
+          }
+      cache_read_order:
+        source: [stagedSorted/cache_read_order, cache_read_order]
+        valueFrom: |
+          ${
+            if(self[0]){
+              return self[0];
+            } else if (self[1]){
+              return self[1];
+            } else {
+              return null;
+            }
+          }
+      aux_tilesets:
+        source: [aux_tilesets, stagedSorted/aux_names, stagedSorted/aux_file_formats, stagedSorted/aux_file_vars, stagedSorted/aux_cache_read_order, stagedSorted/aux_channel_count, stagedSorted/aux_channel_slope, stagedSorted/aux_channel_intercept]
+        valueFrom: |
+          ${
+            if(!self[1] && self[0]){
               return {
                   aux_names: self[0].aux_names,
                   aux_file_formats: self[0].aux_file_formats,
@@ -476,17 +600,23 @@ steps:
                   aux_channel_slope: self[0].aux_channel_slope,
                   aux_channel_intercept: self[0].aux_channel_intercept
               };
-            } else {
+            } else if(self[1]) {
+              var count = self[5];
+              if(self[0]){
+                count = self[0].aux_channel_count;
+              }
               return {
                   aux_names: self[1],
                   aux_file_formats: self[2],
                   aux_file_vars: self[3],
                   aux_cache_read_order: self[4],
-                  aux_channel_count: self[0].aux_channel_count,
-                  aux_channel_slope: self[5],
-                  aux_channel_intercept: self[6]
+                  aux_channel_count: count,
+                  aux_channel_slope: self[6],
+                  aux_channel_intercept: self[7]
               };
-            };
+            } else {
+              return null;
+            }
           }
       add_blanks: add_blanks
     out: [spaceTx_converted]
@@ -573,22 +703,34 @@ steps:
         source: fov_positioning
         valueFrom: |
           ${
-            return {
-              "x_size": self['x_shape'],
-              "y_size": self['y_shape'],
-              "z_size": self['z_shape']
-            };
+            if(self){
+              return {
+                "x_size": self['x_shape'],
+                "y_size": self['y_shape'],
+                "z_size": self['z_shape']
+              };
+            } else {
+              return null;
+            }
+          }
+      has_spots:
+        source: decoding
+        valueFrom: |
+          ${
+            if(self) {
+              return typeof self.decode_method != 'undefined';
+            } else {
+              return null;
+            }
           }
       find_ripley: find_ripley
       save_pdf: save_pdf
       data:
-        source: [starfishRunner/decoded, decoding]
-        linkMerge: merge_flattened
+        source: [starfishRunner/decoded]
         valueFrom: |
           ${
             return {
-              exp: self[0],
-              has_spots: typeof self[1].decode_method != 'undefined'
+              "exp": self
             };
           }
     out:

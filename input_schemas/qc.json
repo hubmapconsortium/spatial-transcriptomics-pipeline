@@ -10,5 +10,10 @@
 				"z_shape"
 			]
 		]
+	},
+	{
+		"decoding":[
+			"decode_method"
+		]
 	}
 ]

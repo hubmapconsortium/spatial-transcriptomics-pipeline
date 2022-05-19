@@ -33,6 +33,7 @@ inputs:
   binary_mask:
     - 'null'
     - type: record
+      name: roi_set
       fields:
         roi_set:
           type: Directory
@@ -41,6 +42,7 @@ inputs:
           type: string
           doc: Layout for name of each RoiSet.zip, per fov. Will be formatted with String.format([fov index]).
     - type: record
+      name: labeled_image
       fields:
         labeled_image:
           type: Directory
@@ -49,6 +51,7 @@ inputs:
           type: string
           doc: Layout for name of each labelled image. Will be formatted with String.format([fov index])
     - type: record
+      name: basic_watershed
       fields:
         img_threshold:
           type: float

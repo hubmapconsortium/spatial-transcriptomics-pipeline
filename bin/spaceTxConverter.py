@@ -936,7 +936,7 @@ if __name__ == "__main__":
     if args.codebook_csv:
         codebook = parse_codebook(args.codebook_csv)
     if args.codebook_json:
-        codebook = Codebook.open_json(args.codebook_json)
+        codebook = Codebook.open_json(str(args.codebook_json))
     if args.add_blanks:
         codebook = blank_codebook(codebook, len(codebook))
     codebook.to_json(output_dir + "codebook.json")

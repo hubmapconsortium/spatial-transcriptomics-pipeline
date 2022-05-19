@@ -16,6 +16,8 @@ inputs:
     inputBinding:
       loadContents: true
 
+# all possible outputs from tool must be listed here.
+# not every output needs to be present in workflows that call this.
 outputs:
   round_count: int
   zplane_count: int
@@ -86,6 +88,13 @@ outputs:
   find_ripley: boolean
   save_pdf: boolean
 
+# input schema describes the expected layout of variables in json format.
+# inputs are stored in an array.
+# any items that are treated as records for cwl input are stored in an object, where the key is the prefix on all items in the object.
+# the value in an object is an array or an array of arrays.
+# if there are two nested arrays, the sub-array with the closest match is used, ie the sub-arrays are mutually exclusive.
+# all items in an object's array must be included in the json file, unless the item ends with a question mark.
+# objects can be nested inside other objects, and all of their prefixes will apply to all items.
 expression: |
   ${   var data = JSON.parse(inputs.datafile.contents);
        var schema = JSON.parse(inputs.schema.contents);

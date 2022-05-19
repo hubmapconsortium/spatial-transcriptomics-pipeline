@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 
+import collections
 import functools
 import gc
 import math
@@ -365,6 +366,9 @@ def getTranscriptsPerCell(segmented, pdf=False):
     # remove unassigned cells
     cells = [int(x) for x in cells if not np.isnan(x)]
 
+    if len(cells) == 0:
+        return ([0], 0, 0)
+
     for i in range(int(max(cells)) + 1):
         counts.append(len([x for x in cells if x == i]))
 
@@ -491,6 +495,21 @@ def getFPR(segmentation, pdf=False):
         plt.close()
 
     return results
+
+
+def simplifyDict(ob):
+    if isinstance(ob, collections.Mapping):
+        return {k: simplifyDict(v) for k, v in ob.items()}
+    elif isinstance(ob, np.ndarray):
+        return ob.tolist()
+    elif isinstance(ob, list):
+        return [simplifyDict(k) for k in ob]
+    elif isinstance(ob, tuple):
+        return tuple([simplifyDict(k) for k in ob])
+    elif isinstance(ob, np.generic):
+        return ob.item()
+    else:
+        return ob
 
 
 def runFOV(
@@ -645,7 +664,7 @@ def run(
     print("Analysis complete\n\ttotal time elapsed: " + str(t - t0))
 
     with open(output_dir + "QC_results.yml", "w") as fl:
-        yaml.dump(results, fl)
+        yaml.dump(simplifyDict(results), fl)
     print("Results saved.")
 
     sys.stdout = sys.__stdout__

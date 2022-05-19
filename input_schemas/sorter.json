@@ -16,7 +16,7 @@
 			"aux_cache_read_order?",
 			"aux_channel_count?",
 			"aux_channel_slope?",
-			"aux_intercept?"
+			"aux_channel_intercept?"
 		]
 	}
 ]

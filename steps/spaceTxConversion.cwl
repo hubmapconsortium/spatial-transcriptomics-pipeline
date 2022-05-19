@@ -84,6 +84,7 @@ inputs:
   aux_tilesets:
     - 'null'
     - type: record
+      name: aux_tilesets
       fields:
         aux_names:
           type: string[]?
