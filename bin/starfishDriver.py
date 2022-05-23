@@ -35,11 +35,11 @@ from tqdm import tqdm
 def blobRunner(
     img: ImageStack,
     ref_img: ImageStack = None,
-    min_sigma: Tuple[float, float, float] = (0.5, 0.5),
-    max_sigma: Tuple[float, float, float] = (8, 8),
-    num_sigma: int = 10,
+    min_sigma: Tuple[float, float, float] = (0.5, 0.5, 0.5),
+    max_sigma: Tuple[float, float, float] = (8, 8, 8),
+    num_sigma: int = 5,
     threshold: float = 0.1,
-    is_volume: bool = False,
+    is_volume: bool = True,
     detector_method: str = "blob_log",
     overlap: float = 0.5,
 ) -> SpotFindingResults:

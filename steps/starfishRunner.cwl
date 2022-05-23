@@ -335,10 +335,10 @@ steps:
         source: [decoding, stage_runner/decoding_min_sigma, stage_runner/decoding_max_sigma, stage_runner/decoding_num_sigma, stage_runner/decoding_threshold, stage_runner/decoding_is_volume, stage_runner/decoding_overlap, stage_runner/decoding_decode_method, stage_runner/decoding_filtered_results, stage_runner/decoding_decoder_trace_building_strategy, stage_runner/decoding_decoder_max_distance, stage_runner/decoding_decoder_min_intensity, stage_runner/decoding_decoder_metric, stage_runner/decoding_decoder_norm_order, stage_runner/decoding_decoder_anchor_round, stage_runner/decoding_decoder_search_radius, stage_runner/decoding_decoder_return_original_intensities, stage_runner/decoding_decoder_error_rounds, stage_runner/decoding_decoder_mode, stage_runner/decoding_decoder_physical_coords, stage_runner/decoding_metric, stage_runner/decoding_distance_threshold, stage_runner/decoding_magnitude_threshold, stage_runner/decoding_min_area, stage_runner/decoding_max_area, stage_runner/decoding_norm_order]
         valueFrom: |
           ${
-            if(!self[1] && !self[12]){
+            if(!self[10] && !self[18] && !self[7] && !self[12]){
               return self[0];
             } else {
-              if(self[1]){
+              if(self[7]){
                 /* blob detection */
                 var decode = {
                   min_sigma: self[1],
