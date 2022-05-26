@@ -4,7 +4,7 @@ import sys
 from argparse import ArgumentParser
 from datetime import datetime
 from functools import partialmethod
-from os import makedirs, path
+from os import cpu_count, makedirs, path
 from pathlib import Path
 from typing import Callable, Mapping, Set, Tuple
 
@@ -35,11 +35,11 @@ from tqdm import tqdm
 def blobRunner(
     img: ImageStack,
     ref_img: ImageStack = None,
-    min_sigma: Tuple[float, float, float] = (0.5, 0.5),
-    max_sigma: Tuple[float, float, float] = (8, 8),
-    num_sigma: int = 10,
+    min_sigma: Tuple[float, float, float] = (0.5, 0.5, 0.5),
+    max_sigma: Tuple[float, float, float] = (8, 8, 8),
+    num_sigma: int = 5,
     threshold: float = 0.1,
-    is_volume: bool = False,
+    is_volume: bool = True,
     detector_method: str = "blob_log",
     overlap: float = 0.5,
 ) -> SpotFindingResults:
@@ -85,6 +85,7 @@ def decodeRunner(
     decoderKwargs: dict,
     callableDecoder: Callable = starfish.spots.DecodeSpots.PerRoundMaxChannel,
     filtered_results: bool = True,
+    n_processes: int = None,
 ) -> DecodedIntensityTable:
     """
     The driver for decoding spots into barcodes.
@@ -108,7 +109,10 @@ def decodeRunner(
         Starfish wrapper for an xarray with the labeled transcripts.
     """
     decoder = callableDecoder(codebook=codebook, **decoderKwargs)
-    results = decoder.run(spots=spots)
+    if n_processes:
+        results = decoder.run(spots=spots, n_processes=n_processes)
+    else:
+        results = decoder.run(spots=spots)
     if filtered_results:
         results = results.loc[results[Features.PASSES_THRESHOLDS]]
         results = results[results.target != "nan"]
@@ -155,19 +159,19 @@ def blobDriver(
     for fov in fovs:
         blob = blobRunner(imgs[fov], ref_img=ref_img[fov] if ref_img else None, **blobRunnerKwargs)
         print("found total spots {}".format(blob.count_total_spots()))
-        if ref_img:
-            # Starfish doesn't apply threshold correctly when a ref image is used
-            # so go through results and manually apply it.
-            if blobRunnerKwargs["threshold"]:
-                thresh = blobRunnerKwargs["threshold"]
-            else:
-                thresh = 0.1
-            for k, v in blob.items():
-                data = v.spot_attrs.data
-                high = data[data["intensity"] > thresh]
-                v.spot_attrs = SpotAttributes(high)
-            print(f"removed spots below threshold, now {blob.count_total_spots()} total spots")
-        blobs[fov] = blob
+        # if ref_img:
+        #    # Starfish doesn't apply threshold correctly when a ref image is used
+        #    # so go through results and manually apply it.
+        #    if blobRunnerKwargs["threshold"]:
+        #        thresh = blobRunnerKwargs["threshold"]
+        #    else:
+        #        thresh = 0.1
+        #    for k, v in blob.items():
+        #        data = v.spot_attrs.data
+        #        high = data[data["intensity"] > thresh]
+        #        v.spot_attrs = SpotAttributes(high)
+        #    print(f"removed spots below threshold, now {blob.count_total_spots()} total spots")
+        # blobs[fov] = blob
         if output_dir:
             blob.save(output_dir + "spots/" + fov + "_")
             print("spots saved.")
@@ -463,6 +467,8 @@ if __name__ == "__main__":
     addKwarg(args, decodeKwargs, "search_radius")
 
     decodeRunnerKwargs = {"decoderKwargs": decodeKwargs, "callableDecoder": method}
+    if method == starfish.spots.DecodeSpots.CheckAll:
+        decodeRunnerKwargs["n_processes"] = cpu_count()
     addKwarg(args, decodeRunnerKwargs, "return_original_intensities")
 
     use_ref = args.use_ref_img

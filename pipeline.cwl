@@ -29,7 +29,6 @@ inputs:
     doc: The directory containing all .tiff files
 
   codebook:
-  # NOTE: if running psort, this is assumed to be json.
     type:
       - type: record
         name: csv
@@ -44,20 +43,24 @@ inputs:
             type: File
             doc: The codebook for this experiment, already formatted in the spaceTx defined .json format.
 
+  parameter_json:
+    type: File?
+    doc: json file containing parameters for the whole experiment.  If variable is present here, it will supercede any passed in the yml.
+
   round_count:
-    type: int
+    type: int?
     doc: The number of imaging rounds in the experiment
 
   zplane_count:
-    type: int
+    type: int?
     doc: The number of z-planes in each image
 
   channel_count:
-    type: int
+    type: int?
     doc: The number of total channels per imaging round
 
   fov_count:
-    type: int
+    type: int?
     doc: The number of FOVs that are included in this experiment
 
   round_offset:
@@ -73,20 +76,20 @@ inputs:
     doc: The index of the first channel (for file names).
 
   file_format:
-    type: string
+    type: string?
     doc: String with layout for .tiff files
 
   file_vars:
-    type: string[]
+    type: string[]?
     doc: Variables to get substituted into the file_format string.
 
   cache_read_order:
-    type: string[]
+    type: string[]?
     doc: Order of non x,y dimensions within each image.
 
   aux_tilesets:
-    type:
-      type: record
+    - 'null'
+    - type: record
       name: aux_tilesets
       fields:
         aux_names:
@@ -115,31 +118,31 @@ inputs:
     - 'null'
     - type: record
       fields:
-        - name: x-locs
+        - name: x_locs
           type: string
           doc: list of x-axis start locations per fov index
-        - name: x-shape
+        - name: x_shape
           type: int
           doc: shape of each fov item in the x-axis
-        - name: x-voxel
+        - name: x_voxel
           type: float
           doc: size of voxels in the x-axis
-        - name: y-locs
+        - name: y_locs
           type: string
           doc: list of y-axis start locations per fov index
-        - name: y-shape
+        - name: y_shape
           type: int
           doc: shape of each fov item in the y-axis
-        - name: y-voxel
+        - name: y_voxel
           type: float
           doc: size of voxels in the y-axis
-        - name: z-locs
+        - name: z_locs
           type: string
           doc: list of z-axis start locations per fov index
-        - name: z-shape
+        - name: z_shape
           type: int
           doc: shape of each fov item in the z-axis
-        - name: z-voxel
+        - name: z_voxel
           type: float
           doc: size of voxels in the z-axis
 
@@ -174,6 +177,7 @@ inputs:
 
   decoding:
     type:
+      - 'null'
       - type: record
         name: blob
         fields:
@@ -191,10 +195,13 @@ inputs:
             doc: Threshold of blob detection
           is_volume:
             type: boolean?
-            doc: If true, pass 3d tiles to func, else pass 2d tiles to func.
+            doc: If True, passes 3d volumes to func, else pass 2d tiles to func.
           overlap:
             type: float?
             doc: Amount of overlap allowed between blobs, passed to blob detector
+          detector_method:
+            type: string?
+            doc: Name of the scikit-image spot detection method to use
           decode_method:
             type: string
             doc: Method name for spot decoding. Refer to starfish documentation.
@@ -216,16 +223,16 @@ inputs:
                     type: float
                     doc: Minimum intensity of spots.
                   metric:
-                    type: string
+                    type: string?
                     doc: Metric name to be used for determining distance.
                   norm_order:
-                    type: int
+                    type: int?
                     doc: Refer to starfish documentation for metric_distance
                   anchor_round:
                     type: int?
                     doc: Anchor round for comparison.
                   search_radius:
-                    type: int
+                    type: int?
                     doc: Distance to search for matching spots.
                   return_original_intensities:
                     type: boolean?
@@ -252,7 +259,7 @@ inputs:
                     type: int?
                     doc: Maximum hamming distance a barcode can be from its target and still be uniquely identified.
                   mode:
-                    type: string
+                    type: string?
                     doc: Accuracy mode to run in.  Can be 'high', 'med', or 'low'.
                   physical_coords:
                     type: boolean?
@@ -280,50 +287,51 @@ inputs:
             type: int?
             doc: Order of L_p norm to apply to intensities and codes when using metric_decode to pair each intensities to its closest target (default = 2)
 
+
 # segmentation
 
   aux_name:
-    type: string
+    type: string?
     doc: The name of the aux view to look at in the experiment file for image segmentation.
 
   binary_mask:
-    type:
-      - type: record
-        name: roi_set
-        fields:
-          roi_set:
-            type: Directory
-            doc: Directory of RoiSet.zip for each fov, from fiji segmentation
-          file_formats:
-            type: string
-            doc: Layout for name of each RoiSet.zip, per fov. Will be formatted with String.format([fov index]).
-      - type: record
-        name: labeled_image
-        fields:
-          labeled_image:
-            type: Directory
-            doc: Directory of labeled images with image segmentation data, such as from ilastik classification.
-          file_formats_labeled:
-            type: string
-            doc: Layout for name of each labelled image. Will be formatted with String.format([fov index])
-      - type: record
-        name: basic_watershed
-        fields:
-          img_threshold:
-            type: float
-            doc: Global threshold value for images
-          min_dist:
-            type: int
-            doc: minimum distance (pixels) between distance transformed peaks
-          min_allowed_size:
-            type: int
-            doc: minimum size for a cell (in pixels)
-          max_allowed_size:
-            type: int
-            doc: maxiumum size for a cell (in pixels)
-          masking_radius:
-            type: int
-            doc: Radius for white tophat noise filter
+    - 'null'
+    - type: record
+      name: roi_set
+      fields:
+        roi_set:
+          type: Directory
+          doc: Directory of RoiSet.zip for each fov, from fiji segmentation
+        file_formats:
+          type: string
+          doc: Layout for name of each RoiSet.zip, per fov. Will be formatted with String.format([fov index]).
+    - type: record
+      name: labeled_image
+      fields:
+        labeled_image:
+          type: Directory
+          doc: Directory of labeled images with image segmentation data, such as from ilastik classification.
+        file_formats_labeled:
+          type: string
+          doc: Layout for name of each labelled image. Will be formatted with String.format([fov index])
+    - type: record
+      name: basic_watershed
+      fields:
+        img_threshold:
+          type: float
+          doc: Global threshold value for images
+        min_dist:
+          type: int
+          doc: minimum distance (pixels) between distance transformed peaks
+        min_allowed_size:
+          type: int
+          doc: minimum size for a cell (in pixels)
+        max_allowed_size:
+          type: int
+          doc: maxiumum size for a cell (in pixels)
+        masking_radius:
+          type: int
+          doc: Radius for white tophat noise filter
 
 # QC
   skip_baysor:
@@ -335,6 +343,7 @@ inputs:
     type: boolean?
     doc: If true, will run ripley K estimates to find spatial density measures.  Can be slow.
     default: False
+
   save_pdf:
     type: boolean?
     doc: If true, will save graphical output to a pdf.
@@ -365,11 +374,27 @@ outputs:
 
 steps:
 
+  stage:
+    run: steps/inputParser.cwl
+    in:
+      datafile: parameter_json
+      schema:
+        valueFrom: |
+          ${
+            return {
+              "class": "File",
+              "location": "../input_schemas/pipeline.json"
+            };
+          }
+    out: [skip_baysor, skip_processing]
+    when: $(inputs.datafile != null)
+
   sorter:
     run: steps/sorter.cwl
     in:
       channel_yml: channel_yml
       cycle_yml: cycle_yml
+      parameter_json: parameter_json
       input_dir: tiffs
       codebook: codebook
       round_count: round_count
@@ -389,21 +414,31 @@ steps:
     in:
       channel_yml: channel_yml
       exp_dir: sorter/pseudosorted_dir
+      parameter_json: parameter_json
+      input_dir: tiffs
       aux_names:
         source: aux_tilesets
         valueFrom: |
           ${
-            return self.aux_names;
+            if(self){
+                return self.aux_names;
+            } else {
+                return null;
+            }
           }
       cache_read_order: cache_read_order
       aux_cache_read_order:
         source: aux_tilesets
         valueFrom: |
           ${
-            return self.aux_cache_read_order
+            if(self) {
+                return self.aux_cache_read_order;
+            } else {
+                return null;
+            }
           }
     when: $(inputs.channel_yml != null)
-    out: [codebook, round_offset, fov_offset, channel_offset, zplane_offset, file_format, file_vars, cache_read_order, aux_names, aux_file_formats, aux_file_vars, aux_cache_read_order, aux_channel_slope, aux_channel_intercept]
+    out: [codebook, round_count, fov_count, channel_count, zplane_count, round_offset, fov_offset, channel_offset, zplane_offset, file_format, file_vars, cache_read_order, aux_names, aux_file_formats, aux_file_vars, aux_cache_read_order, aux_channel_count, aux_channel_slope, aux_channel_intercept]
 
   spaceTxConversion:
     run: steps/spaceTxConversion.cwl
@@ -421,33 +456,141 @@ steps:
             }
             return {json: self[0]};
           }
-      round_count: round_count
-      zplane_count: zplane_count
-      channel_count: channel_count
-      fov_count: fov_count
-      round_offset:
-        source: [stagedSorted/round_offset, round_offset]
-        pickValue: first_non_null
-      fov_offset:
-        source: [stagedSorted/fov_offset, fov_offset]
-        pickValue: first_non_null
-      channel_offset:
-        source: [stagedSorted/channel_offset, channel_offset]
-        pickValue: first_non_null
-      file_format:
-        source: [stagedSorted/file_format, file_format]
-        pickValue: first_non_null
-      file_vars:
-        source: [stagedSorted/file_vars, file_vars]
-        pickValue: first_non_null
-      cache_read_order:
-        source: [stagedSorted/cache_read_order, cache_read_order]
-        pickValue: first_non_null
-      aux_tilesets:
-        source: [aux_tilesets, stagedSorted/aux_names, stagedSorted/aux_file_formats, stagedSorted/aux_file_vars, stagedSorted/aux_cache_read_order, stagedSorted/aux_channel_slope, stagedSorted/aux_channel_intercept]
+      parameter_json:
+        source: [parameter_json, sorter/pseudosorted_dir]
         valueFrom: |
           ${
-            if(!self[1]){
+            if(self[1]){
+              return null;
+            } else {
+              return self[0];
+            }
+          }
+      round_count:
+        source: [stagedSorted/round_count, round_count]
+        valueFrom: |
+          ${
+            if(self[0]){
+              return self[0];
+            } else if (self[1]){
+              return self[1];
+            } else {
+              return null;
+            }
+          }
+      zplane_count:
+        source: [stagedSorted/zplane_count, zplane_count]
+        valueFrom: |
+          ${
+            if(self[0]){
+              return self[0];
+            } else if (self[1]){
+              return self[1];
+            } else {
+              return null;
+            }
+          }
+      channel_count:
+        source: [stagedSorted/channel_count, channel_count]
+        valueFrom: |
+          ${
+            if(self[0]){
+              return self[0];
+            } else if (self[1]){
+              return self[1];
+            } else {
+              return null;
+            }
+          }
+      fov_count:
+        source: [stagedSorted/fov_count, fov_count]
+        valueFrom: |
+          ${
+            if(self[0]){
+              return self[0];
+            } else if (self[1]){
+              return self[1];
+            } else {
+              return null;
+            }
+          }
+      round_offset:
+        source: [stagedSorted/round_offset, round_offset]
+        valueFrom: |
+          ${
+            if(self[0]){
+              return self[0];
+            } else if (self[1]){
+              return self[1];
+            } else {
+              return null;
+            }
+          }
+      fov_offset:
+        source: [stagedSorted/fov_offset, fov_offset]
+        valueFrom: |
+          ${
+            if(self[0]){
+              return self[0];
+            } else if (self[1]){
+              return self[1];
+            } else {
+              return null;
+            }
+          }
+      channel_offset:
+        source: [stagedSorted/channel_offset, channel_offset]
+        valueFrom: |
+          ${
+            if(self[0]){
+              return self[0];
+            } else if (self[1]){
+              return self[1];
+            } else {
+              return null;
+            }
+          }
+      file_format:
+        source: [stagedSorted/file_format, file_format]
+        valueFrom: |
+          ${
+            if(self[0]){
+              return self[0];
+            } else if (self[1]){
+              return self[1];
+            } else {
+              return null;
+            }
+          }
+      file_vars:
+        source: [stagedSorted/file_vars, file_vars]
+        valueFrom: |
+          ${
+            if(self[0]){
+              return self[0];
+            } else if (self[1]){
+              return self[1];
+            } else {
+              return null;
+            }
+          }
+      cache_read_order:
+        source: [stagedSorted/cache_read_order, cache_read_order]
+        valueFrom: |
+          ${
+            if(self[0]){
+              return self[0];
+            } else if (self[1]){
+              return self[1];
+            } else {
+              return null;
+            }
+          }
+      aux_tilesets:
+        source: [aux_tilesets, stagedSorted/aux_names, stagedSorted/aux_file_formats, stagedSorted/aux_file_vars, stagedSorted/aux_cache_read_order, stagedSorted/aux_channel_count, stagedSorted/aux_channel_slope, stagedSorted/aux_channel_intercept]
+        valueFrom: |
+          ${
+            if(!self[1] && self[0]){
               return {
                   aux_names: self[0].aux_names,
                   aux_file_formats: self[0].aux_file_formats,
@@ -457,17 +600,23 @@ steps:
                   aux_channel_slope: self[0].aux_channel_slope,
                   aux_channel_intercept: self[0].aux_channel_intercept
               };
-            } else {
+            } else if(self[1]) {
+              var count = self[5];
+              if(self[0]){
+                count = self[0].aux_channel_count;
+              }
               return {
                   aux_names: self[1],
                   aux_file_formats: self[2],
                   aux_file_vars: self[3],
                   aux_cache_read_order: self[4],
-                  aux_channel_count: self[0].aux_channel_count,
-                  aux_channel_slope: self[5],
-                  aux_channel_intercept: self[6]
+                  aux_channel_count: count,
+                  aux_channel_slope: self[6],
+                  aux_channel_intercept: self[7]
               };
-            };
+            } else {
+              return null;
+            }
           }
       add_blanks: add_blanks
     out: [spaceTx_converted]
@@ -475,8 +624,18 @@ steps:
   processing:
     run: steps/processing.cwl
     in:
-      skip_processing: skip_processing
+      skip_processing:
+        source: [stage/skip_processing, skip_processing]
+        valueFrom: |
+          ${
+            if(self[0] || self[1]){
+              return true;
+            } else {
+              return false;
+            };
+          }
       input_dir: spaceTxConversion/spaceTx_converted
+      parameter_json: parameter_json
       clip_min: clip_min
       opening_size: opening_size
       register_aux_view: register_aux_view
@@ -490,6 +649,7 @@ steps:
       exp_loc:
         source: [processing/processed_exp, spaceTxConversion/spaceTx_converted]
         pickValue: first_non_null
+      parameter_json: parameter_json
       use_ref_img: use_ref_img
       decoding: decoding
     out:
@@ -498,9 +658,9 @@ steps:
   segmentation:
     run: steps/segmentation.cwl
     in:
-      skip_baysor: skip_baysor
       decoded_loc: starfishRunner/decoded
       exp_loc: spaceTxConversion/spaceTx_converted
+      parameter_json: parameter_json
       aux_name: aux_name
       fov_count: fov_count
       binary_mask: binary_mask
@@ -510,6 +670,16 @@ steps:
   baysorStaged:
     run: steps/baysorStaged.cwl
     in:
+      skip_baysor:
+        source: [stage/skip_baysor, skip_baysor]
+        valueFrom: |
+          ${
+            if(self[0]||self[1]){
+              return true;
+            } else {
+              return false;
+            };
+          }
       segmented: segmentation/segmented
     when: $(inputs.skip_baysor == false)
     out:
@@ -528,26 +698,39 @@ steps:
       segmentation_loc:
         source: [baysorStaged/baysor, segmentation/segmented]
         pickValue: first_non_null
+      parameter_json: parameter_json
       imagesize:
         source: fov_positioning
         valueFrom: |
           ${
-            return {
-              "x-size": self['x-shape'],
-              "y-size": self['y-shape'],
-              "z-size": self['z-shape']
-            };
+            if(self){
+              return {
+                "x_size": self['x_shape'],
+                "y_size": self['y_shape'],
+                "z_size": self['z_shape']
+              };
+            } else {
+              return null;
+            }
+          }
+      has_spots:
+        source: decoding
+        valueFrom: |
+          ${
+            if(self) {
+              return typeof self.decode_method != 'undefined';
+            } else {
+              return null;
+            }
           }
       find_ripley: find_ripley
       save_pdf: save_pdf
       data:
-        source: [starfishRunner/decoded, decoding]
-        linkMerge: merge_flattened
+        source: [starfishRunner/decoded]
         valueFrom: |
           ${
             return {
-              exp: self[0],
-              has_spots: typeof self[1].decode_method != 'undefined'
+              "exp": self
             };
           }
     out:

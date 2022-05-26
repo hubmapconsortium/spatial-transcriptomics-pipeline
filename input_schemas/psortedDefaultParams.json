@@ -1,0 +1,14 @@
+[
+	"round_count",
+	"fov_count",
+	"channel_count",
+	"zplane_count",
+	"cache_read_order",
+	{
+		"aux_tilesets": [
+			"aux_names?",
+			"aux_cache_read_order?",
+			"aux_channel_count"
+		]
+	}
+]

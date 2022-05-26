@@ -1,0 +1,19 @@
+[
+	"find_ripley",
+	"save_pdf",
+	{
+		"fov_positioning" : [
+			[],
+			[
+				"x_shape",
+				"y_shape",
+				"z_shape"
+			]
+		]
+	},
+	{
+		"decoding":[
+			"decode_method"
+		]
+	}
+]
