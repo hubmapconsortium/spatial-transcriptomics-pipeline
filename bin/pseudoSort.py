@@ -122,10 +122,10 @@ def reformatter(
                         slices = []
                         for i in range(len(combined_cache_read_order[target])):
                             axis = combined_cache_read_order[target][i]
-                            if axis == "ch":
+                            if axis.lower() == "ch":
                                 c_adj = int(channel_slope[target] * c) + channel_intercept[target]
                                 slices.append(int(c_adj))
-                            elif axis == "round":
+                            elif axis.lower() == "round":
                                 slices.append(r)
                             else:
                                 slices.append(slice(0, img.shape[i]))
