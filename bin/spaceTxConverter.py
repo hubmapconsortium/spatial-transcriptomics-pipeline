@@ -62,8 +62,6 @@ class FISHTile(FetchedTile):
         cache_read_order: list
             Description of the order of the axes of the images. Each item in the list is one dimension in the image.
             The following strings will be converted to Axes objects and will be parsed based on the instance variables of the tile:
-                -Z -> Axes.ZPLANE
-                -CH -> Axes.CH
             All ofther values will be treated as an axis where the full contents will be read for each individual tile. (in pratice, this should only be Axes.X and Axes.Y)
 
         The following parameters are optional, and are only used if .coordinates() is called.  They may be used further downstream in analysis, in particular if there are multiple FOVs.
@@ -223,8 +221,6 @@ class PrimaryTileFetcher(TileFetcher):
         cache_read_order: list
             Description of the order of the axes of the images. Each item in the list is one dimension in the image.
             The following strings will be converted to Axes objects and will be parsed based on the instance variables of the tile:
-                -Z -> Axes.ZPLANE
-                -CH -> Axes.CH
             All ofther values will be treated as an axis where the full contents will be read for each individual tile. (in pratice, this should only be Axes.X and Axes.Y)
         zplane_offset: int
             Integer to be added to zplane names when looking for external file names, equal to the number of the first index.
@@ -585,9 +581,9 @@ def cli(
 
     cache_read_order_formatted = []
     for item in cache_read_order:
-        if item == "Z":
+        if item.lower() == "z":
             cache_read_order_formatted.append(Axes.ZPLANE)
-        elif item == "CH":
+        elif item.lower() == "ch":
             cache_read_order_formatted.append(Axes.CH)
         else:
             cache_read_order_formatted.append("other")
@@ -620,9 +616,9 @@ def cli(
             aux_cache_read_order_raw = aux_cache_read_order[i].split(";")
             aux_cache_read_order_formatted = []
             for item in aux_cache_read_order_raw:
-                if item == "Z":
+                if item.lower() == "z":
                     aux_cache_read_order_formatted.append(Axes.ZPLANE)
-                elif item == "CH":
+                elif item.lower() == "ch":
                     aux_cache_read_order_formatted.append(Axes.CH)
                 else:
                     aux_cache_read_order_formatted.append("other")
@@ -647,6 +643,11 @@ def cli(
 
     t1 = time()
     print("Elapsed time to make experiment", t1 - t0)
+
+    print(image_dimensions)
+    print(primary_tile_fetcher)
+    # print(aux_name_to_dimensions)
+    # print(aux_tile_fetcher)
 
     write_experiment_json(
         path=output_dir,

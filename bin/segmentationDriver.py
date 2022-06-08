@@ -244,6 +244,18 @@ def run(
     for i in range(fov_count):
         labeled = al.run(masks[i], results[i])
         # labeled = labeled[labeled.cell_id != "nan"]
+        if "xc" not in labeled.features.coords:
+            temp = labeled.to_dict()
+            temp["coords"]["xc"] = temp["coords"]["x"]
+            labeled = DecodedIntensityTable.from_dict(temp)
+        if "yc" not in labeled.features.coords:
+            temp = labeled.to_dict()
+            temp["coords"]["yc"] = temp["coords"]["y"]
+            labeled = DecodedIntensityTable.from_dict(temp)
+        if "zc" not in labeled.features.coords:
+            temp = labeled.to_dict()
+            temp["coords"]["zc"] = temp["coords"]["z"]
+            labeled = DecodedIntensityTable.from_dict(temp)
         labeled.to_decoded_dataframe().save_csv(output_dir + keys[i] + "/segmentation.csv")
         labeled.to_netcdf(output_dir + keys[i] + "/df_segmented.cdf")
         labeled.to_expression_matrix().to_pandas().to_csv(

@@ -110,7 +110,7 @@ steps:
 
       requirements:
         DockerRequirement:
-          dockerPull: docker.pkg.github.com/hubmapconsortium/spatial-transcriptomics-pipeline/starfish-custom:2.03
+          dockerPull: docker.pkg.github.com/hubmapconsortium/spatial-transcriptomics-pipeline/starfish-custom:latest
 
       inputs:
         codebook:
@@ -163,7 +163,7 @@ steps:
 
         roi:
           type: File?
-          inputBinding:
+          inputBinding: 
             prefix: --roi
 
         imagesize:
