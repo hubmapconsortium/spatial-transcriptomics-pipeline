@@ -84,7 +84,7 @@ def decodeRunner(
     codebook: Codebook,
     decoderKwargs: dict,
     callableDecoder: Callable = starfish.spots.DecodeSpots.PerRoundMaxChannel,
-    filtered_results: bool = True,
+    filtered_results: bool = False,
     n_processes: int = None,
 ) -> DecodedIntensityTable:
     """
@@ -215,7 +215,10 @@ def saveTable(table: DecodedIntensityTable, savename: str):
     """
     Reformats and saves a DecodedIntensityTable.
     """
-    intensities = IntensityTable(table.where(table[Features.PASSES_THRESHOLDS], drop=True))
+    if Features.PASSES_THRESHOLDS in table:
+        intensities = IntensityTable(table.where(table[Features.PASSES_THRESHOLDS], drop=True))
+    else:  # SimpleLookupDecoder will not have PASSES_THRESHOLDS
+        intensities = IntensityTable(table)
     traces = intensities.stack(traces=(Axes.ROUND.value, Axes.CH.value))
     # traces = table.stack(traces=(Axes.ROUND.value, Axes.CH.value))
     traces = traces.to_features_dataframe()
@@ -455,7 +458,6 @@ if __name__ == "__main__":
                 raise Exception("TraceBuildingStrategies " + str(trace_strat) + " is not valid.")
             decodeKwargs["trace_building_strategy"] = trace_strat
 
-    addKwarg(args, decodeKwargs, "filtered_results")
     addKwarg(args, decodeKwargs, "error_rounds")
     addKwarg(args, decodeKwargs, "mode")
     addKwarg(args, decodeKwargs, "physical_coords")
@@ -466,7 +468,11 @@ if __name__ == "__main__":
     addKwarg(args, decodeKwargs, "anchor_round")
     addKwarg(args, decodeKwargs, "search_radius")
 
-    decodeRunnerKwargs = {"decoderKwargs": decodeKwargs, "callableDecoder": method}
+    decodeRunnerKwargs = {
+        "decoderKwargs": decodeKwargs,
+        "callableDecoder": method,
+        "filtered_results": args.filtered_results,
+    }
     if method == starfish.spots.DecodeSpots.CheckAll:
         decodeRunnerKwargs["n_processes"] = cpu_count()
     addKwarg(args, decodeRunnerKwargs, "return_original_intensities")
