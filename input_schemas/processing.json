@@ -1,5 +1,14 @@
 [
 	"clip_min?",
-	"opening_size?",
-	"register_aux_view?"
+	"register_aux_view?",
+	"channels_per_reg?",
+	"background_view?",
+	"anchor_view?",
+	"high_sigma?",
+	"deconvolve_iter?",
+	"deconvolve_sigma?",
+	"low_sigma?",
+	"rolling_radius?",
+	"match_histogram?",
+	"tophat_radius?"
 ]

@@ -75,18 +75,35 @@ outputs:
     outputSource: execute_segmentation/segmented
 
 steps:
+  read_schema:
+    run:
+      class: CommandLineTool
+      baseCommand: cat
+
+      requirements:
+        DockerRequirement:
+          dockerPull: docker.pkg.github.com/hubmapconsortium/spatial-transcriptomics-pipeline/starfish-custom:latest
+
+      inputs:
+        schema:
+          type: string
+          inputBinding:
+            position: 1
+
+      outputs:
+        data:
+          type: stdout
+
+    in:
+      schema:
+        valueFrom: "/opt/segmentation.json"
+    out: [data]
+
   stage_segmentation:
     run: inputParser.cwl
     in:
       datafile: parameter_json
-      schema:
-        valueFrom: |
-          ${
-            return {
-              "class": "File",
-              "location": "../input_schemas/segmentation.json"
-            };
-          }
+      schema: read_schema/data
     out: [aux_name, fov_count, binary_mask_img_threshold, binary_mask_min_dist, binary_mask_min_allowed_size, binary_mask_max_allowed_size, binary_mask_masking_radius]
     when: $(inputs.datafile != null)
   execute_segmentation:

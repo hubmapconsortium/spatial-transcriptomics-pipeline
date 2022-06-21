@@ -50,8 +50,17 @@ outputs:
   add_blanks: boolean
   skip_processing: boolean
   clip_min: float
-  opening_size: int
   register_aux_view: string
+  channels_per_reg: int
+  background_view: string
+  anchor_view: string
+  high_sigma: int
+  deconvolve_iter: int
+  deconvolve_sigma: int
+  low_sigma: int
+  rolling_radius: int
+  match_histogram: boolean
+  tophat_radius: int
   use_ref_img: boolean
   decoding_min_sigma: float[]
   decoding_max_sigma: float[]

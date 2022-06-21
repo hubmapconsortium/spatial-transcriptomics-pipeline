@@ -9,8 +9,8 @@ from typing import Dict, List
 
 import numpy as np
 import pandas as pd
+import skimage.io
 import starfish
-import tifffile as tiff
 import yaml
 from PIL import Image
 from starfish import Codebook
@@ -115,7 +115,7 @@ def reformatter(
                             ),
                         )
 
-                        img = tiff.imread(file_path)
+                        img = skimage.io.imread(file_path)
                         # img_out = img
 
                         # figure out what slice to take.
@@ -132,7 +132,7 @@ def reformatter(
 
                         # take slices out of image and reduce unneeded dims
                         slices = tuple(slices)
-                        # print(slices)
+                        print(slices)
                         img_out = np.squeeze(img[slices])
 
                         # convert to new rounds/channels
@@ -155,7 +155,7 @@ def reformatter(
                         )
                         print("{}\n->{}".format(file_path, output_path))
                         print(np.shape(img_out))
-                        tiff.imsave(output_path, img_out)
+                        skimage.io.imsave(output_path, img_out)
 
     sys.stdout = sys.__stdout__
     return True

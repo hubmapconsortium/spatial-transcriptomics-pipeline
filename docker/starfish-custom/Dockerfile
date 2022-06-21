@@ -10,6 +10,7 @@ RUN git clone --branch ctcisar-hubmap https://github.com/ctcisar/starfish.git
 RUN cd /starfish;make install-dev
 
 COPY bin /opt
+COPY input_schemas /opt
 RUN chmod +x /opt/*.py
 
 CMD ["/bin/bash"]

@@ -19,6 +19,9 @@ inputs:
   aux_names:
     type: string[]?
     doc: list of the aux view names.  Assumed none if blank.
+  channel_count:
+    type: int?
+    doc: the number of channel expected for this experiment.
   cache_read_order:
     type: string[]?
     doc: Cache read order for files. Will strip any CH dimensions.
@@ -86,18 +89,35 @@ outputs:
     outputSource: execute_defaults/aux_channel_intercept
 
 steps:
+  read_schema:
+    run:
+      class: CommandLineTool
+      baseCommand: cat
+
+      requirements:
+        DockerRequirement:
+          dockerPull: docker.pkg.github.com/hubmapconsortium/spatial-transcriptomics-pipeline/starfish-custom:latest
+
+      inputs:
+        schema:
+          type: string
+          inputBinding:
+            position: 1
+
+      outputs:
+        data:
+          type: stdout
+
+    in:
+      schema:
+        valueFrom: "/opt/psortedDefaultParams.json"
+    out: [data]
+
   stage_defaults:
     run: inputParser.cwl
     in:
       datafile: parameter_json
-      schema:
-        valueFrom: |
-          ${
-            return {
-              "class": "File",
-              "location": "../input_schemas/psortedDefaultParams.json"
-            };
-          }
+      schema: read_schema/data
     out: [round_count, fov_count, channel_count, zplane_count, aux_tilesets_aux_names, cache_read_order, aux_tilesets_aux_cache_read_order, aux_tilesets_aux_channel_count]
     when: $(inputs.datafile != null)
 
@@ -125,7 +145,7 @@ steps:
           var aux_channel_slope = [];
           var aux_channel_intercept = [];
           var cache = inputs.cache_read_order;
-          var aux_channel_count = inputs.aux_channel_count;
+          var aux_channel_count = [];
           var ind = cache.indexOf("CH"); // remove channel if it was in the read order
           if(ind > -1){
             cache.splice(ind, 1);
@@ -147,6 +167,7 @@ steps:
             aux_file_formats.push("PseudoCycle{}/MMStack_Pos{}_"+inputs.aux_names[i]+"ch{}.ome.tif");
             aux_file_vars.push("round;fov;channel");
             aux_cache_read_order.push(aux_cache);
+            aux_channel_count.push(inputs.channel_count);
             aux_channel_slope.push(1);
             aux_channel_intercept.push(0);
           }
@@ -177,8 +198,8 @@ steps:
           type: string[]
         aux_cache_read_order:
           type: string[]?
-        aux_channel_count:
-          type: int[]?
+        channel_count:
+          type: int?
 
       outputs:
         codebook:
@@ -228,8 +249,9 @@ steps:
       cache_read_order:
         source: [stage_defaults/cache_read_order, cache_read_order]
         pickValue: first_non_null
-      aux_channel_count:
-        source: stage_defaults/aux_tilesets_aux_channel_count
+      channel_count:
+        source: [stage_defaults/channel_count, channel_count]
+        pickValue: first_non_null
       aux_cache_read_order:
         source: [stage_defaults/aux_tilesets_aux_cache_read_order, aux_cache_read_order]
         valueFrom: |
