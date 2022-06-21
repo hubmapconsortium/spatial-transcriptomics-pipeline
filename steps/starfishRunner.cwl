@@ -111,7 +111,7 @@ inputs:
                     doc: Accuracy mode to run in.  Can be 'high', 'med', or 'low'.
                   physical_coords:
                     type: boolean?
-                    doc: Whether to use physical coordinates or pixel coordinates 
+                    doc: Whether to use physical coordinates or pixel coordinates
 
 
       - type: record
@@ -150,7 +150,7 @@ steps:
 
       requirements:
         DockerRequirement:
-          dockerPull: docker.pkg.github.com/hubmapconsortium/spatial-transcriptomics-pipeline/starfish-custom:latest
+          dockerPull: docker.pkg.github.com/hubmapconsortium/spatial-transcriptomics-pipeline/starfish-custom:2.05
 
       inputs:
         schema:
@@ -183,7 +183,7 @@ steps:
 
       requirements:
         DockerRequirement:
-          dockerPull: docker.pkg.github.com/hubmapconsortium/spatial-transcriptomics-pipeline/starfish-custom:latest
+          dockerPull: docker.pkg.github.com/hubmapconsortium/spatial-transcriptomics-pipeline/starfish-custom:2.05
 
       inputs:
         exp_loc:
