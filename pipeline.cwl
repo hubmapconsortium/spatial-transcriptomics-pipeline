@@ -28,8 +28,17 @@ inputs:
     type: Directory
     doc: The directory containing all .tiff files
 
+  codebook_csv:
+    type: File?
+    doc: Flattened csv input, refer to record entry.
+
+  codebook_json:
+    type: File?
+    doc: Flattened json input, refer to record entry.
+
   codebook:
     type:
+      - 'null'
       - type: record
         name: csv
         fields:
@@ -119,31 +128,31 @@ inputs:
     - type: record
       fields:
         - name: x_locs
-          type: string
+          type: string?
           doc: list of x-axis start locations per fov index
         - name: x_shape
-          type: int
+          type: int?
           doc: shape of each fov item in the x-axis
         - name: x_voxel
-          type: float
+          type: float?
           doc: size of voxels in the x-axis
         - name: y_locs
-          type: string
+          type: string?
           doc: list of y-axis start locations per fov index
         - name: y_shape
-          type: int
+          type: int?
           doc: shape of each fov item in the y-axis
         - name: y_voxel
-          type: float
+          type: float?
           doc: size of voxels in the y-axis
         - name: z_locs
-          type: string
+          type: string?
           doc: list of z-axis start locations per fov index
         - name: z_shape
-          type: int
+          type: int?
           doc: shape of each fov item in the z-axis
         - name: z_voxel
-          type: float
+          type: float?
           doc: size of voxels in the z-axis
 
   add_blanks:
@@ -161,13 +170,49 @@ inputs:
     type: float?
     doc: Pixels below this percentile are set to 0.
 
-  opening_size:
-    type: int?
-    doc: Size of the morphological opening filter to be applied to the image
-
   register_aux_view:
     type: string?
     doc: The name of the auxillary view to be used for image registration.
+
+  channels_per_reg:
+    type: int?
+    doc: The number of images associated with each channel of the registration image.  Defaults to 1.
+
+  background_view:
+    type: string?
+    doc: The name of the auxillary view to be used for background subtraction.  Background will be estimated if not provided.
+
+  anchor_view:
+    type: string?
+    doc: The name of the auxillary view to be processed in parallel with primary view, such as for anchor round in ISS processing. Will not be included if not provided.
+
+  high_sigma:
+    type: int?
+    doc: Sigma value for high pass gaussian filter. Will not be run if not provided.
+
+  deconvolve_iter:
+    type: int?
+    doc: Number of iterations to perform for deconvolution. High values remove more noise while lower values remove less. The value 15 will work for most datasets unless image is very noisy. Will not be run if not provided.
+
+  deconvolve_sigma:
+    type: int?
+    doc: Sigma value for deconvolution. Should be approximately the expected spot size.
+
+  low_sigma:
+    type: int?
+    doc: Sigma value for low pass gaussian filter. Will not be run if not provided.
+
+  rolling_radius:
+    type: int?
+    doc: Radius for rolling ball background subtraction. Larger values lead to increased intensity evening effect. The value of 3 will work for most datasets. Will not be run if not provided.
+
+  match_histogram:
+    type: boolean?
+    doc: If true, histograms will be equalized.
+
+  tophat_radius:
+    type: int?
+    doc: Radius for white top hat filter. Should be slightly larger than the expected spot radius. Will not be run if not provided.
 
 # starfishRunner
 
@@ -374,18 +419,35 @@ outputs:
 
 steps:
 
+  read_schema:
+    run:
+      class: CommandLineTool
+      baseCommand: cat
+
+      requirements:
+        DockerRequirement:
+          dockerPull: docker.pkg.github.com/hubmapconsortium/spatial-transcriptomics-pipeline/starfish-custom:latest
+
+      inputs:
+        schema:
+          type: string
+          inputBinding:
+            position: 1
+
+      outputs:
+        data:
+          type: stdout
+
+    in:
+      schema:
+        valueFrom: "/opt/pipeline.json"
+    out: [data]
+
   stage:
     run: steps/inputParser.cwl
     in:
       datafile: parameter_json
-      schema:
-        valueFrom: |
-          ${
-            return {
-              "class": "File",
-              "location": "../input_schemas/pipeline.json"
-            };
-          }
+      schema: read_schema/data
     out: [skip_baysor, skip_processing]
     when: $(inputs.datafile != null)
 
@@ -396,7 +458,19 @@ steps:
       cycle_yml: cycle_yml
       parameter_json: parameter_json
       input_dir: tiffs
-      codebook: codebook
+      codebook:
+        source: [codebook, codebook_csv, codebook_json]
+        linkMerge: merge_flattened
+        valueFrom: |
+          ${
+            if(self[0]){
+              return self[0];
+            } else if(self[1]){
+              return {csv: self[1]};
+            } else {
+              return {json: self[2]};
+            }
+          }
       round_count: round_count
       fov_count: fov_count
       round_offset: round_offset
@@ -415,7 +489,6 @@ steps:
       channel_yml: channel_yml
       exp_dir: sorter/pseudosorted_dir
       parameter_json: parameter_json
-      input_dir: tiffs
       aux_names:
         source: aux_tilesets
         valueFrom: |
@@ -427,6 +500,7 @@ steps:
             }
           }
       cache_read_order: cache_read_order
+      channel_count: channel_count
       aux_cache_read_order:
         source: aux_tilesets
         valueFrom: |
@@ -447,14 +521,19 @@ steps:
         source: [sorter/pseudosorted_dir, tiffs]
         pickValue: first_non_null
       codebook:
-        source: [stagedSorted/codebook, codebook]
+        source: [stagedSorted/codebook, codebook, codebook_csv, codebook_json]
         linkMerge: merge_flattened
         valueFrom: |
           ${
-            if(!self[0]){
+            if(self[0]){
+              return {json: self[0]};
+            } else if(self[1]) {
               return self[1];
+            } else if(self[2]) {
+              return {csv: self[2]};
+            } else {
+              return {json: self[3]};
             }
-            return {json: self[0]};
           }
       parameter_json:
         source: [parameter_json, sorter/pseudosorted_dir]
@@ -637,8 +716,17 @@ steps:
       input_dir: spaceTxConversion/spaceTx_converted
       parameter_json: parameter_json
       clip_min: clip_min
-      opening_size: opening_size
       register_aux_view: register_aux_view
+      channels_per_reg: channels_per_reg
+      background_view: background_view
+      anchor_view: anchor_view
+      high_sigma: high_sigma
+      deconvolve_iter: deconvolve_iter
+      deconvolve_sigma: deconvolve_sigma
+      low_sigma: low_sigma
+      rolling_radius: rolling_radius
+      match_histogram: match_histogram
+      tophat_radius: tophat_radius
     when: $(inputs.skip_processing == false)
     out:
       [processed_exp]
@@ -703,7 +791,7 @@ steps:
         source: fov_positioning
         valueFrom: |
           ${
-            if(self){
+            if(self['x_shape'] && self['y_shape'] && self['z_shape']){
               return {
                 "x_size": self['x_shape'],
                 "y_size": self['y_shape'],

@@ -9,6 +9,7 @@ RUN python3 -m pip install -r /opt/requirements.txt \
 RUN echo "import matplotlib.pyplot as plt" | python
 
 COPY bin /opt
+COPY input_schemas /opt
 RUN chmod +x /opt/*.py
 
 CMD ["/bin/bash"]

@@ -109,18 +109,36 @@ outputs:
     outputSource: execute_sort/pseudosorted_dir
 
 steps:
+
+  read_schema:
+    run:
+      class: CommandLineTool
+      baseCommand: cat
+
+      requirements:
+        DockerRequirement:
+          dockerPull: docker.pkg.github.com/hubmapconsortium/spatial-transcriptomics-pipeline/starfish-custom:latest
+
+      inputs:
+        schema:
+          type: string
+          inputBinding:
+            position: 1
+
+      outputs:
+        data:
+          type: stdout
+
+    in:
+      schema:
+        valueFrom: "/opt/sorter.json"
+    out: [data]
+
   stage_sort:
     run: inputParser.cwl
     in:
       datafile: parameter_json
-      schema:
-        valueFrom: |
-          ${
-            return {
-              "class": "File",
-              "location": "../input_schemas/sorter.json"
-            };
-          }
+      schema: read_schema/data
     out: [round_count, fov_count, round_offset, fov_offset, channel_offset, channel_slope, file_format, file_vars, cache_read_order, aux_tilesets_aux_names, aux_tilesets_aux_file_formats, aux_tilesets_aux_file_vars, aux_tilesets_aux_cache_read_order, aux_tilesets_aux_channel_count, aux_tilesets_aux_channel_slope, aux_tilesets_aux_channel_intercept]
     when: $(inputs.datafile != null)
   execute_sort:
@@ -130,7 +148,7 @@ steps:
 
       requirements:
         DockerRequirement:
-          dockerPull: docker.pkg.github.com/hubmapconsortium/spatial-transcriptomics-pipeline/starfish-custom:2.04
+          dockerPull: docker.pkg.github.com/hubmapconsortium/spatial-transcriptomics-pipeline/starfish-custom:latest
 
       inputs:
         input_dir:

@@ -151,18 +151,36 @@ outputs:
     outputSource: execute_conversion/spaceTx_converted
 
 steps:
+
+  read_schema:
+    run:
+      class: CommandLineTool
+      baseCommand: cat
+
+      requirements:
+        DockerRequirement:
+          dockerPull: docker.pkg.github.com/hubmapconsortium/spatial-transcriptomics-pipeline/starfish-custom:latest
+
+      inputs:
+        schema:
+          type: string
+          inputBinding:
+            position: 1
+
+      outputs:
+        data:
+          type: stdout
+
+    in:
+      schema:
+        valueFrom: "/opt/spaceTxConversion.json"
+    out: [data]
+
   stage_conversion:
     run: inputParser.cwl
     in:
       datafile: parameter_json
-      schema:
-        valueFrom: |
-          ${
-            return {
-              "class": "File",
-              "location": "../input_schemas/spaceTxConversion.json"
-            };
-          }
+      schema: read_schema/data
     out: [round_count, zplane_count, channel_count, fov_count, round_offset, fov_offset, zplane_offset, channel_offset, file_format, file_vars, cache_read_order, aux_tilesets_aux_names, aux_tilesets_aux_file_formats, aux_tilesets_aux_file_vars, aux_tilesets_aux_cache_read_order, aux_tilesets_aux_channel_count, aux_tilesets_aux_channel_slope, aux_tilesets_aux_channel_intercept,  fov_positioning_x_locs, fov_positioning_x_shape, fov_positioning_x_voxel, fov_positioning_y_locs, fov_positioning_y_shape, fov_positioning_y_voxel, fov_positioning_z_locs, fov_positioning_z_shape, fov_positioning_z_voxel, add_blanks]
     when: $(inputs.datafile != null)
 
@@ -173,7 +191,7 @@ steps:
 
       requirements:
         DockerRequirement:
-            dockerPull: docker.pkg.github.com/hubmapconsortium/spatial-transcriptomics-pipeline/starfish-custom:2.04
+            dockerPull: docker.pkg.github.com/hubmapconsortium/spatial-transcriptomics-pipeline/starfish-custom:latest
       inputs:
           tiffs:
             type: Directory

@@ -111,7 +111,7 @@ inputs:
                     doc: Accuracy mode to run in.  Can be 'high', 'med', or 'low'.
                   physical_coords:
                     type: boolean?
-                    doc: Whether to use physical coordinates or pixel coordinates
+                    doc: Whether to use physical coordinates or pixel coordinates 
 
 
       - type: record
@@ -142,18 +142,36 @@ outputs:
     outputSource: execute_runner/decoded
 
 steps:
+
+  read_schema:
+    run:
+      class: CommandLineTool
+      baseCommand: cat
+
+      requirements:
+        DockerRequirement:
+          dockerPull: docker.pkg.github.com/hubmapconsortium/spatial-transcriptomics-pipeline/starfish-custom:latest
+
+      inputs:
+        schema:
+          type: string
+          inputBinding:
+            position: 1
+
+      outputs:
+        data:
+          type: stdout
+
+    in:
+      schema:
+        valueFrom: "/opt/starfishRunner.json"
+    out: [data]
+
   stage_runner:
     run: inputParser.cwl
     in:
       datafile: parameter_json
-      schema:
-        valueFrom: |
-          ${
-            return {
-              "class": "File",
-              "location": "../input_schemas/starfishRunner.json"
-            };
-          }
+      schema: read_schema/data
     out: [use_ref_img, decoding_min_sigma, decoding_max_sigma, decoding_num_sigma, decoding_threshold, decoding_is_volume, decoding_overlap, decoding_decode_method, decoding_filtered_results, decoding_decoder_trace_building_strategy, decoding_decoder_max_distance, decoding_decoder_min_intensity, decoding_decoder_metric, decoding_decoder_norm_order, decoding_decoder_anchor_round, decoding_decoder_search_radius, decoding_decoder_return_original_intensities, decoding_decoder_error_rounds, decoding_decoder_mode, decoding_decoder_physical_coords, decoding_metric, decoding_distance_threshold, decoding_magnitude_threshold, decoding_min_area, decoding_max_area, decoding_norm_order]
     when: $(inputs.datafile != null)
 
@@ -165,7 +183,7 @@ steps:
 
       requirements:
         DockerRequirement:
-          dockerPull: docker.pkg.github.com/hubmapconsortium/spatial-transcriptomics-pipeline/starfish-custom:2.04
+          dockerPull: docker.pkg.github.com/hubmapconsortium/spatial-transcriptomics-pipeline/starfish-custom:latest
 
       inputs:
         exp_loc:

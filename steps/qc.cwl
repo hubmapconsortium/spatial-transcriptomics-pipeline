@@ -59,18 +59,19 @@ inputs:
     doc: The json with parameters to be read in for the following variables.
 
   imagesize:
-    - 'null'
-    - type: record
-      fields:
-        - name: x_size
-          type: int
-          doc: x-dimension of image
-        - name: y_size
-          type: int
-          doc: y-dimension of image
-        - name: z_size
-          type: int
-          doc: number of z-stacks
+    type:
+      - 'null'
+      - type: record
+        fields:
+          - name: x_size
+            type: int
+            doc: x-dimension of image
+          - name: y_size
+            type: int
+            doc: y-dimension of image
+          - name: z_size
+            type: int
+            doc: number of z-stacks
 
   find_ripley:
     type: boolean?
@@ -88,18 +89,36 @@ outputs:
     outputSource: execute_qc/qc_metrics
 
 steps:
+
+  read_schema:
+    run:
+      class: CommandLineTool
+      baseCommand: cat
+
+      requirements:
+        DockerRequirement:
+          dockerPull: docker.pkg.github.com/hubmapconsortium/spatial-transcriptomics-pipeline/starfish-custom:latest
+
+      inputs:
+        schema:
+          type: string
+          inputBinding:
+            position: 1
+
+      outputs:
+        data:
+          type: stdout
+
+    in:
+      schema:
+        valueFrom: "/opt/qc.json"
+    out: [data]
+
   stage_qc:
     run: inputParser.cwl
     in:
       datafile: parameter_json
-      schema:
-        valueFrom: |
-          ${
-            return {
-              "class": "File",
-              "location": "../input_schemas/qc.json"
-            };
-          }
+      schema: read_schema/data
     out: [find_ripley, save_pdf, fov_positioning_x_shape, fov_positioning_y_shape, fov_positioning_z_shape, decoding_decode_method]
     when: $(inputs.datafile != null)
 
@@ -110,7 +129,7 @@ steps:
 
       requirements:
         DockerRequirement:
-          dockerPull: docker.pkg.github.com/hubmapconsortium/spatial-transcriptomics-pipeline/starfish-custom:2.04
+          dockerPull: docker.pkg.github.com/hubmapconsortium/spatial-transcriptomics-pipeline/starfish-custom:latest
 
       inputs:
         codebook:
@@ -163,7 +182,7 @@ steps:
 
         roi:
           type: File?
-          inputBinding:
+          inputBinding: 
             prefix: --roi
 
         imagesize:
