@@ -96,7 +96,7 @@ steps:
 
       requirements:
         DockerRequirement:
-          dockerPull: docker.pkg.github.com/hubmapconsortium/spatial-transcriptomics-pipeline/starfish-custom:latest
+          dockerPull: hubmap/spatial-transcriptomics-starfish-custom:latest
 
       inputs:
         schema:

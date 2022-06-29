@@ -6,9 +6,7 @@ baseCommand: ["baysor","run"]
 
 requirements:
   DockerRequirement:
-    #dockerPull: vpetukhov/baysor:v0.5.0
-    #dockerPull: waltsbaysor:latest
-    dockerPull: docker.pkg.github.com/hubmapconsortium/spatial-transcriptomics-pipeline/baysor:latest
+    dockerPull: hubmap/spatial-transcriptomics-baysor:latest
 
 inputs:
   csv:
