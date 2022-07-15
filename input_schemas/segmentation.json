@@ -3,11 +3,23 @@
 	"fov_count",
 	{
 		"binary_mask":[
-			"img_threshold",
-			"min_dist",
-			"min_allowed_size",
-			"max_allowed_size",
-			"masking_radius"
+			[
+				"img_threshold",
+				"min_dist",
+				"min_allowed_size",
+				"max_allowed_size",
+				"masking_radius"
+			],
+			[
+				"nuclei_view",
+				"cyto_seg",
+				"correct_seg",
+				"border_buffer",
+				"area_thresh",
+				"thresh_block_size",
+				"watershed_footprint_size",
+				"label_exp_size"
+			]
 		]
 	}
 ]

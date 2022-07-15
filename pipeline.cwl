@@ -170,13 +170,13 @@ inputs:
     type: float?
     doc: Pixels below this percentile are set to 0.
 
+  clip_max:
+    type: float?
+    doc: Pixels above this percentile are set to 1.
+
   register_aux_view:
     type: string?
     doc: The name of the auxillary view to be used for image registration.
-
-  channels_per_reg:
-    type: int?
-    doc: The number of images associated with each channel of the registration image.  Defaults to 1.
 
   background_view:
     type: string?
@@ -220,7 +220,16 @@ inputs:
     type: boolean?
     doc: Whether to generate a reference image and use it alongside spot detection.
 
-  decoding:
+  is_volume:
+    type: boolean?
+    doc: Whether to treat the zplanes as a 3D image.
+    default: False
+
+  rescale:
+    type: boolean?
+    doc: Whether to rescale images before running decoding.
+
+  decoding_blob:
     type:
       - 'null'
       - type: record
@@ -238,9 +247,6 @@ inputs:
           threshold:
             type: float?
             doc: Threshold of blob detection
-          is_volume:
-            type: boolean?
-            doc: If True, passes 3d volumes to func, else pass 2d tiles to func.
           overlap:
             type: float?
             doc: Amount of overlap allowed between blobs, passed to blob detector
@@ -310,12 +316,15 @@ inputs:
                     type: boolean?
                     doc: Whether to use physical coordinates or pixel coordinates
 
+  decoding_pixel:
+    type:
+      - 'null'
       - type: record
         name: pixel
         fields:
           metric:
-            type: string
-            doc: The sklearn metric string to pass to NearestNeighbors
+            type: string?
+            doc: The sklearn metric string to pass to NearestNeighbors. Defaults to euclidean.
           distance_threshold:
             type: float
             doc: Spots whose codewords are more than this metric distance from an expected code are filtered
@@ -323,11 +332,11 @@ inputs:
             type: float
             doc: spots with intensity less than this value are filtered.
           min_area:
-            type: int
-            doc: Spots with total area less than this value are filtered
+            type: int?
+            doc: Spots with total area less than this value are filtered. Defaults to 2.
           max_area:
-            type: int
-            doc: Spots with total area greater than this value are filtered
+            type: int?
+            doc: Spots with total area greater than this value are filtered. Defaults to `np.inf`.
           norm_order:
             type: int?
             doc: Order of L_p norm to apply to intensities and codes when using metric_decode to pair each intensities to its closest target (default = 2)
@@ -377,6 +386,33 @@ inputs:
         masking_radius:
           type: int
           doc: Radius for white tophat noise filter
+    - type: record
+      name: density_based
+      fields:
+        nuclei_view:
+          type: string
+          doc: Name of the auxillary view with nuclei data
+        cyto_seg:
+          type: boolean
+          doc: If true, the cytoplasm will be segmented
+        correct_seg:
+          type: boolean
+          doc: If true, suspected nuclei/cytoplasms that overlap will be removed.
+        border_buffer:
+          type: int
+          doc: If not None, removes cytoplasms whose nuclei lie within the given distance from the border.
+        area_thresh:
+          type: float
+          doc: Threshold used when determining if an object is one nucleus or two or more overlapping nuclei. Objects whose ratio of convex hull area to normal area are above this threshold are removed if the option to remove overlapping nuclei is set.
+        thresh_block_size:
+          type: int
+          doc: Size of structuring element for local thresholding of nuclei. If nuclei interiors aren't passing threshold, increase this value, if too much non-nuclei is passing threshold, lower it.
+        watershed_footprint_size:
+          type: int
+          doc: Size of structuring element for watershed segmentation. Larger values will segment the nuclei into larger objects and smaller values will result in smaller objects. Adjust according to nucleus size.
+        label_exp_size:
+          type: int
+          doc:  Pixel size labels are dilated by in final step. Helpful for closing small holes that are common from thresholding but can also cause cell boundaries to exceed their true boundaries if set too high. Label dilation respects label borders and does not mix labels.
 
 # QC
   skip_baysor:
@@ -448,7 +484,7 @@ steps:
     in:
       datafile: parameter_json
       schema: read_schema/data
-    out: [skip_baysor, skip_processing]
+    out: [skip_baysor, skip_processing, register_aux_view]
     when: $(inputs.datafile != null)
 
   sorter:
@@ -716,8 +752,26 @@ steps:
       input_dir: spaceTxConversion/spaceTx_converted
       parameter_json: parameter_json
       clip_min: clip_min
+      clip_max: clip_max
       register_aux_view: register_aux_view
-      channels_per_reg: channels_per_reg
+      channels_per_reg:
+        source: [stagedSorted/aux_names, stagedSorted/aux_channel_count, stagedSorted/channel_count, register_aux_view, stage/register_aux_view]
+        valueFrom: |
+          ${
+            if(self[0] && self[1] && self[2]){
+              var name = "";
+              if(self[3]){
+                name = self[3];
+              } else {
+                name = self[4];
+              }
+              var aux_ind = self[0].indexOf(name);
+              var aux_count = self[1][aux_ind];
+              return Math.round(self[2] / aux_count)
+            } else {
+              return null;
+            }
+          }
       background_view: background_view
       anchor_view: anchor_view
       high_sigma: high_sigma
@@ -739,7 +793,10 @@ steps:
         pickValue: first_non_null
       parameter_json: parameter_json
       use_ref_img: use_ref_img
-      decoding: decoding
+      is_volume: is_volume
+      rescale: rescale
+      decoding_blob: decoding_blob
+      decoding_pixel: decoding_pixel
     out:
       [decoded]
 
@@ -791,7 +848,7 @@ steps:
         source: fov_positioning
         valueFrom: |
           ${
-            if(self['x_shape'] && self['y_shape'] && self['z_shape']){
+            if(self && 'x_shape' in self && 'y_shape' in self && 'z_shape' in self){
               return {
                 "x_size": self['x_shape'],
                 "y_size": self['y_shape'],
@@ -802,7 +859,7 @@ steps:
             }
           }
       has_spots:
-        source: decoding
+        source: decoding_blob
         valueFrom: |
           ${
             if(self) {

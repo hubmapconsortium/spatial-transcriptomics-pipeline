@@ -13,6 +13,7 @@ from datetime import datetime
 from functools import partial, partialmethod
 from os import cpu_count, makedirs, path
 from pathlib import Path
+from time import time
 
 import cv2
 import numpy as np
@@ -250,6 +251,7 @@ def cli(
     input_dir: Path,
     output_dir: Path,
     clip_min: float = 95,
+    clip_max: float = 99.9,
     aux_name: str = None,
     ch_per_reg: int = 1,
     background_name: str = None,
@@ -305,11 +307,14 @@ def cli(
 
     tqdm.__init__ = partialmethod(tqdm.__init__, disable=True)
 
+    t0 = time()
+
     exp = starfish.core.experiment.experiment.Experiment.from_json(
         str(input_dir / "experiment.json")
     )
     for fov in exp.keys():
         img = exp[fov].get_image("primary")
+        t1 = time()
         print("Fetched view " + fov)
         if aux_name:
             # If registration image is given calculate registration shifts for each image and apply them
@@ -317,41 +322,54 @@ def cli(
             print("\taligning to " + aux_name)
             img = register_primary(img, register, ch_per_reg)
 
+        anchor = None
+        if anchor_name:
+            anchor = exp[fov].get_image(anchor_name)
+            print("\tanchor image retrieved")
+
         if background_name:
             # If a background image is provided, subtract it from the primary image.
             bg = exp[fov].get_image(background_name)
             print("\tremoving existing backgound...")
             img = subtract_background(img, bg, register, 1)
+            if anchor_name:
+                print("\tremoving existing background from anchor image...")
+                anchor = subtract_background(anchor, bg, register, 1)
         else:
             # If no background image is provided, estimate background using a large morphological
             # opening to subtract from primary images
             print("\tremoving estimated background...")
             img = subtract_background_estimate(img, cpu_count())
+            if anchor_name:
+                print("\tremoving estimated background from anchor image...")
+                anchor = subtract_background(anchor, bg, register, 1)
 
         if high_sigma:
             # Remove cellular autofluorescence w/ gaussian high-pass filter
             print("\trunning high pass filter...")
             ghp = starfish.image.Filter.GaussianHighPass(sigma=high_sigma)
-            ghp.run(img, verbose=False, in_place=True)
+            # ghp.run(img, verbose=False, in_place=True)
+            ghp.run(img, verbose=False, in_place=True, n_processes=cpu_count())
 
         if decon_sigma:
             # Increase resolution by deconvolving w/ point spread function
             print("\tdeconvolving point spread function...")
             dpsf = starfish.image.Filter.DeconvolvePSF(num_iter=decon_iter, sigma=decon_sigma)
-            dpsf.run(img, verbose=False, in_place=True)
+            # dpsf.run(img, verbose=False, in_place=True)
+            dpsf.run(img, verbose=False, in_place=True, n_processes=cpu_count())
 
         if low_sigma:
             # Blur image with lowpass filter
             print("\trunning low pass filter...")
             glp = starfish.image.Filter.GaussianLowPass(sigma=low_sigma)
-            glp.run(img, verbose=False, in_place=True)
+            # glp.run(img, verbose=False, in_place=True)
+            glp.run(img, verbose=False, in_place=True, n_processes=cpu_count())
 
         if wth_rad:
             print("\trunning white tophat filter...")
             img = white_top_hat(img, wth_rad)
             if anchor_name:
                 print("\trunning white tophat filter on anchor image...")
-                anchor = exp[fov].get_image(anchor_name)
                 anchor = white_top_hat(anchor, wth_rad)
 
         if rolling_rad:
@@ -373,7 +391,7 @@ def cli(
         print("\tclip and scaling...")
         # Scale image, clipping all but the highest intensities to zero
         clip = starfish.image.Filter.ClipPercentileToZero(
-            p_min=clip_min, p_max=99.9, is_volume=True, level_method=Levels.SCALE_BY_CHUNK
+            p_min=clip_min, p_max=clip_max, is_volume=True, level_method=Levels.SCALE_BY_CHUNK
         )
         clip.run(img, in_place=True)
         if anchor_name:
@@ -393,8 +411,10 @@ def cli(
                 saveImg(output_dir, f"{view}-{fov}", anchor)
 
         print(f"View {fov} saved")
+        print(f"Time for {fov}: {time() - t1}")
 
     saveExp(input_dir, output_dir)
+    print(f"\n\nTotal time elapsed for processing: {time() - t0}")
 
 
 if __name__ == "__main__":
@@ -405,6 +425,7 @@ if __name__ == "__main__":
 
     p.add_argument("--input-dir", type=Path)
     p.add_argument("--clip-min", type=float, default=95)
+    p.add_argument("--clip-max", type=float, default=99.9)
     p.add_argument("--register-aux-view", type=str, nargs="?")
     p.add_argument("--ch-per-reg", type=int, nargs="?")
     p.add_argument("--background-view", type=str, nargs="?")
@@ -423,6 +444,7 @@ if __name__ == "__main__":
         input_dir=args.input_dir,
         output_dir=output_dir,
         clip_min=args.clip_min,
+        clip_max=args.clip_max,
         aux_name=args.register_aux_view,
         ch_per_reg=args.ch_per_reg,
         background_name=args.background_view,

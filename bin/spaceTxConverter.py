@@ -346,6 +346,7 @@ class AuxTileFetcher(TileFetcher):
             Variables to insert in file_format.  The following values are accepted:
                 - channel
                 - offset_channel (channel + channel_offset)
+                - input_channel (see img channel below)
                 - round
                 - offset_round (round + round_offset)
                 - fov
@@ -423,6 +424,7 @@ class AuxTileFetcher(TileFetcher):
         varTable = {
             "channel": ch_label,
             "offset_channel": ch_label + self.channel_offset,
+            "input_channel": int(int(self.slope * ch_label) + self.intercept),
             "round": round_label,
             "offset_round": round_label + self.round_offset,
             "fov": fov_id,

@@ -108,13 +108,16 @@ def reformatter(
                 }
                 for target in range(views):
                     if c < combined_channel_count[target]:
+                        varTable["input_channel"] = int(
+                            int(c * channel_slope[target]) + channel_intercept[target]
+                        )
                         file_path = path.join(
                             input_dir,
                             combined_file_format[target].format(
                                 *[varTable[arg] for arg in combined_file_vars[target]]
                             ),
                         )
-
+                        print(varTable)
                         img = skimage.io.imread(file_path)
                         # img_out = img
 

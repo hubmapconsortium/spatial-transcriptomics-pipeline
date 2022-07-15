@@ -1,16 +1,24 @@
 [
 	"use_ref_img?",
+	"is_volume?",
+	"rescale?",
 	{
 		"decoding":[
+			[],
 			[
 				"min_sigma?",
 				"max_sigma?",
 				"num_sigma?",
 				"threshold?",
-				"is_volume?",
 				"overlap?",
-				"decode_method",
+				"decode_method?",
 				"filtered_results?",
+				"metric?",
+				"distance_threshold?",
+				"magnitude_threshold?",
+				"min_area?",
+				"max_area?",
+				"norm_order?",
 				{
 					"decoder":[
 						[
@@ -39,14 +47,6 @@
 						]
 					]
 				}
-			],
-			[
-				"metric",
-				"distance_threshold",
-				"magnitude_threshold",
-				"min_area",
-				"max_area",
-				"norm_order?"
 			]
 		]
 	}
