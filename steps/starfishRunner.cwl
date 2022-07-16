@@ -33,117 +33,115 @@ inputs:
     doc: Whether to iteratively rescale images before running the decoder.
 
   decoding_blob:
-    type:
-      - 'null'
-      - type: record
-        name: blob
-        fields:
-          min_sigma:
-            type: float[]?
-            doc: Minimum sigma tuple to be passed to blob detector
-          max_sigma:
-            type: float[]?
-            doc: Maximum sigma tuple to be passed to blob detector
-          num_sigma:
-            type: int?
-            doc: The number of sigma values to be tested, passed to blob detector
-          threshold:
-            type: float?
-            doc: Threshold of blob detection
-          overlap:
-            type: float?
-            doc: Amount of overlap allowed between blobs, passed to blob detector
-          detector_method:
-            type: string?
-            doc: Name of the scikit-image spot detection method to use
-          decode_method:
-            type: string
-            doc: Method name for spot decoding. Refer to starfish documentation.
-          filtered_results:
-            type: boolean?
-            doc: Automatically remove genes that do not match a target and do not meet criteria.
-          decoder:
-            type:
-              - type: record
-                name: metric_distance
-                fields:
-                  trace_building_strategy:
-                    type: string
-                    doc: Which tracing strategy to use.  See starfish docs.
-                  max_distance:
-                    type: float
-                    doc: Maximum distance between spots.
-                  min_intensity:
-                    type: float
-                    doc: Minimum intensity of spots.
-                  metric:
-                    type: string?
-                    doc: Metric name to be used for determining distance.
-                  norm_order:
-                    type: int?
-                    doc: Refer to starfish documentation for metric_distance
-                  anchor_round:
-                    type: int?
-                    doc: Anchor round for comparison.
-                  search_radius:
-                    type: int?
-                    doc: Distance to search for matching spots.
-                  return_original_intensities:
-                    type: boolean?
-                    doc: Return original intensities instead of normalized ones.
-              - type: record
-                name: per_round_max
-                fields:
-                  trace_building_strategy:
-                    type: string
-                    doc: Which tracing strategy to use.  See starfish docs.
-                  anchor_round:
-                    type: int?
-                    doc: Round to refer to.  Required for nearest_neighbor.
-                  search_radius:
-                    type: int?
-                    doc: Distance to search for matching spots.
-              - type: record
-                name: check_all
-                fields:
-                  search_radius:
-                    type: int?
-                    doc: Distance to search for matching spots.
-                  error_rounds:
-                    type: int?
-                    doc: Maximum hamming distance a barcode can be from its target and still be uniquely identified.
-                  mode:
-                    type: string?
-                    doc: Accuracy mode to run in.  Can be 'high', 'med', or 'low'.
-                  physical_coords:
-                    type: boolean?
-                    doc: Whether to use physical coordinates or pixel coordinates 
+    - 'null'
+    - type: record
+      name: blob
+      fields:
+        min_sigma:
+          type: float[]?
+          doc: Minimum sigma tuple to be passed to blob detector
+        max_sigma:
+          type: float[]?
+          doc: Maximum sigma tuple to be passed to blob detector
+        num_sigma:
+          type: int?
+          doc: The number of sigma values to be tested, passed to blob detector
+        threshold:
+          type: float?
+          doc: Threshold of blob detection
+        overlap:
+          type: float?
+          doc: Amount of overlap allowed between blobs, passed to blob detector
+        detector_method:
+          type: string?
+          doc: Name of the scikit-image spot detection method to use
+        decode_method:
+          type: string
+          doc: Method name for spot decoding. Refer to starfish documentation.
+        filtered_results:
+          type: boolean?
+          doc: Automatically remove genes that do not match a target and do not meet criteria.
+        decoder:
+          type:
+            - type: record
+              name: metric_distance
+              fields:
+                trace_building_strategy:
+                  type: string
+                  doc: Which tracing strategy to use.  See starfish docs.
+                max_distance:
+                  type: float
+                  doc: Maximum distance between spots.
+                min_intensity:
+                  type: float
+                  doc: Minimum intensity of spots.
+                metric:
+                  type: string?
+                  doc: Metric name to be used for determining distance.
+                norm_order:
+                  type: int?
+                  doc: Refer to starfish documentation for metric_distance
+                anchor_round:
+                  type: int?
+                  doc: Anchor round for comparison.
+                search_radius:
+                  type: int?
+                  doc: Distance to search for matching spots.
+                return_original_intensities:
+                  type: boolean?
+                  doc: Return original intensities instead of normalized ones.
+            - type: record
+              name: per_round_max
+              fields:
+                trace_building_strategy:
+                  type: string
+                  doc: Which tracing strategy to use.  See starfish docs.
+                anchor_round:
+                  type: int?
+                  doc: Round to refer to.  Required for nearest_neighbor.
+                search_radius:
+                  type: int?
+                  doc: Distance to search for matching spots.
+            - type: record
+              name: check_all
+              fields:
+                search_radius:
+                  type: int?
+                  doc: Distance to search for matching spots.
+                error_rounds:
+                  type: int?
+                  doc: Maximum hamming distance a barcode can be from its target and still be uniquely identified.
+                mode:
+                  type: string?
+                  doc: Accuracy mode to run in.  Can be 'high', 'med', or 'low'.
+                physical_coords:
+                  type: boolean?
+                  doc: Whether to use physical coordinates or pixel coordinates 
 
 
   decoding_pixel:
-    type:
-      - 'null'
-      - type: record
-        name: pixel
-        fields:
-          metric:
-            type: string?
-            doc: The sklearn metric string to pass to NearestNeighbors. Defaults to 'euclidean'
-          distance_threshold:
-            type: float
-            doc: Spots whose codewords are more than this metric distance from an expected code are filtered
-          magnitude_threshold:
-            type: float
-            doc: spots with intensity less than this value are filtered.
-          min_area:
-            type: int?
-            doc: Spots with total area less than this value are filtered. Defaults to 2.
-          max_area:
-            type: int?
-            doc: Spots with total area greater than this value are filtered. Defaults to `np.inf`.
-          norm_order:
-            type: int?
-            doc: Order of L_p norm to apply to intensities and codes when using metric_decode to pair each intensities to its closest target (default = 2)
+    - 'null'
+    - type: record
+      name: pixel
+      fields:
+        metric:
+          type: string?
+          doc: The sklearn metric string to pass to NearestNeighbors. Defaults to 'euclidean'
+        distance_threshold:
+          type: float
+          doc: Spots whose codewords are more than this metric distance from an expected code are filtered
+        magnitude_threshold:
+          type: float
+          doc: spots with intensity less than this value are filtered.
+        min_area:
+          type: int?
+          doc: Spots with total area less than this value are filtered. Defaults to 2.
+        max_area:
+          type: int?
+          doc: Spots with total area greater than this value are filtered. Defaults to `np.inf`.
+        norm_order:
+          type: int?
+          doc: Order of L_p norm to apply to intensities and codes when using metric_decode to pair each intensities to its closest target (default = 2)
 
 outputs:
   decoded:
@@ -216,145 +214,143 @@ steps:
             prefix: --rescale
 
         decoding_blob:
-          type:
-            - 'null'
-            - type: record
-              name: blob
-              fields:
-                min_sigma:
-                  type: float[]?
-                  inputBinding:
-                    prefix: --min-sigma
-                max_sigma:
-                  type: float[]?
-                  inputBinding:
-                    prefix: --max-sigma
-                num_sigma:
-                  type: int?
-                  inputBinding:
-                    prefix: --num-sigma
-                threshold:
-                  type: float?
-                  inputBinding:
-                    prefix: --threshold
-                overlap:
-                  type: float?
-                  inputBinding:
-                    prefix: --overlap
-                detector_method:
-                  type: string?
-                  inputBinding:
-                    prefix: --detector-method
-                decode_method:
-                  type: string
-                  inputBinding:
-                    prefix: --decode-spots-method
-                filtered_results:
-                  type: boolean?
-                  inputBinding:
-                    prefix: --filtered-results
-                decoder:
-                  type:
-                    - type: record
-                      name: metric_distance
-                      fields:
-                        trace_building_strategy:
-                          type: string
-                          inputBinding:
-                            prefix: --trace-building-strategy
-                        max_distance:
-                          type: float
-                          inputBinding:
-                            prefix: --max-distance
-                        min_intensity:
-                          type: float
-                          inputBinding:
-                            prefix: --min-intensity
-                        metric:
-                          type: string?
-                          inputBinding:
-                            prefix: --metric
-                        norm_order:
-                          type: int?
-                          inputBinding:
-                            prefix: --norm-order
-                        anchor_round:
-                          type: int?
-                          inputBinding:
-                            prefix: --anchor-round
-                        search_radius:
-                          type: int?
-                          inputBinding:
-                            prefix: --search-radius
-                        return_original_intensities:
-                          type: boolean?
-                          inputBinding:
-                            prefix: --return-original-intensities
-                    - type: record
-                      name: per_round_max
-                      fields:
-                        trace_building_strategy:
-                          type: string
-                          inputBinding:
-                            prefix: --trace-building-strategy
-                        anchor_round:
-                          type: int?
-                          inputBinding:
-                            prefix: --anchor-round
-                        search_radius:
-                          type: int?
-                          inputBinding:
-                            prefix: --search-radius
-                    - type: record
-                      name: check_all
-                      fields:
-                        search_radius:
-                          type: int?
-                          inputBinding:
-                            prefix: --search-radius
-                        error_rounds:
-                          type: int?
-                          inputBinding:
-                            prefix: --error-rounds
-                        mode:
-                          type: string?
-                          inputBinding:
-                            prefix: --mode
-                        physical_coords:
-                          type: boolean?
-                          inputBinding:
-                            prefix: --physical-coords
+          - 'null'
+          - type: record
+            name: blob
+            fields:
+              min_sigma:
+                type: float[]?
+                inputBinding:
+                  prefix: --min-sigma
+              max_sigma:
+                type: float[]?
+                inputBinding:
+                  prefix: --max-sigma
+              num_sigma:
+                type: int?
+                inputBinding:
+                  prefix: --num-sigma
+              threshold:
+                type: float?
+                inputBinding:
+                  prefix: --threshold
+              overlap:
+                type: float?
+                inputBinding:
+                  prefix: --overlap
+              detector_method:
+                type: string?
+                inputBinding:
+                  prefix: --detector-method
+              decode_method:
+                type: string
+                inputBinding:
+                  prefix: --decode-spots-method
+              filtered_results:
+                type: boolean?
+                inputBinding:
+                  prefix: --filtered-results
+              decoder:
+                type:
+                  - type: record
+                    name: metric_distance
+                    fields:
+                      trace_building_strategy:
+                        type: string
+                        inputBinding:
+                          prefix: --trace-building-strategy
+                      max_distance:
+                        type: float
+                        inputBinding:
+                          prefix: --max-distance
+                      min_intensity:
+                        type: float
+                        inputBinding:
+                          prefix: --min-intensity
+                      metric:
+                        type: string?
+                        inputBinding:
+                          prefix: --metric
+                      norm_order:
+                        type: int?
+                        inputBinding:
+                          prefix: --norm-order
+                      anchor_round:
+                        type: int?
+                        inputBinding:
+                          prefix: --anchor-round
+                      search_radius:
+                        type: int?
+                        inputBinding:
+                          prefix: --search-radius
+                      return_original_intensities:
+                        type: boolean?
+                        inputBinding:
+                          prefix: --return-original-intensities
+                  - type: record
+                    name: per_round_max
+                    fields:
+                      trace_building_strategy:
+                        type: string
+                        inputBinding:
+                          prefix: --trace-building-strategy
+                      anchor_round:
+                        type: int?
+                        inputBinding:
+                          prefix: --anchor-round
+                      search_radius:
+                        type: int?
+                        inputBinding:
+                          prefix: --search-radius
+                  - type: record
+                    name: check_all
+                    fields:
+                      search_radius:
+                        type: int?
+                        inputBinding:
+                          prefix: --search-radius
+                      error_rounds:
+                        type: int?
+                        inputBinding:
+                          prefix: --error-rounds
+                      mode:
+                        type: string?
+                        inputBinding:
+                          prefix: --mode
+                      physical_coords:
+                        type: boolean?
+                        inputBinding:
+                          prefix: --physical-coords
 
         decoding_pixel:
-           type:
-             - 'null'
-             - type: record
-               name: pixel
-               fields:
-                 metric:
-                   type: string?
-                   inputBinding:
-                     prefix: --metric
-                 distance_threshold:
-                   type: float
-                   inputBinding:
-                     prefix: --distance-threshold
-                 magnitude_threshold:
-                   type: float
-                   inputBinding:
-                     prefix: --magnitude-threshold
-                 min_area:
-                   type: int?
-                   inputBinding:
-                     prefix: --min-area
-                 max_area:
-                   type: int?
-                   inputBinding:
-                     prefix: --max-area
-                 norm_order:
-                   type: int?
-                   inputBinding:
-                     prefix: --norm-order
+           - 'null'
+           - type: record
+             name: pixel
+             fields:
+               metric:
+                 type: string?
+                 inputBinding:
+                   prefix: --metric
+               distance_threshold:
+                 type: float
+                 inputBinding:
+                   prefix: --distance-threshold
+               magnitude_threshold:
+                 type: float
+                 inputBinding:
+                   prefix: --magnitude-threshold
+               min_area:
+                 type: int?
+                 inputBinding:
+                   prefix: --min-area
+               max_area:
+                 type: int?
+                 inputBinding:
+                   prefix: --max-area
+               norm_order:
+                 type: int?
+                 inputBinding:
+                   prefix: --norm-order
 
       outputs:
         decoded:
