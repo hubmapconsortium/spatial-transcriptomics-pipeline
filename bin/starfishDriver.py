@@ -127,7 +127,7 @@ def blobDriver(
     codebook: Codebook,
     blobRunnerKwargs: dict,
     decodeRunnerKwargs: dict,
-    output_dir: str,
+    output_name: str,
 ) -> Tuple[SpotFindingResults, DecodedIntensityTable]:
     """
     Method to handle the blob-based version of the detection and decoding steps.
@@ -171,7 +171,7 @@ def blobDriver(
     #    print(f"removed spots below threshold, now {blob.count_total_spots()} total spots")
     # blobs[fov] = blob
     if output_dir:
-        blob.save(output_dir + "spots/" + fov + "_")
+        blob.save(output_name)
         print("spots saved.")
     decoded = decodeRunner(blob, codebook, **decodeRunnerKwargs)
     return blob, decoded
@@ -607,8 +607,14 @@ def run(
             img = rescaleImage(img, experiment.codebook, pixelRunnerKwargs, pix_iter, is_volume)
 
         if blob_based:
+            output_name = f"{output_dir}spots/{fov}_"
             blobs, decoded = blobDriver(
-                img, ref_img, experiment.codebook, blobRunnerKwargs, decodeRunnerKwargs, output_dir
+                img,
+                ref_img,
+                experiment.codebook,
+                blobRunnerKwargs,
+                decodeRunnerKwargs,
+                output_name,
             )
             del blobs  # this is saved within the driver now
         else:
