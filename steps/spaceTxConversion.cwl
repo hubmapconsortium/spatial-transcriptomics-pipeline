@@ -191,7 +191,7 @@ steps:
 
       requirements:
         DockerRequirement:
-            dockerPull: docker.pkg.github.com/hubmapconsortium/spatial-transcriptomics-pipeline/starfish-custom:latest
+            dockerPull: ghcr.io/hubmapconsortium/spatial-transcriptomics-pipeline/starfish-custom:latest
       inputs:
           tiffs:
             type: Directory
