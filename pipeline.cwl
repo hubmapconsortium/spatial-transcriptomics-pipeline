@@ -232,6 +232,12 @@ inputs:
   decoding_blob:
     - 'null'
     - type: record
+      name: dummy
+      fields:
+        dummy:
+          type: string?
+          doc: Added to prevent cli parsing of the decoding_blob record.
+    - type: record
       name: blob
       fields:
         min_sigma:
@@ -317,6 +323,12 @@ inputs:
 
   decoding_pixel:
     - 'null'
+    - type: record
+      name: dummy
+      fields:
+        dummy:
+          type: string?
+          doc: Added to prevent cli parsing of decoding_pixel parameters.
     - type: record
       name: pixel
       fields:
