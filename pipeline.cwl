@@ -858,7 +858,10 @@ steps:
         source: fov_positioning
         valueFrom: |
           ${
-            if(self && 'x_shape' in self && 'y_shape' in self && 'z_shape' in self){
+            if(self &&
+               'x_shape' in self && self['x_shape'] != null &&
+               'y_shape' in self && self['y_shape'] != null &&
+               'z_shape' in self && self['z_shape'] != null){
               return {
                 "x_size": self['x_shape'],
                 "y_size": self['y_shape'],
