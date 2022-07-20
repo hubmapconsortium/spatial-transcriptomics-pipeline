@@ -177,207 +177,6 @@ def blobDriver(
     return blob, decoded
 
 
-def rescaleImage(
-    img: ImageStack, codebook: Codebook, pixelRunnerKwargs: dict, is_volume: bool
-) -> ImageStack:
-    """
-    Method to rescale image brightnesses, such as for MERFISH decoding.
-
-    Parameters
-    ----------
-    #TODO
-    """
-    tqdm.__init__ = partialmethod(tqdm.__init__, disable=True)
-    # Initialize scaling factors
-    og_img = deepcopy(img)
-    local_scale = init_scale(og_img)
-
-    # Optimize scaling factors
-    scaling_factors = deepcopy(local_scale)
-
-    mod_mean = 1
-    iters = 0
-
-    while mod_mean > 0.01:
-        scaling_mods = optimize_scale(img, scaling_factors, codebook, pixelRunnerKwargs, is_volume)
-
-        # Apply modifications to scaling_factors
-        for key in sorted(scaling_factors):
-            scaling_factors[key] = scaling_factors[key] * scaling_mods[key]
-
-        # Replace image with unscaled version
-        img = deepcopy(og_img)
-
-        # Update mod_mean and add to iteration number. If iters reaches 20 return current scaling factors
-        # and print message
-        mod_mean = np.mean(abs(np.array([x for x in scaling_mods.values()]) - 1))
-        iters += 1
-        if iters >= 20:
-            print(
-                "Scaling factors did not converge after 20 iterations. Returning initial estimate."
-            )
-            scaling_factors = deepcopy(local_scale)
-            break
-
-    return scaling_factors
-
-
-def init_scale(img):
-
-    # Initialize scaling factors for each image based on the relative positions of the 90th percentile
-    # of their intensity histograms.
-
-    # Build pixel histograms for each image
-    pixel_histos = dict()
-    for r in range(img.num_rounds):
-        for ch in range(img.num_chs):
-            data = deepcopy(img.xarray.data[r, ch])
-            data = np.rint(data * (2**16))
-            data[data == 2**16] = (2**16) - 1
-            hist = np.histogram(data, bins=range((2**16)))
-            pixel_histos[(r, ch)] = hist[0]
-
-    # Estimate scaling factors using cumulative distribution of each images intensities
-    local_scale = {}
-    for r in range(img.num_rounds):
-        for ch in range(img.num_chs):
-            cumsum = np.cumsum(pixel_histos[(r, ch)])
-            cumsum = cumsum / cumsum[-1]
-            diffs = np.abs(cumsum - 0.9)
-            local_scale[(r, ch)] = np.where(diffs == np.min(diffs))[0][0] + 1
-
-    # Normalize
-    scale_mean = np.mean([x for x in local_scale.values()])
-    for key in local_scale:
-        local_scale[key] /= scale_mean
-
-    return local_scale
-
-
-def optimize_scale(img, scaling_factors, codebook, volume=False, mag_thresh=0.1, dist_thresh=0.5):
-
-    """
-    Parameters:
-
-        img: Processed image.
-
-        scaling_factors: Current intensity scaling factors
-
-        codebook: Codebook object
-
-        volume: Boolean whether to scale the image as a 3D volume or as individual 2D tiles.
-
-        mag_thresh: magnitude_threshold parameter for PixelSpotDecoder.
-
-    """
-
-    # Apply scaling factors
-    for r in range(img.num_rounds):
-        for ch in range(img.num_chs):
-            img.xarray.data[r, ch] = img.xarray.data[r, ch] / scaling_factors[(r, ch)]
-
-    # Scale image
-    pmin = 0
-    pmax = 100
-    clip = starfish.image.Filter.ClipPercentileToZero(
-        p_min=pmin, p_max=pmax, is_volume=volume, level_method=Levels.SCALE_BY_IMAGE
-    )
-    clip.run(img, in_place=True)
-
-    # Decode image
-    psd = DetectPixels.PixelSpotDecoder(
-        codebook=codebook,
-        metric="euclidean",
-        norm_order=2,
-        distance_threshold=dist_thresh,
-        magnitude_threshold=mag_thresh,
-        min_area=2,
-        max_area=np.inf,
-    )
-
-    decoded_targets, prop_results = psd.run(img)
-    decoded_targets = decoded_targets.loc[decoded_targets[Features.PASSES_THRESHOLDS]]
-
-    # Calculate on-bit scaling factors for each bit
-    local_pixel_vector = []
-    for barcode in range(1, len(codebook) + 1):
-        idx = np.where(prop_results.decoded_image == barcode)
-        coords = [(idx[0][i], idx[1][i], idx[2][i]) for i in range(len(idx[0]))]
-        if len(coords) > 0:
-            local_traces = np.array([img.xarray.data[:, :, c[0], c[1], c[2]] for c in coords])
-            local_mean = np.mean(local_traces, axis=0)
-            local_pixel_vector.append(local_mean / np.linalg.norm(local_mean))
-            local_pixel_vector[-1] /= len(coords)
-    pixel_traces = np.array(local_pixel_vector)
-
-    # Normalize pixel traces by l2 norm
-    norms = np.linalg.norm(np.asarray(pixel_traces), axis=(1, 2))
-    for i in range(len(norms)):
-        pixel_traces[i] = pixel_traces[i] / norms[i]
-
-    # Calculate average pixel trace for each barcode and normalize
-    one_bit_int = np.mean(pixel_traces, axis=0)
-    one_bit_int = one_bit_int / np.mean(one_bit_int)
-
-    # Convert into dictionary with same keys as scaling_factors
-    scaling_mods = {}
-    for i in range(one_bit_int.shape[0]):
-        for j in range(one_bit_int.shape[1]):
-            scaling_mods[(i, j)] = one_bit_int[i, j]
-
-    return scaling_mods
-
-
-def scale_img(img, codebook, volume=False, mag_thresh=1e-4, dist_thresh=0.5, type=None):
-
-    # Initialize scaling factors
-    local_scale = init_scale(img)
-
-    # Optimize scaling factors until convergence
-    scaling_factors = deepcopy(local_scale)
-    og_img = deepcopy(img)
-    mod_mean = 1
-    iters = 0
-    while mod_mean > 0.01:
-
-        scaling_mods = optimize_scale(
-            img, scaling_factors, codebook, volume, mag_thresh, dist_thresh
-        )
-
-        # Apply modifications to scaling_factors
-        for key in sorted(scaling_factors):
-            scaling_factors[key] = scaling_factors[key] * scaling_mods[key]
-
-        # Replace image with unscaled version
-        img = deepcopy(og_img)
-
-        # Update mod_mean and add to iteration number. If iters reaches 20 return current scaling factors
-        # and print message
-        mod_mean = np.mean(abs(np.array([x for x in scaling_mods.values()]) - 1))
-        iters += 1
-        if iters >= 20:
-            print(
-                "Scaling factors did not converge after 20 iterations. Returning initial estimate."
-            )
-            scaling_factors = deepcopy(local_scale)
-            break
-
-    # Scale with final factors
-    for r in range(img.num_rounds):
-        for ch in range(img.num_chs):
-            img.xarray.data[r, ch] = img.xarray.data[r, ch] / scaling_factors[(r, ch)]
-
-    # Scale image
-    pmin = 0
-    pmax = 100
-    clip = starfish.image.Filter.ClipPercentileToZero(
-        p_min=pmin, p_max=pmax, is_volume=is_volume, level_method=Levels.SCALE_BY_IMAGE
-    )
-    clip.run(img, in_place=True)
-
-    return img
-
-
 def init_scale(img: ImageStack):
     # Initialize scaling factors for each image based on the relative positions of the 90th percentile
     # of their intensity histograms.
@@ -470,6 +269,58 @@ def optimize_scale(
         for j in range(one_bit_int.shape[1]):
             scaling_mods[(i, j)] = one_bit_int[i, j]
     return scaling_mods
+
+
+def scale_img(img, codebook, pixelRunnerKwargs: dict, is_volume: bool = False):
+    """
+    Main method for image rescaling. Takes a set of images and rescales them to get the best
+    pixel-based estimate.  Returns an ImageStack.
+    """
+
+    # Initialize scaling factors
+    local_scale = init_scale(img)
+
+    # Optimize scaling factors until convergence
+    scaling_factors = deepcopy(local_scale)
+    og_img = deepcopy(img)
+    mod_mean = 1
+    iters = 0
+    while mod_mean > 0.01:
+
+        scaling_mods = optimize_scale(img, scaling_factors, codebook, pixelRunnerKwargs, is_volume)
+
+        # Apply modifications to scaling_factors
+        for key in sorted(scaling_factors):
+            scaling_factors[key] = scaling_factors[key] * scaling_mods[key]
+
+        # Replace image with unscaled version
+        img = deepcopy(og_img)
+
+        # Update mod_mean and add to iteration number. If iters reaches 20 return current scaling factors
+        # and print message
+        mod_mean = np.mean(abs(np.array([x for x in scaling_mods.values()]) - 1))
+        iters += 1
+        if iters >= 20:
+            print(
+                "Scaling factors did not converge after 20 iterations. Returning initial estimate."
+            )
+            scaling_factors = deepcopy(local_scale)
+            break
+
+    # Scale with final factors
+    for r in range(img.num_rounds):
+        for ch in range(img.num_chs):
+            img.xarray.data[r, ch] = img.xarray.data[r, ch] / scaling_factors[(r, ch)]
+
+    # Scale image
+    pmin = 0
+    pmax = 100
+    clip = starfish.image.Filter.ClipPercentileToZero(
+        p_min=pmin, p_max=pmax, is_volume=is_volume, level_method=Levels.SCALE_BY_IMAGE
+    )
+    clip.run(img, in_place=True)
+
+    return img
 
 
 def pixelDriver(
@@ -604,7 +455,7 @@ def run(
             ref_img = img.reduce({Axes.CH, Axes.ROUND, Axes.ZPLANE}, func="max")
 
         if rescale:
-            img = rescaleImage(img, experiment.codebook, pixelRunnerKwargs, pix_iter, is_volume)
+            img = scale_img(img, experiment.codebook, pixelRunnerKwargs, is_volume)
 
         if blob_based:
             output_name = f"{output_dir}spots/{fov}_"

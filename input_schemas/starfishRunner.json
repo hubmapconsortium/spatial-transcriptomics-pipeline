@@ -4,7 +4,6 @@
 	"rescale?",
 	{
 		"decoding":[
-			[],
 			[
 				"min_sigma?",
 				"max_sigma?",

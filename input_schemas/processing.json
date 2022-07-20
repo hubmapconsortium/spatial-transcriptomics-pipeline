@@ -15,8 +15,10 @@
 	"channel_count",
 	{
 		"aux_tilesets":[
-			"aux_names?",
-			"aux_channel_count?"
+			[
+				"aux_names?",
+				"aux_channel_count?"
+			]
 		]
 	}
 ]
