@@ -22,13 +22,17 @@ inputs:
     type: float?
     doc: Pixels below this percentile are set to 0.
 
+  clip_max:
+    type: float?
+    doc: Pixels above this percentile are set to 1.
+
   register_aux_view:
     type: string?
     doc: The name of the auxillary view to be used for image registration.
 
   channels_per_reg:
     type: int?
-    doc: The number of images associated with each channel in the registration image.
+    doc: The number of images associated with each channel in the registration image.  Will be calculated from aux view if provided through parameter_json, otherwise defaults to one.
 
   background_view:
     type: string?
@@ -80,7 +84,7 @@ steps:
 
       requirements:
         DockerRequirement:
-          dockerPull: docker.pkg.github.com/hubmapconsortium/spatial-transcriptomics-pipeline/starfish-custom:2.05
+          dockerPull: ghcr.io/hubmapconsortium/spatial-transcriptomics-pipeline/starfish-custom:latest
 
       inputs:
         schema:
@@ -102,7 +106,7 @@ steps:
     in:
       datafile: parameter_json
       schema: read_schema/data
-    out: [clip_min, register_aux_view, channels_per_reg, background_view, anchor_view, high_sigma, deconvolve_iter, deconvolve_sigma, low_sigma, rolling_radius, match_histogram, tophat_radius]
+    out: [clip_min, clip_max, register_aux_view, channels_per_reg, background_view, anchor_view, high_sigma, deconvolve_iter, deconvolve_sigma, low_sigma, rolling_radius, match_histogram, tophat_radius, channel_count, aux_tilesets_aux_names, aux_tilesets_aux_channel_count]
     when: $(inputs.datafile != null)
 
   execute_processing:
@@ -112,7 +116,7 @@ steps:
 
       requirements:
         DockerRequirement:
-            dockerPull: docker.pkg.github.com/hubmapconsortium/spatial-transcriptomics-pipeline/starfish-custom:2.05
+            dockerPull: ghcr.io/hubmapconsortium/spatial-transcriptomics-pipeline/starfish-custom:latest
 
       inputs:
         input_dir:
@@ -126,6 +130,12 @@ steps:
           inputBinding:
             prefix: --clip-min
           doc: Pixels below this percentile are set to 0. Defaults to 95.
+
+        clip_max:
+          type: float?
+          inputBinding:
+            prefix: --clip-max
+          doc: Pixels above this percentile are set to 1. Defaults to 99.9.
 
         register_aux_view:
           type: string?
@@ -212,6 +222,18 @@ steps:
               return null;
             }
           }
+      clip_max:
+        source: [stage_processing/clip_max, clip_max]
+        valueFrom: |
+          ${
+            if(self[0]){
+              return self[0];
+            } else if(self[1]) {
+              return self[1];
+            } else {
+              return null;
+            }
+          }
       register_aux_view:
         source: [stage_processing/register_aux_view, register_aux_view]
         valueFrom: |
@@ -225,13 +247,23 @@ steps:
             }
           }
       channels_per_reg:
-        source: [stage_processing/channels_per_reg, channels_per_reg]
+        source: [stage_processing/channels_per_reg, channels_per_reg, stage_processing/channel_count, stage_processing/register_aux_view, register_aux_view, stage_processing/aux_tilesets_aux_names, stage_processing/aux_tilesets_aux_channel_count]
         valueFrom: |
           ${
-            if(self[0]){
-              return self[0];
-            } else if(self[1]) {
+            if (self[1]){
               return self[1];
+            } else if (self[2] && self[5] && self[6]) {
+              var name = "";
+              if(self[3]){
+                name = self[3];
+              } else {
+                name = self[4];
+              }
+              var aux_ind = self[5].indexOf(name);
+              var aux_count = self[6][aux_ind];
+              return Math.round(self[2] / aux_count);
+            } else if(self[0]){
+              return self[0];
             } else {
               return null;
             }

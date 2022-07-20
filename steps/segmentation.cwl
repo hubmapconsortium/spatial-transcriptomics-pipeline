@@ -68,6 +68,33 @@ inputs:
         masking_radius:
           type: int
           doc: Radius for white tophat noise filter
+    - type: record
+      name: density_based
+      fields:
+        nuclei_view:
+          type: string
+          doc: Name of the auxillary view with nuclei data
+        cyto_seg:
+          type: boolean
+          doc: If true, the cytoplasm will be segmented
+        correct_seg:
+          type: boolean
+          doc: If true, suspected nuclei/cytoplasms that overlap will be removed.
+        border_buffer:
+          type: int
+          doc: If not None, removes cytoplasms whose nuclei lie within the given distance from the border.
+        area_thresh:
+          type: float
+          doc: Threshold used when determining if an object is one nucleus or two or more overlapping nuclei. Objects whose ratio of convex hull area to normal area are above this threshold are removed if the option to remove overlapping nuclei is set.
+        thresh_block_size:
+          type: int
+          doc: Size of structuring element for local thresholding of nuclei. If nuclei interiors aren't passing threshold, increase this value, if too much non-nuclei is passing threshold, lower it.
+        watershed_footprint_size:
+          type: int
+          doc: Size of structuring element for watershed segmentation. Larger values will segment the nuclei into larger objects and smaller values will result in smaller objects. Adjust according to nucleus size.
+        label_exp_size:
+          type: int
+          doc:  Pixel size labels are dilated by in final step. Helpful for closing small holes that are common from thresholding but can also cause cell boundaries to exceed their true boundaries if set too high. Label dilation respects label borders and does not mix labels.
 
 outputs:
   segmented:
@@ -82,7 +109,7 @@ steps:
 
       requirements:
         DockerRequirement:
-          dockerPull: docker.pkg.github.com/hubmapconsortium/spatial-transcriptomics-pipeline/starfish-custom:2.05
+          dockerPull: ghcr.io/hubmapconsortium/spatial-transcriptomics-pipeline/starfish-custom:latest
 
       inputs:
         schema:
@@ -104,7 +131,7 @@ steps:
     in:
       datafile: parameter_json
       schema: read_schema/data
-    out: [aux_name, fov_count, binary_mask_img_threshold, binary_mask_min_dist, binary_mask_min_allowed_size, binary_mask_max_allowed_size, binary_mask_masking_radius]
+    out: [aux_name, fov_count, binary_mask_img_threshold, binary_mask_min_dist, binary_mask_min_allowed_size, binary_mask_max_allowed_size, binary_mask_masking_radius, binary_mask_nuclei_view, binary_mask_cyto_seg, binary_mask_correct_seg, binary_mask_border_buffer, binary_mask_area_thresh, binary_mask_thresh_block_size, binary_mask_watershed_footprint_size, binary_mask_label_exp_size]
     when: $(inputs.datafile != null)
   execute_segmentation:
     run:
@@ -113,7 +140,7 @@ steps:
 
       requirements:
         DockerRequirement:
-          dockerPull: docker.pkg.github.com/hubmapconsortium/spatial-transcriptomics-pipeline/starfish-custom:2.05
+          dockerPull: ghcr.io/hubmapconsortium/spatial-transcriptomics-pipeline/starfish-custom:latest
 
       inputs:
         decoded_loc:
@@ -183,6 +210,41 @@ steps:
                   type: int
                   inputBinding:
                     prefix: --masking-radius
+            - type: record
+              name: density_based
+              fields:
+                nuclei_view:
+                  type: string
+                  inputBinding:
+                    prefix: --nuclei-view
+                cyto_seg:
+                  type: boolean
+                  inputBinding:
+                    prefix: --cyto-seg
+                correct_seg:
+                  type: boolean
+                  inputBinding:
+                    prefix: --correct-seg
+                border_buffer:
+                  type: int
+                  inputBinding:
+                    prefix: --border-buffer
+                area_thresh:
+                  type: float
+                  inputBinding:
+                    prefix: --area-thresh
+                thresh_block_size:
+                  type: int
+                  inputBinding:
+                    prefix: --thresh-block-size
+                watershed_footprint_size:
+                  type: int
+                  inputBinding:
+                    prefix: --watershed-footprint-size
+                label_exp_size:
+                  type: int
+                  inputBinding:
+                    prefix: --label-exp-size
 
       outputs:
         segmented:
@@ -200,18 +262,27 @@ steps:
         source: [stage_segmentation/fov_count, fov_count]
         pickValue: first_non_null
       binary_mask:
-        source: [binary_mask, stage_segmentation/binary_mask_img_threshold, stage_segmentation/binary_mask_min_dist, stage_segmentation/binary_mask_min_allowed_size, stage_segmentation/binary_mask_max_allowed_size, stage_segmentation/binary_mask_masking_radius]
+        source: [binary_mask, stage_segmentation/binary_mask_img_threshold, stage_segmentation/binary_mask_min_dist, stage_segmentation/binary_mask_min_allowed_size, stage_segmentation/binary_mask_max_allowed_size, stage_segmentation/binary_mask_masking_radius, stage_segmentation/binary_mask_nuclei_view, stage_segmentation/binary_mask_cyto_seg, stage_segmentation/binary_mask_correct_seg, stage_segmentation/binary_mask_border_buffer, stage_segmentation/binary_mask_area_thresh, stage_segmentation/binary_mask_thresh_block_size, stage_segmentation/binary_mask_watershed_footprint_size, stage_segmentation/binary_mask_label_exp_size]
         valueFrom: |
           ${
-            if(!self[1]){
+            if(!self[1] && !self[6]){
               return self[0]
-            } else {
+            } else if(self[1]){
               return {
                 "img_threshold": self[1],
                 "min_dist": self[2],
                 "min_allowed_size": self[3],
                 "max_allowed_size": self[4],
                 "masking_radius": self[5]
+              };
+            } else {
+              return {
+                "nuclei_view": self[6],
+                "cyto_seg": self[7],
+                "correct_seg": self[8],
+                "border_buffer": self[9],
+                "area_thresh": self[10],
+                "thresh_block_size": self[11]
               };
             }
           }

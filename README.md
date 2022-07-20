@@ -98,10 +98,29 @@ The following variables describe the structure of auxillary views, if any are pr
 The following are used in `processing.cwl` for basic image formatting.  Alternatively, if `skip_processing` is set to `True`, this step will be skipped.
 - `clip_min` *float*
   Pixels with brightness below this percentile are set to zero. Defaults to 95.
-- `opening_size` *int*
-  Size of the morphological opening filter to be applied to the image. This will be treated as a ‘background’ and then dividing that out. Defaults to 10.
 - `register_aux_view` *string*
   The name of the auxiliary view to be used for image registration.  If not provided, no registration will happen.
+- `channels_per_reg` *int*
+  The number of images associated with each channel in the registration image. Defaults to 1.
+- `background_view` *string*
+  The name of the auxillary view to be used for background subtraction.  Background will be estimated if not provided.
+
+- `anchor_view` *string*
+  The name of the auxillary view to be processed in parallel with primary view, such as for anchor round in ISS processing. Will not be included if not provided.
+- `high_sigma` *int*
+  Sigma value for high pass gaussian filter. Will not be run if not provided.
+- `deconvolve_iter` *int*
+  Number of iterations to perform for deconvolution. High values remove more noise while lower values remove less. The value 15 will work for most datasets unless image is very noisy. Will not be run if not provided.
+- `deconvolve_sigma` *int*
+  Sigma value for deconvolution. Should be approximately the expected spot size. Must be provided if `deconvolve_iter` is provided.
+- `low_sigma` *int*
+  Sigma value for low pass gaussian filter. Will not be run if not provided.
+- `rolling_radius` *int*
+  Radius for rolling ball background subtraction. Larger values lead to increased intensity evening effect. The value of 3 will work for most datasets. Will not be run if not provided.
+- `match_histogram` *boolean*
+  If true, histograms will be equalized. Defaults to false.
+- `tophat_radius` *int*
+  Radius for white top hat filter. Should be slightly larger than the expected spot radius. Will not be run if not provided.
 
 ### Image Decoding
 The following are used in `starfishRunner.cwl`, which is effectively a wrapper for the starfish spot detection/decoding methods.

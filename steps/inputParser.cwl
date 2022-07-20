@@ -50,6 +50,7 @@ outputs:
   add_blanks: boolean
   skip_processing: boolean
   clip_min: float
+  clip_max: float
   register_aux_view: string
   channels_per_reg: int
   background_view: string
@@ -62,11 +63,12 @@ outputs:
   match_histogram: boolean
   tophat_radius: int
   use_ref_img: boolean
+  is_volume: boolean
+  rescale: boolean
   decoding_min_sigma: float[]
   decoding_max_sigma: float[]
   decoding_num_sigma: int
   decoding_threshold: float
-  decoding_is_volume: boolean
   decoding_overlap: float
   decoding_decode_method: string
   decoding_filtered_results: boolean
@@ -93,6 +95,14 @@ outputs:
   binary_mask_min_allowed_size: int
   binary_mask_max_allowed_size: int
   binary_mask_masking_radius: int
+  binary_mask_nuclei_view: string
+  binary_mask_cyto_seg: string
+  binary_mask_correct_seg: boolean
+  binary_mask_border_buffer: int
+  binary_mask_area_thresh: float
+  binary_mask_thresh_block_size: int
+  binary_mask_watershed_footprint_size: int
+  binary_mask_label_exp_size: int
   skip_baysor: boolean
   find_ripley: boolean
   save_pdf: boolean
@@ -116,7 +126,7 @@ expression: |
                 for(var i=0;i<items.length;i++){
                         var tally = 0.0;
                         for(var j=0;j<items[i].length;j++){
-                                if(items[i][j].length > 0){
+                                if(items[i][j].constructor != Object){
                                         var subkey = items[i][j].replace("?","");
                                         if(subkey in data){
                                                 tally++;
@@ -125,6 +135,15 @@ expression: |
                                         // all possible outputs from schema are accounted for,
                                         // even for non-selected schemas
                                         output_dict[key + "_" + subkey] = null;
+                                } else {
+                                        var sbk = Object.keys(items[i][j])[0];
+                                        for(var k=0;k<items[i][j][sbk].length; k++){
+                                                var sublis = items[i][j][sbk][k];
+                                                for(var m=0;m<sublis.length;m++){
+                                                        var cleaned = sublis[m].replace("?","");
+                                                        output_dict[key + "_" + sbk + "_" + cleaned] = null;
+                                                }
+                                        }
                                 }
                         }
                         var new_coverage = tally / items[i].length;
@@ -142,7 +161,7 @@ expression: |
                                 enforce_record(data[subkey], key+"_"+subkey, items[i][subkey], output_dict);
                         } else {
                                 // If not present, throw an error unless marked with "?"
-                                var item_comp = items[i].replace("?","")
+                                var item_comp = items[i].replace("?","");
                                 if(!(item_comp in data)){
                                         if(!items[i].includes("?")){
                                                 throw 'If '+key+' is defined, then all of '+items+' must be defined.';
@@ -164,7 +183,7 @@ expression: |
                 var lis = schema[i][key];
                 enforce_record(data[key], key, lis, values_dict);
            } else {
-                var sch = schema[i].replace("?","")
+                var sch = schema[i].replace("?","");
                 if(sch in data){
                      values_dict[sch] = data[sch];
                 } else {

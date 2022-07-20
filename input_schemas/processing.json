@@ -1,5 +1,6 @@
 [
 	"clip_min?",
+	"clip_max?",
 	"register_aux_view?",
 	"channels_per_reg?",
 	"background_view?",
@@ -10,5 +11,14 @@
 	"low_sigma?",
 	"rolling_radius?",
 	"match_histogram?",
-	"tophat_radius?"
+	"tophat_radius?",
+	"channel_count",
+	{
+		"aux_tilesets":[
+			[
+				"aux_names?",
+				"aux_channel_count?"
+			]
+		]
+	}
 ]
