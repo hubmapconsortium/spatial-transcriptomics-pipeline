@@ -159,7 +159,7 @@ steps:
 
       requirements:
         DockerRequirement:
-          dockerPull: ghcr.io/hubmapconsortium/spatial-transcriptomics-pipeline/starfish-custom:latest
+          dockerPull: hubmap/starfish-custom:latest
 
       inputs:
         schema:
@@ -191,7 +191,7 @@ steps:
 
       requirements:
         DockerRequirement:
-            dockerPull: ghcr.io/hubmapconsortium/spatial-transcriptomics-pipeline/starfish-custom:latest
+            dockerPull: hubmap/starfish-custom:latest
       inputs:
           tiffs:
             type: Directory
