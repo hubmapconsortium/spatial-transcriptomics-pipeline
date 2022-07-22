@@ -291,7 +291,9 @@ steps:
                 "correct_seg": self[8],
                 "border_buffer": self[9],
                 "area_thresh": self[10],
-                "thresh_block_size": self[11]
+                "thresh_block_size": self[11],
+                "watershed_footprint_size": self[12],
+                "label_exp_size": self[13]
               };
             }
           }
