@@ -612,12 +612,6 @@ def run(
     )
     print("loaded " + str(exp_loc / "experiment.json"))
 
-    img_stack = []
-    for key in exp.keys():
-        print("looking at " + key + ", " + aux_name)
-        cur_img = exp[key].get_image(aux_name)
-        img_stack.append(cur_img)
-
     # IF WE'RE DOING DENSITY BASED, THAT's DIFFERENT'
     if "nuclei_view" in densityKwargs:
         nuclei_imgs = {}
@@ -643,6 +637,11 @@ def run(
             print("saved fov key: {}, index {}".format(keys[i], i))
 
     else:
+        img_stack = []
+        for key in exp.keys():
+            print("looking at " + key + ", " + aux_name)
+            cur_img = exp[key].get_image(aux_name)
+            img_stack.append(cur_img)
         # determine how we generate mask, then make it
         if len(roiKwargs.keys()) > 0:
             # then apply roi
@@ -712,7 +711,7 @@ if __name__ == "__main__":
     p.add_argument("--decoded-loc", type=Path)
     p.add_argument("--fov-count", type=int)
     p.add_argument("--exp-loc", type=Path)
-    p.add_argument("--aux-name", type=str)
+    p.add_argument("--aux-name", type=str, nargs="?")
 
     # for importing roi set
     p.add_argument("--roi-set", type=Path, nargs="?")

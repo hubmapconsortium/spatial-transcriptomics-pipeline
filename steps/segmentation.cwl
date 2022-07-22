@@ -154,7 +154,7 @@ steps:
             prefix: --exp-loc
 
         aux_name:
-          type: string
+          type: string?
           inputBinding:
             prefix: --aux-name
 
@@ -257,7 +257,16 @@ steps:
       exp_loc: exp_loc
       aux_name:
         source: [stage_segmentation/aux_name, aux_name]
-        pickValue: first_non_null
+        valueFrom: |
+          ${
+            if(self[0]){
+              return self[0];
+            } else if (self[1]){
+              return self[1];
+            } else {
+              return null;
+            }
+          }
       fov_count:
         source: [stage_segmentation/fov_count, fov_count]
         pickValue: first_non_null
