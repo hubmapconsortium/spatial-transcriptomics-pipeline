@@ -25,6 +25,7 @@
 	},
 	{
 		"fov_positioning":[
+			[],
 			[
 				"x_locs?",
 				"x_shape?",

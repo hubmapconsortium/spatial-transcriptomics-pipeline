@@ -445,7 +445,7 @@ def segmentByDensity(
     border_buffer=None,
     area_thresh=1.05,
     thresh_block_size=51,
-    wtshd_ftprnt_size=100,
+    watershed_footprint_size=100,
     label_exp_size=20,
 ):
 
@@ -496,7 +496,7 @@ def segmentByDensity(
         border_buffer=border_buffer,
         area_thresh=area_thresh,
         thresh_block_size=thresh_block_size,
-        wtshd_ftprnt_size=wtshd_ftprnt_size,
+        wtshd_ftprnt_size=watershed_footprint_size,
     )
     # Segment cytoplasm if specifed, returns two objects like previous function, cytoplasms with non-overlapping
     # nuclei and all cytoplasms (minus border if border_buffer is set).
@@ -613,28 +613,22 @@ def run(
     print("loaded " + str(exp_loc / "experiment.json"))
 
     # IF WE'RE DOING DENSITY BASED, THAT's DIFFERENT'
+    # TODO: rearrange this to be more memory efficient by only loading in one image at a time.
     if "nuclei_view" in densityKwargs:
         nuclei_imgs = {}
         for key in exp.keys():
             nuclei_imgs[key] = exp[key].get_image(densityKwargs["nuclei_view"])
         del densityKwargs["nuclei_view"]
-        results = {}
         for i in range(len(keys)):
             print(f"Segmenting {keys[i]}")
-            results = segmentByDensity(
+            raw_mask = segmentByDensity(
                 nuclei=nuclei_imgs[keys[i]], decoded_targets=results[i], **densityKwargs
             )
-
-            results.to_decoded_dataframe().save_csv(output_dir + keys[i] + "/segmentation.csv")
-            results.to_netcdf(output_dir + keys[i] + "/df_segmented.cdf")
-            results.to_expression_matrix().to_pandas().to_csv(
-                output_dir + keys[i] + "/exp_segmented.csv"
+            maskname = f"{output_dir}/{keys[i]}/mask.tiff"
+            skimage.io.imsave(maskname, raw_mask)
+            masks.append(
+                BinaryMaskCollection.from_external_labeled_image(maskname, nuclei_imgs[keys[i]])
             )
-            results.to_expression_matrix().save(output_dir + keys[i] + "/exp_segmented.cdf")
-            results.to_expression_matrix().save_anndata(
-                output_dir + keys[i] + "/exp_segmented.h5ad"
-            )
-            print("saved fov key: {}, index {}".format(keys[i], i))
 
     else:
         img_stack = []
@@ -667,33 +661,31 @@ def run(
             binmask = binmask > 0
             PIL.Image.fromarray(binmask).save("{}/{}/mask.tiff".format(output_dir, keys[i]))
 
-        # apply mask to tables, save results
-        al = AssignTargets.Label()
-        for i in range(fov_count):
-            labeled = al.run(masks[i], results[i])
-            # labeled = labeled[labeled.cell_id != "nan"]
-            if "xc" not in labeled.features.coords:
-                temp = labeled.to_dict()
-                temp["coords"]["xc"] = temp["coords"]["x"]
-                labeled = DecodedIntensityTable.from_dict(temp)
-            if "yc" not in labeled.features.coords:
-                temp = labeled.to_dict()
-                temp["coords"]["yc"] = temp["coords"]["y"]
-                labeled = DecodedIntensityTable.from_dict(temp)
-            if "zc" not in labeled.features.coords:
-                temp = labeled.to_dict()
-                temp["coords"]["zc"] = temp["coords"]["z"]
-                labeled = DecodedIntensityTable.from_dict(temp)
-            labeled.to_decoded_dataframe().save_csv(output_dir + keys[i] + "/segmentation.csv")
-            labeled.to_netcdf(output_dir + keys[i] + "/df_segmented.cdf")
-            labeled.to_expression_matrix().to_pandas().to_csv(
-                output_dir + keys[i] + "/exp_segmented.csv"
-            )
-            labeled.to_expression_matrix().save(output_dir + keys[i] + "/exp_segmented.cdf")
-            labeled.to_expression_matrix().save_anndata(
-                output_dir + keys[i] + "/exp_segmented.h5ad"
-            )
-            print("saved fov key: {}, index {}".format(keys[i], i))
+    # apply mask to tables, save results
+    al = AssignTargets.Label()
+    for i in range(fov_count):
+        labeled = al.run(masks[i], results[i])
+        # labeled = labeled[labeled.cell_id != "nan"]
+        if "xc" not in labeled.features.coords:
+            temp = labeled.to_dict()
+            temp["coords"]["xc"] = temp["coords"]["x"]
+            labeled = DecodedIntensityTable.from_dict(temp)
+        if "yc" not in labeled.features.coords:
+            temp = labeled.to_dict()
+            temp["coords"]["yc"] = temp["coords"]["y"]
+            labeled = DecodedIntensityTable.from_dict(temp)
+        if "zc" not in labeled.features.coords:
+            temp = labeled.to_dict()
+            temp["coords"]["zc"] = temp["coords"]["z"]
+            labeled = DecodedIntensityTable.from_dict(temp)
+        labeled.to_decoded_dataframe().save_csv(output_dir + keys[i] + "/segmentation.csv")
+        labeled.to_netcdf(output_dir + keys[i] + "/df_segmented.cdf")
+        labeled.to_expression_matrix().to_pandas().to_csv(
+            output_dir + keys[i] + "/exp_segmented.csv"
+        )
+        labeled.to_expression_matrix().save(output_dir + keys[i] + "/exp_segmented.cdf")
+        labeled.to_expression_matrix().save_anndata(output_dir + keys[i] + "/exp_segmented.h5ad")
+        print("saved fov key: {}, index {}".format(keys[i], i))
 
     sys.stdout = sys.__stdout__
 
