@@ -70,6 +70,10 @@ inputs:
     type: int?
     doc: Radius for white top hat filter. Should be slightly larger than the expected spot radius. Will not be run if not provided.
 
+  inline_log:
+    type: boolean?
+    doc: If true, log will be sent to stdout instead of a file.
+
 outputs:
   processed_exp:
     type: Directory
@@ -202,6 +206,12 @@ steps:
           inputBinding:
             prefix: --tophat-radius
           doc: Radius for white top hat filter. Should be slightly larger than the expected spot radius. Will not be run if not provided.
+
+        inline_log:
+          type: boolean?
+          inputBinding:
+            prefix: --inline-log
+          doc: If true, logs will be sent to stdout instead of a file.
 
       outputs:
         processed_exp:
@@ -376,5 +386,6 @@ steps:
               return null;
             }
           }
+      inline_log: inline_log
     out: [processed_exp]
 
