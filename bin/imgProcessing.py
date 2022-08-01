@@ -263,6 +263,7 @@ def cli(
     rolling_rad: int = None,
     match_hist: bool = False,
     wth_rad: int = None,
+    inline_log: bool = False,
 ):
     """
     clip_min: minimum value for ClipPercentileToZero
@@ -299,11 +300,12 @@ def cli(
     if not path.isdir(output_dir):
         makedirs(output_dir)
 
-    reporter = open(
-        path.join(output_dir, datetime.now().strftime("%Y%m%d_%H%M_img_processing.log")), "w"
-    )
-    sys.stdout = reporter
-    sys.stderr = reporter
+    if not inline_log:
+        reporter = open(
+            path.join(output_dir, datetime.now().strftime("%Y%m%d_%H%M_img_processing.log")), "w"
+        )
+        sys.stdout = reporter
+        sys.stderr = reporter
 
     tqdm.__init__ = partialmethod(tqdm.__init__, disable=True)
 
@@ -436,6 +438,7 @@ if __name__ == "__main__":
     p.add_argument("--low-sigma", type=int, nargs="?")
     p.add_argument("--rolling-radius", type=int, nargs="?")
     p.add_argument("--match-histogram", dest="match_histogram", action="store_true")
+    p.add_argument("--inline-log", dest="inline_log", action="store_true")
     p.add_argument("--tophat-radius", type=int, nargs="?")
 
     args = p.parse_args()
@@ -456,4 +459,5 @@ if __name__ == "__main__":
         rolling_rad=args.rolling_radius,
         match_hist=args.match_histogram,
         wth_rad=args.tophat_radius,
+        inline_log=args.inline_log,
     )
