@@ -10,8 +10,18 @@ requirements:
    - class: MultipleInputFeatureRequirement
 
 inputs:
+
+  codebook_exp:
+    type: Directory?
+    doc: Flattened codebook input, refer to record entry.
+
+  codebook_pkl:
+    type: File?
+    doc: Flattened codebook input, refer to record entry.
+
   codebook:
     type:
+      - 'null'
       - type: record
         name: pkl
         fields:
@@ -28,8 +38,21 @@ inputs:
     type: Directory?
     doc: The location of the output from the segmentation step, if it was performed.
 
+  data_pkl_spots:
+    type: File?
+    doc: Flattened data input, refer to record entry.
+
+  data_pkl_transcripts:
+    type: File?
+    doc: Flattened data input, refer to record entry.
+
+  data_exp:
+    type: Directory
+    doc: Flattened data input, refer to record entry.
+
   data:
     type:
+    - 'null'
     - type: record
       name: pkl
       fields:
@@ -61,6 +84,12 @@ inputs:
   imagesize:
     type:
       - 'null'
+      - type: record
+        name: dummy
+        fields:
+          dummy:
+            type: string?
+            doc: Added to prevent cli parsing of the fov_positioning record.
       - type: record
         fields:
           - name: x_size
@@ -218,7 +247,18 @@ steps:
           outputBinding:
             glob: "7_QC/"
     in:
-      codebook: codebook
+      codebook:
+        source: [codebook, codebook_exp, codebook_pkl]
+        valueFrom: |
+          ${
+            if(self[0]){
+              return self[0];
+            } else if(self[1]) {
+              return {exp: self[1]};
+            } else {
+              return {pkl: self[2]}
+            }
+          }
       segmentation_loc: segmentation_loc
       has_spots:
         source: [stage_qc/decoding_decode_method, has_spots]
@@ -230,7 +270,18 @@ steps:
                return false;
              }
           }
-      data: data
+      data:
+        source: [data, data_exp, data_pkl_spots, data_pkl_transcripts]
+        valueFrom: |
+          ${
+            if(self[0]){
+              return self[0];
+            } else if(self[1]) {
+              return {exp: self[1]};
+            } else {
+              return {pkl: {spots: self[2], transcripts: self[3]}};
+            }
+          }
       roi: roi
       imagesize:
         source: [imagesize, stage_qc/fov_positioning_x_shape, stage_qc/fov_positioning_y_shape, stage_qc/fov_positioning_z_shape]
