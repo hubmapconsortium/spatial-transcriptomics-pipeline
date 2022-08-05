@@ -38,7 +38,7 @@ def saveImg(loc: str, prefix: str, img: ImageStack):
         for c in range(img.num_chs):
             for z in range(img.num_zplanes):
                 tiff.imsave(
-                    "{}/{}-c{}-r{}-z{}.tiff".format(loc, prefix, c, r, z), img._data[r, c, z, :, :]
+                    "{}{}-c{}-r{}-z{}.tiff".format(loc, prefix, c, r, z), img._data[r, c, z, :, :]
                 )
 
 
@@ -249,7 +249,7 @@ def white_top_hat(img, wth_rad):
 
 def cli(
     input_dir: Path,
-    output_dir: Path,
+    output_dir: str,
     clip_min: float = 95,
     clip_max: float = 99.9,
     aux_name: str = None,
@@ -297,8 +297,8 @@ def cli(
 
     wth_rad: Radius for white top hat filter. Should be slightly larger than the expected spot radius.
     """
-    if not path.isdir(output_dir):
-        makedirs(output_dir)
+
+    os.makedirs(output_dir, exist_ok=True)
 
     if not inline_log:
         reporter = open(
@@ -421,7 +421,7 @@ def cli(
 
 if __name__ == "__main__":
 
-    output_dir = Path("3_processed")
+    output_dir = "3_processed/"
 
     p = ArgumentParser()
 

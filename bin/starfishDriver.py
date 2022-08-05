@@ -223,7 +223,6 @@ def optimize_scale(
         is_volume: Boolean whether to scale the image as a 3D volume or as individual 2D tiles.
         pixelRunnerKwargs: the parameters for running the decoder.
     """
-    tqdm.__init__ = partialmethod(tqdm.__init__, disable=True)
 
     # Apply scaling factors
     for r in range(img.num_rounds):
