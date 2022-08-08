@@ -47,7 +47,7 @@ inputs:
     doc: Flattened data input, refer to record entry.
 
   data_exp:
-    type: Directory
+    type: Directory?
     doc: Flattened data input, refer to record entry.
 
   data:
