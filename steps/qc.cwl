@@ -264,7 +264,7 @@ steps:
         source: [stage_qc/decoding_decode_method, has_spots]
         valueFrom: |
           ${
-             if(self[0] || self[1]){
+             if((self[0] && self[0].length) || self[1]){
                return true;
              } else {
                return false;
