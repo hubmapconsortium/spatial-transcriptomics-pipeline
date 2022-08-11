@@ -12,8 +12,11 @@
 		]
 	},
 	{
-		"decoding":[[
-			"decode_method"
-		]]
+		"decoding":[
+			[],
+			[
+				"decode_method"
+			]
+		]
 	}
 ]
