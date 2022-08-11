@@ -327,7 +327,7 @@ def getSpotChannelDist(spots, pdf=False):
         plt.bar(list(range(len(tally))), tally)
         plt.title("Spots per channel")
         plt.xlabel("Channel number")
-        plt.ylabel("Spot count")
+        plt.ylabel("Fraction of spots")
         pdf.savefig(fig)
         plt.close()
     return tally, std, skw
@@ -431,7 +431,7 @@ def getTranscriptChannelDist(transcripts, pdf=False):
         fig = plt.figure()
         plt.bar(range(len(counts)), counts)
         plt.title("Transcript source spot distribution across channels")
-        plt.ylabel("Spot count")
+        plt.ylabel("Fraction of spots")
         plt.xlabel("Channel ID")
 
         pdf.savefig(fig)
@@ -441,18 +441,31 @@ def getTranscriptChannelDist(transcripts, pdf=False):
 
 def getFPR(segmentation, pdf=False):
     # remove unassigned transcripts, if the columns to do so are present.
-    if "cell" in segmentation.keys():
-        transcripts = segmentation[segmentation["cell"] != "nan"]
-    elif "cell_id" in segmentation.keys():
-        transcripts = segmentation[segmentation["cell_id"] != "nan"]
 
-    blank_counts_full = segmentation[[col for col in segmentation.columns if "blank" in col]]
-    real_counts_full = segmentation[[col for col in segmentation.columns if "blank" not in col]]
+    # remove unassigned transcripts, if the columns to do so are present.
+    key = "cell"
+    if "cell_id" in segmentation.keys():
+        key = "cell_id"
 
-    real_per_cell_full = real_counts_full.sum(axis=1)
-    blank_per_cell_full = blank_counts_full.sum(axis=1)
-    sorted_reals_full = real_per_cell_full.sort_values(ascending=False)
-    sorted_blanks_full = blank_per_cell_full[sorted_reals_full.index]
+    segmentation = segmentation[segmentation[key].notnull()]
+
+    if len(segmentation) == 0:
+        return None
+
+    blank_counts_full = segmentation[segmentation["target"].str.contains("blank")]
+    real_counts_full = segmentation[~segmentation["target"].str.contains("blank")]
+
+    cell_count = int(real_counts_full[key].max())
+    real_per_cell_full = np.histogram(real_counts_full[key], bins=cell_count)[0]
+    blank_per_cell_full = np.histogram(blank_counts_full[key], bins=cell_count)[0]
+
+    sort_ind = np.argsort(real_per_cell_full)
+    sorted_reals_full = [
+        real_per_cell_full[sort_ind[len(sort_ind) - i - 1]] for i in range(len(sort_ind))
+    ]
+    sorted_blanks_full = [
+        blank_per_cell_full[sort_ind[len(sort_ind) - i - 1]] for i in range(len(sort_ind))
+    ]
 
     results = {
         "FP": sum(blank_per_cell_full),
@@ -583,7 +596,7 @@ def runFOV(
         trRes["per_cell"] = getTranscriptsPerCell(segmentation, pdf)
         trRes["FPR"] = getFPR(segmentation, pdf)
     trRes["density"] = getTranscriptDensity(transcripts, codebook)
-    if spots is not None:
+    if spots:
         trRes["fraction_spots_used"] = getFractionSpotsUsed(relevSpots, transcripts)
     trRes["round_dist"] = getTranscriptRoundDist(transcripts, pdf)
     trRes["channel_dist"] = getTranscriptChannelDist(transcripts, pdf)
@@ -758,5 +771,13 @@ if __name__ == "__main__":
         # reading in from experiment can have multiple FOVs
         fovs = [k for k in transcripts.keys()]
     run(
-        transcripts, codebook, size, fovs, spots, roi, segmentation, args.run_ripley, args.save_pdf
+        transcripts=transcripts,
+        codebook=codebook,
+        size=size,
+        fovs=fovs,
+        spots=spots,
+        segmask=roi,
+        segmentation=segmentation,
+        doRipley=args.run_ripley,
+        savePdf=args.save_pdf,
     )

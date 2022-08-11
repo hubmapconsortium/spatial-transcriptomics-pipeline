@@ -235,11 +235,13 @@ steps:
           type: boolean?
           inputBinding:
             prefix: --run-ripley
+          default: False
 
         save_pdf:
           type: boolean?
           inputBinding:
             prefix: --save-pdf
+          default: True
 
       outputs:
         qc_metrics:
