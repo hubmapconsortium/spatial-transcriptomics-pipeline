@@ -384,6 +384,7 @@ def run(
     experiment: Experiment,
     blob_based: bool,
     use_ref: bool,
+    anchor_name: str,
     rescale: bool,
     level_method: Levels,
     is_volume: bool,
@@ -404,6 +405,8 @@ def run(
         If true, use blob-detection and decoding methods. Else, use pixel-based methods.
     use_ref: bool
         If true, a reference image will be used and created by flattening the fov.
+    anchor_name: str
+        If provided, that aux view will be flattened and used as the reference image.
     rescale: bool
         If true, the image will be rescaled until convergence before running the decoder.
     blobRunnerKwargs: dict
@@ -455,6 +458,12 @@ def run(
         ref_img = None
         if use_ref:
             ref_img = img.reduce({Axes.CH, Axes.ROUND, Axes.ZPLANE}, func="max")
+        if anchor_name:
+            ref_img = (
+                experiment[fov]
+                .get_image(anchor_name)
+                .reduce({Axes.CH, Axes.ROUND, Axes.ZPLANE}, func="max")
+            )
 
         if rescale:
             img = scale_img(img, experiment.codebook, pixelRunnerKwargs, level_method, is_volume)
@@ -503,6 +512,7 @@ if __name__ == "__main__":
     p.add_argument("--is-volume", dest="is_volume", action="store_true")
     p.add_argument("--rescale", dest="rescale", action="store_true")
     p.add_argument("--level-method", type=str, nargs="?")
+    p.add_argument("--anchor-view", type=str, nargs="?")
 
     # blobRunner kwargs
     p.add_argument("--min-sigma", type=float, nargs="*")
@@ -649,6 +659,7 @@ if __name__ == "__main__":
     addKwarg(args, decodeRunnerKwargs, "return_original_intensities")
 
     use_ref = args.use_ref_img
+    anchor_name = args.anchor_view
     rescale = args.rescale
 
     level_method = args.level_method
@@ -668,6 +679,7 @@ if __name__ == "__main__":
         experiment,
         blob_based,
         use_ref,
+        anchor_name,
         rescale,
         level_method,
         vol,

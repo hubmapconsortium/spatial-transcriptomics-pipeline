@@ -809,6 +809,7 @@ steps:
         pickValue: first_non_null
       parameter_json: parameter_json
       use_ref_img: use_ref_img
+      anchor_view: anchor_view
       is_volume: is_volume
       rescale: rescale
       level_method: level_method

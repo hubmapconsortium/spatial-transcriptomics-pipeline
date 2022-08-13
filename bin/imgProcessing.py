@@ -415,6 +415,9 @@ def cli(
         clip.run(img, in_place=True)
         if anchor_name:
             print("\tapplying clip and scale to anchor image...")
+            clip = starfish.image.Filter.ClipPercentileToZero(
+                p_min=90, p_max=99.9, is_volume=is_volume, level_method=level_method
+            )
             clip.run(anchor, in_place=True)
 
         print(f"\tView {fov} complete")

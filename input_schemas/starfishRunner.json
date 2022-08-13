@@ -3,6 +3,7 @@
 	"is_volume?",
 	"rescale?",
 	"level_method?",
+	"anchor_name?",
 	{
 		"decoding":[
 			[
