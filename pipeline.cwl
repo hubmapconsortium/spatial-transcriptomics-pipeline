@@ -174,6 +174,10 @@ inputs:
     type: float?
     doc: Pixels above this percentile are set to 1.
 
+  level_method:
+    type: string?
+    doc: Levelling method for clip and scale application. Defaults to SCALE_BY_CHUNK.
+
   register_aux_view:
     type: string?
     doc: The name of the auxillary view to be used for image registration.
@@ -763,6 +767,7 @@ steps:
       parameter_json: parameter_json
       clip_min: clip_min
       clip_max: clip_max
+      level_method: level_method
       is_volume: is_volume
       register_aux_view: register_aux_view
       channels_per_reg:
@@ -806,6 +811,7 @@ steps:
       use_ref_img: use_ref_img
       is_volume: is_volume
       rescale: rescale
+      level_method: level_method
       decoding_blob: decoding_blob
       decoding_pixel: decoding_pixel
     out:

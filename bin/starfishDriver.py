@@ -270,7 +270,9 @@ def optimize_scale(
     return scaling_mods
 
 
-def scale_img(img, codebook, pixelRunnerKwargs: dict, is_volume: bool = False):
+def scale_img(
+    img, codebook, pixelRunnerKwargs: dict, level_method: Levels, is_volume: bool = False
+):
     """
     Main method for image rescaling. Takes a set of images and rescales them to get the best
     pixel-based estimate.  Returns an ImageStack.
@@ -315,7 +317,7 @@ def scale_img(img, codebook, pixelRunnerKwargs: dict, is_volume: bool = False):
     pmin = 0
     pmax = 100
     clip = starfish.image.Filter.ClipPercentileToZero(
-        p_min=pmin, p_max=pmax, is_volume=is_volume, level_method=Levels.SCALE_BY_IMAGE
+        p_min=pmin, p_max=pmax, is_volume=is_volume, level_method=level_method
     )
     clip.run(img, in_place=True)
 
@@ -383,6 +385,7 @@ def run(
     blob_based: bool,
     use_ref: bool,
     rescale: bool,
+    level_method: Levels,
     is_volume: bool,
     blobRunnerKwargs: dict,
     decodeRunnerKwargs: dict,
@@ -454,7 +457,7 @@ def run(
             ref_img = img.reduce({Axes.CH, Axes.ROUND, Axes.ZPLANE}, func="max")
 
         if rescale:
-            img = scale_img(img, experiment.codebook, pixelRunnerKwargs, is_volume)
+            img = scale_img(img, experiment.codebook, pixelRunnerKwargs, level_method, is_volume)
 
         if blob_based:
             output_name = f"{output_dir}spots/{fov}_"
@@ -499,6 +502,7 @@ if __name__ == "__main__":
     p.add_argument("--exp-loc", type=Path)
     p.add_argument("--is-volume", dest="is_volume", action="store_true")
     p.add_argument("--rescale", dest="rescale", action="store_true")
+    p.add_argument("--level-method", type=str, nargs="?")
 
     # blobRunner kwargs
     p.add_argument("--min-sigma", type=float, nargs="*")
@@ -647,12 +651,25 @@ if __name__ == "__main__":
     use_ref = args.use_ref_img
     rescale = args.rescale
 
+    level_method = args.level_method
+    if level_method == "SCALE_BY_CHUNK":
+        level_method = Levels.SCALE_BY_CHUNK
+    elif level_method == "SCALE_BY_IMAGE":
+        level_method = Levels.SCALE_BY_IMAGE
+    elif level_method == "SCALE_SATURATED_BY_CHUNK":
+        level_method = Levels.SCALE_SATURATED_BY_CHUNK
+    elif level_method == "SCALE_SATURATED_BY_IMAGE":
+        level_method = Levels.SCALE_SATURATED_BY_IMAGE
+    else:
+        level_method = Levels.SCALE_BY_CHUNK
+
     run(
         output_dir,
         experiment,
         blob_based,
         use_ref,
         rescale,
+        level_method,
         vol,
         blobRunnerKwargs,
         decodeRunnerKwargs,

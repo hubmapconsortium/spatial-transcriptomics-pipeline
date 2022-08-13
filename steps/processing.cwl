@@ -26,6 +26,10 @@ inputs:
     type: float?
     doc: Pixels above this percentile are set to 1.
 
+  level_method:
+    type: string?
+    doc: Levelling method for clip and scale application. Defaults to SCALE_BY_CHUNK.
+
   is_volume:
     type: boolean?
     doc: Whether to treat the zplanes as a 3D image.
@@ -114,7 +118,7 @@ steps:
     in:
       datafile: parameter_json
       schema: read_schema/data
-    out: [clip_min, clip_max, register_aux_view, channels_per_reg, background_view, anchor_view, high_sigma, deconvolve_iter, deconvolve_sigma, low_sigma, rolling_radius, match_histogram, tophat_radius, channel_count, aux_tilesets_aux_names, aux_tilesets_aux_channel_count, is_volume]
+    out: [clip_min, clip_max, level_method, register_aux_view, channels_per_reg, background_view, anchor_view, high_sigma, deconvolve_iter, deconvolve_sigma, low_sigma, rolling_radius, match_histogram, tophat_radius, channel_count, aux_tilesets_aux_names, aux_tilesets_aux_channel_count, is_volume]
     when: $(inputs.datafile != null)
 
   execute_processing:
@@ -144,6 +148,12 @@ steps:
           inputBinding:
             prefix: --clip-max
           doc: Pixels above this percentile are set to 1. Defaults to 99.9.
+
+        level_method:
+          type: string?
+          inputBinding:
+            prefix: --level-method
+          doc: Levelling method for clip and scale application. Defaults to SCALE_BY_CHUNK.
 
         is_volume:
           type: boolean?
@@ -244,6 +254,18 @@ steps:
           }
       clip_max:
         source: [stage_processing/clip_max, clip_max]
+        valueFrom: |
+          ${
+            if(self[0]){
+              return self[0];
+            } else if(self[1]) {
+              return self[1];
+            } else {
+              return null;
+            }
+          }
+      level_method:
+        source: [stage_processing/level_method, level_method]
         valueFrom: |
           ${
             if(self[0]){

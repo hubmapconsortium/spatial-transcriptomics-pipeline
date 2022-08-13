@@ -250,8 +250,9 @@ def white_top_hat(img, wth_rad):
 def cli(
     input_dir: Path,
     output_dir: str,
-    clip_min: float = 95,
+    clip_min: float = 0,
     clip_max: float = 99.9,
+    level_method: str = "",
     is_volume: bool = True,
     aux_name: str = None,
     ch_per_reg: int = 1,
@@ -270,6 +271,8 @@ def cli(
     clip_min: minimum value for ClipPercentileToZero
 
     is_volume: whether to treat the z-planes as a 3D image.
+
+    level_method: Which level method to be applied to the Clip filter.
 
     aux_name: name of the aux view to align registration to
 
@@ -311,6 +314,17 @@ def cli(
         sys.stderr = reporter
 
     tqdm.__init__ = partialmethod(tqdm.__init__, disable=True)
+
+    if level_method == "SCALE_BY_CHUNK":
+        level_method = Levels.SCALE_BY_CHUNK
+    elif level_method == "SCALE_BY_IMAGE":
+        level_method = Levels.SCALE_BY_IMAGE
+    elif level_method == "SCALE_SATURATED_BY_CHUNK":
+        level_method = Levels.SCALE_SATURATED_BY_CHUNK
+    elif level_method == "SCALE_SATURATED_BY_IMAGE":
+        level_method = Levels.SCALE_SATURATED_BY_IMAGE
+    else:
+        level_method = Levels.SCALE_BY_CHUNK
 
     t0 = time()
 
@@ -396,7 +410,7 @@ def cli(
         print("\tclip and scaling...")
         # Scale image, clipping all but the highest intensities to zero
         clip = starfish.image.Filter.ClipPercentileToZero(
-            p_min=clip_min, p_max=clip_max, is_volume=is_volume, level_method=Levels.SCALE_BY_CHUNK
+            p_min=clip_min, p_max=clip_max, is_volume=is_volume, level_method=level_method
         )
         clip.run(img, in_place=True)
         if anchor_name:
@@ -429,8 +443,9 @@ if __name__ == "__main__":
     p = ArgumentParser()
 
     p.add_argument("--input-dir", type=Path)
-    p.add_argument("--clip-min", type=float, default=95)
+    p.add_argument("--clip-min", type=float, default=0)
     p.add_argument("--clip-max", type=float, default=99.9)
+    p.add_argument("--level-method", type=str, nargs="?")
     p.add_argument("--is-volume", dest="is_volume", action="store_true")
     p.add_argument("--register-aux-view", type=str, nargs="?")
     p.add_argument("--ch-per-reg", type=int, nargs="?")
@@ -452,6 +467,7 @@ if __name__ == "__main__":
         output_dir=output_dir,
         clip_min=args.clip_min,
         clip_max=args.clip_max,
+        level_method=args.level_method,
         is_volume=args.is_volume,
         aux_name=args.register_aux_view,
         ch_per_reg=args.ch_per_reg,
