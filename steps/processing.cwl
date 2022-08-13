@@ -26,6 +26,10 @@ inputs:
     type: float?
     doc: Pixels above this percentile are set to 1.
 
+  is_volume:
+    type: boolean?
+    doc: Whether to treat the zplanes as a 3D image.
+
   register_aux_view:
     type: string?
     doc: The name of the auxillary view to be used for image registration.
@@ -110,7 +114,7 @@ steps:
     in:
       datafile: parameter_json
       schema: read_schema/data
-    out: [clip_min, clip_max, register_aux_view, channels_per_reg, background_view, anchor_view, high_sigma, deconvolve_iter, deconvolve_sigma, low_sigma, rolling_radius, match_histogram, tophat_radius, channel_count, aux_tilesets_aux_names, aux_tilesets_aux_channel_count]
+    out: [clip_min, clip_max, register_aux_view, channels_per_reg, background_view, anchor_view, high_sigma, deconvolve_iter, deconvolve_sigma, low_sigma, rolling_radius, match_histogram, tophat_radius, channel_count, aux_tilesets_aux_names, aux_tilesets_aux_channel_count, is_volume]
     when: $(inputs.datafile != null)
 
   execute_processing:
@@ -140,6 +144,12 @@ steps:
           inputBinding:
             prefix: --clip-max
           doc: Pixels above this percentile are set to 1. Defaults to 99.9.
+
+        is_volume:
+          type: boolean?
+          inputBinding:
+            prefix: --is-volume
+          doc: Whether to treat the zplanes as a 3D image.
 
         register_aux_view:
           type: string?
@@ -234,6 +244,18 @@ steps:
           }
       clip_max:
         source: [stage_processing/clip_max, clip_max]
+        valueFrom: |
+          ${
+            if(self[0]){
+              return self[0];
+            } else if(self[1]) {
+              return self[1];
+            } else {
+              return null;
+            }
+          }
+      is_volume:
+        source: [stage_processing/is_volume, is_volume]
         valueFrom: |
           ${
             if(self[0]){

@@ -1,6 +1,7 @@
 [
 	"clip_min?",
 	"clip_max?",
+	"is_volume?",
 	"register_aux_view?",
 	"channels_per_reg?",
 	"background_view?",

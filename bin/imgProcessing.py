@@ -252,6 +252,7 @@ def cli(
     output_dir: str,
     clip_min: float = 95,
     clip_max: float = 99.9,
+    is_volume: bool = True,
     aux_name: str = None,
     ch_per_reg: int = 1,
     background_name: str = None,
@@ -267,6 +268,8 @@ def cli(
 ):
     """
     clip_min: minimum value for ClipPercentileToZero
+
+    is_volume: whether to treat the z-planes as a 3D image.
 
     aux_name: name of the aux view to align registration to
 
@@ -393,7 +396,7 @@ def cli(
         print("\tclip and scaling...")
         # Scale image, clipping all but the highest intensities to zero
         clip = starfish.image.Filter.ClipPercentileToZero(
-            p_min=clip_min, p_max=clip_max, is_volume=True, level_method=Levels.SCALE_BY_CHUNK
+            p_min=clip_min, p_max=clip_max, is_volume=is_volume, level_method=Levels.SCALE_BY_CHUNK
         )
         clip.run(img, in_place=True)
         if anchor_name:
@@ -428,6 +431,7 @@ if __name__ == "__main__":
     p.add_argument("--input-dir", type=Path)
     p.add_argument("--clip-min", type=float, default=95)
     p.add_argument("--clip-max", type=float, default=99.9)
+    p.add_argument("--is-volume", dest="is_volume", action="store_true")
     p.add_argument("--register-aux-view", type=str, nargs="?")
     p.add_argument("--ch-per-reg", type=int, nargs="?")
     p.add_argument("--background-view", type=str, nargs="?")
@@ -448,6 +452,7 @@ if __name__ == "__main__":
         output_dir=output_dir,
         clip_min=args.clip_min,
         clip_max=args.clip_max,
+        is_volume=args.is_volume,
         aux_name=args.register_aux_view,
         ch_per_reg=args.ch_per_reg,
         background_name=args.background_view,

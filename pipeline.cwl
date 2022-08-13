@@ -763,6 +763,7 @@ steps:
       parameter_json: parameter_json
       clip_min: clip_min
       clip_max: clip_max
+      is_volume: is_volume
       register_aux_view: register_aux_view
       channels_per_reg:
         source: [stagedSorted/aux_names, stagedSorted/aux_channel_count, stagedSorted/channel_count, register_aux_view, stage/register_aux_view]
