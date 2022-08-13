@@ -373,6 +373,7 @@ def getTranscriptsPerCell(segmented, pdf=False):
         counts.append(len([x for x in cells if x == i]))
 
     counts.sort()
+    counts = np.flip(counts)
     q1, mid, q3 = np.percentile(counts, [25, 50, 75])
     iqr_scale = 1.5
 
@@ -388,6 +389,7 @@ def getTranscriptsPerCell(segmented, pdf=False):
         plt.axhline(y=mid + iqr_scale * (q3 - q1), dashes=(1, 1), color="gray")
         plt.title("Transcript count per cell")
         plt.ylabel("Transcript count")
+        plt.xlabel("Cells")
         plt.legend()
 
         pdf.savefig(fig)
@@ -455,7 +457,7 @@ def getFPR(segmentation, pdf=False):
     blank_counts_full = segmentation[segmentation["target"].str.contains("blank")]
     real_counts_full = segmentation[~segmentation["target"].str.contains("blank")]
 
-    cell_count = int(real_counts_full[key].max())
+    cell_count = int(real_counts_full[key].max()) + 1
     real_per_cell_full = np.histogram(real_counts_full[key], bins=cell_count)[0]
     blank_per_cell_full = np.histogram(blank_counts_full[key], bins=cell_count)[0]
 
@@ -479,16 +481,16 @@ def getFPR(segmentation, pdf=False):
         plt.bar(
             range(len(real_per_cell_full)),
             sorted_reals_full,
-            color="blue",
             width=1,
             label="On-target",
+            color=(0, 119 / 256, 187 / 256),
         )
         plt.bar(
             range(len(blank_per_cell_full)),
             sorted_blanks_full,
-            color="red",
             width=1,
             label="Off-target",
+            color=(204 / 256, 51 / 256, 17 / 256),
         )
         plt.plot(
             [0, len(real_per_cell_full)],
