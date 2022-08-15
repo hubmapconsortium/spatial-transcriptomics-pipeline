@@ -812,7 +812,6 @@ steps:
       anchor_view: anchor_view
       is_volume: is_volume
       rescale: rescale
-      level_method: level_method
       decoding_blob: decoding_blob
       decoding_pixel: decoding_pixel
     out:

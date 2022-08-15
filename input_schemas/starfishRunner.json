@@ -2,7 +2,7 @@
 	"use_ref_img?",
 	"is_volume?",
 	"rescale?",
-	"anchor_name?",
+	"anchor_view?",
 	{
 		"decoding":[
 			[
