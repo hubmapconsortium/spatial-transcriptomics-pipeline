@@ -36,10 +36,6 @@ inputs:
     type: boolean?
     doc: Whether to iteratively rescale images before running the decoder.
 
-  level_method:
-    type: string?
-    doc: Levelling method for clip and scale application. Defaults to SCALE_BY_CHUNK. Only matters if using rescaling.
-
   decoding_blob:
     - 'null'
     - type: record
@@ -199,7 +195,7 @@ steps:
     in:
       datafile: parameter_json
       schema: read_schema/data
-    out: [use_ref_img, is_volume, level_method, anchor_view, rescale, decoding_min_sigma, decoding_max_sigma, decoding_num_sigma, decoding_threshold, decoding_overlap, decoding_decode_method, decoding_filtered_results, decoding_decoder_trace_building_strategy, decoding_decoder_max_distance, decoding_decoder_min_intensity, decoding_decoder_metric, decoding_decoder_norm_order, decoding_decoder_anchor_round, decoding_decoder_search_radius, decoding_decoder_return_original_intensities, decoding_decoder_error_rounds, decoding_decoder_mode, decoding_decoder_physical_coords, decoding_metric, decoding_distance_threshold, decoding_magnitude_threshold, decoding_min_area, decoding_max_area, decoding_norm_order]
+    out: [use_ref_img, is_volume, anchor_view, rescale, decoding_min_sigma, decoding_max_sigma, decoding_num_sigma, decoding_threshold, decoding_overlap, decoding_decode_method, decoding_filtered_results, decoding_decoder_trace_building_strategy, decoding_decoder_max_distance, decoding_decoder_min_intensity, decoding_decoder_metric, decoding_decoder_norm_order, decoding_decoder_anchor_round, decoding_decoder_search_radius, decoding_decoder_return_original_intensities, decoding_decoder_error_rounds, decoding_decoder_mode, decoding_decoder_physical_coords, decoding_metric, decoding_distance_threshold, decoding_magnitude_threshold, decoding_min_area, decoding_max_area, decoding_norm_order]
     when: $(inputs.datafile != null)
 
   execute_runner:
@@ -421,13 +417,13 @@ steps:
             }
           }
       level_method:
-        source: [stage_runner/level_method, level_method]
+        source: [stage_runner/rescale, rescale]
         valueFrom: |
           ${
-            if(self[0]){
-              return self[0];
-            } else if(self[1]) {
-              return self[1];
+            if(self[0] || self[1]){
+              return "SCALE_BY_CHUNK";
+            } else if(self[0] === false || self[1] === false) {
+              return "SCALE_BY_IMAGE"
             } else {
               return null;
             }

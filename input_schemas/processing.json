@@ -2,6 +2,7 @@
 	"clip_min?",
 	"clip_max?",
 	"level_method?",
+	"rescale?",
 	"is_volume?",
 	"register_aux_view?",
 	"channels_per_reg?",
