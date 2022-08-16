@@ -16,6 +16,7 @@ from pathlib import Path
 from time import time
 
 import matplotlib.pyplot as plt
+import matplotlib.ticker as ticker
 import numpy as np
 import pandas as pd
 import starfish
@@ -296,7 +297,11 @@ def getSpotRoundDist(spots, pdf=False):
     skw = skew(tally)
 
     if pdf:
-        fig = plt.figure()
+        fig, ax = plt.subplots()
+
+        for axis in [ax.xaxis, ax.yaxis]:
+            axis.set_major_locator(ticker.MaxNLocator(integer=True))
+
         plt.bar(list(range(len(tally))), tally)
         plt.title("Spots per round")
         plt.xlabel("Round number")
@@ -305,7 +310,7 @@ def getSpotRoundDist(spots, pdf=False):
         pdf.savefig(fig)
         plt.close()
 
-    return tally, std, skw
+    return {"tally": tally, "stdev": std, "skew": skw}
 
 
 def getSpotChannelDist(spots, pdf=False):
@@ -323,14 +328,18 @@ def getSpotChannelDist(spots, pdf=False):
     skw = skew(tally)
 
     if pdf:
-        fig = plt.figure()
+        fig, ax = plt.subplots()
+
+        for axis in [ax.xaxis, ax.yaxis]:
+            axis.set_major_locator(ticker.MaxNLocator(integer=True))
+
         plt.bar(list(range(len(tally))), tally)
         plt.title("Spots per channel")
         plt.xlabel("Channel number")
         plt.ylabel("Fraction of spots")
         pdf.savefig(fig)
         plt.close()
-    return tally, std, skw
+    return {"tally": tally, "stdev": std, "skew": skw}
 
 
 def maskedSpatialDensity(masked, unmasked, imgsize, steps, pdf=False):
@@ -345,7 +354,7 @@ def maskedSpatialDensity(masked, unmasked, imgsize, steps, pdf=False):
     maskedPer = percentMoreClustered(maskedDens)[0]
     unmaskedPer = percentMoreClustered(unmaskedDens)[0]
 
-    return (unmaskedPer / maskedPer, unmaskedPer, maskedPer)
+    return {"ratio": unmaskedPer / maskedPer, "unmasked": unmaskedPer, "masked": maskedPer}
 
 
 # Transcript metrics
@@ -378,7 +387,11 @@ def getTranscriptsPerCell(segmented, pdf=False):
     iqr_scale = 1.5
 
     if pdf:
-        fig = plt.figure()
+        fig, ax = plt.subplots()
+
+        for axis in [ax.xaxis, ax.yaxis]:
+            axis.set_major_locator(ticker.MaxNLocator(integer=True))
+
         plt.bar(list(range(len(counts))), counts)
         plt.axhline(
             y=mid - iqr_scale * (q3 - q1), dashes=(1, 1), color="gray", label="Outlier Threshold"
@@ -394,7 +407,12 @@ def getTranscriptsPerCell(segmented, pdf=False):
 
         pdf.savefig(fig)
         plt.close()
-    return (counts, np.std(counts), skew(counts))
+    return {
+        "counts": counts,
+        "quartiles": (q1, mid, q3),
+        "stdev": np.std(counts),
+        "skew": skew(counts),
+    }
 
 
 def getFractionSpotsUsed(spots, transcripts):
@@ -411,7 +429,11 @@ def getTranscriptRoundDist(transcripts, pdf=False):
     skw = skew(counts)
 
     if pdf:
-        fig = plt.figure()
+        fig, ax = plt.subplots()
+
+        for axis in [ax.xaxis, ax.yaxis]:
+            axis.set_major_locator(ticker.MaxNLocator(integer=True))
+
         plt.bar(range(len(counts)), counts)
         plt.title("Transcript source spot distribution across rounds")
         plt.ylabel("Spot count")
@@ -419,7 +441,7 @@ def getTranscriptRoundDist(transcripts, pdf=False):
 
         pdf.savefig(fig)
         plt.close()
-    return counts, std, skw
+    return {"counts": counts, "stdev": std, "skew": skw}
 
 
 def getTranscriptChannelDist(transcripts, pdf=False):
@@ -430,7 +452,11 @@ def getTranscriptChannelDist(transcripts, pdf=False):
     skw = skew(counts)
 
     if pdf:
-        fig = plt.figure()
+        fig, ax = plt.subplots()
+
+        for axis in [ax.xaxis, ax.yaxis]:
+            axis.set_major_locator(ticker.MaxNLocator(integer=True))
+
         plt.bar(range(len(counts)), counts)
         plt.title("Transcript source spot distribution across channels")
         plt.ylabel("Fraction of spots")
@@ -438,7 +464,7 @@ def getTranscriptChannelDist(transcripts, pdf=False):
 
         pdf.savefig(fig)
         plt.close()
-    return counts, std, skw
+    return {"counts": counts, "stdev": std, "skew": skw}
 
 
 def getFPR(segmentation, pdf=False):
@@ -476,13 +502,14 @@ def getFPR(segmentation, pdf=False):
     }
 
     if pdf:
-        fig = plt.figure()
+        fig, ax = plt.subplots()
 
         plt.bar(
             range(len(real_per_cell_full)),
             sorted_reals_full,
             width=1,
             label="On-target",
+            align="edge",
             color=(0, 119 / 256, 187 / 256),
         )
         plt.bar(
@@ -490,6 +517,7 @@ def getFPR(segmentation, pdf=False):
             sorted_blanks_full,
             width=1,
             label="Off-target",
+            align="edge",
             color=(204 / 256, 51 / 256, 17 / 256),
         )
         plt.plot(
