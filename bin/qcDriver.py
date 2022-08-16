@@ -524,6 +524,7 @@ def getFPR(segmentation, pdf=False):
             [0, len(real_per_cell_full)],
             [np.median(real_per_cell_full), np.median(real_per_cell_full)],
             color="black",
+            label="Median count",
             linewidth=3,
         )
         plt.xlabel("Cells")
