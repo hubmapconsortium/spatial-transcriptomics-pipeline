@@ -361,7 +361,7 @@ def cli(
             img = subtract_background_estimate(img, cpu_count())
             if anchor_name:
                 print("\tremoving estimated background from anchor image...")
-                anchor = subtract_background(anchor, bg, register, 1)
+                anchor = subtract_background_estimate(anchor, cpu_count())
 
         if high_sigma:
             # Remove cellular autofluorescence w/ gaussian high-pass filter
