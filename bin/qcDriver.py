@@ -779,6 +779,8 @@ if __name__ == "__main__":
             segmentation[name] = pd.read_csv(
                 "{}/{}/segmentation.csv".format(args.segmentation_loc, name)
             )
+            # pre-filtering for nan targets, since this will crash QC code.
+            segmentation[name] = segmentation[name][~segmentation[name]["target"].isna()]
 
     spots = False
     if args.spots_pkl:

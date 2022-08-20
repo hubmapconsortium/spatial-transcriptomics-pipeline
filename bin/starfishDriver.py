@@ -542,7 +542,7 @@ if __name__ == "__main__":
     )  # also used in PerRoundMaxChannel, CheckAll
     p.add_argument("--return-original-intensities", type=bool, nargs="?")
     p.add_argument(
-        "--filtered_results", dest="filtered_results", action="store_true"
+        "--filtered-results", dest="filtered_results", action="store_true"
     )  # defined by us
     p.set_defaults(filtered_results=False)
 
@@ -644,8 +644,11 @@ if __name__ == "__main__":
     addKwarg(args, decodeKwargs, "physical_coords")
     addKwarg(args, decodeKwargs, "max_distance")
     addKwarg(args, decodeKwargs, "min_intensity")
-    addKwarg(args, decodeKwargs, "metric")
-    addKwarg(args, decodeKwargs, "norm_order")
+    if method == starfish.spots.DecodeSpots.MetricDistance:
+        addKwarg(args, decodeKwargs, "metric")
+        addKwarg(args, decodeKwargs, "norm_order")
+        # notably including this when rescale is used with other decoders
+        # leads to bugs since these two params aren't' an accepted decoder arg
     addKwarg(args, decodeKwargs, "anchor_round")
     addKwarg(args, decodeKwargs, "search_radius")
 
