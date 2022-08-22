@@ -155,7 +155,7 @@ def segment_nuclei(
     nuclei.xarray.data[0, 0, 0][nuclei.xarray.data[0, 0, 0] < 0] = 0
 
     # Median filter
-    nuclei.xarray.data[0, 0, 0] = ndimage.median_filter(nuclei.xarray.data[0, 0, 0], size=30)
+    nuclei.xarray.data[0, 0, 0] = ndimage.median_filter(nuclei.xarray.data[0, 0, 0], size=10)
 
     # Scale image intensities and convert low intensities to zero
     pmin = 50
@@ -518,16 +518,19 @@ def segmentByDensity(
     else:
         # Non overlapping nuclei
         if correct_seg:
+            if label_exp_size is not None:
+                good_nuclei = skimage.segmentation.expand_labels(good_nuclei, distance=label_exp_size)
             return good_nuclei
         # All nuclei
         else:
-            # Had to put this here because I need border nuclei for cytoplasm segmentation.
+            
+            # Had to put this here because I need border nuclei for cytoplasm segmentation. 
             if border_buffer is not None:
-                all_nuclei = skimage.segmentation.clear_border(
-                    all_nuclei, buffer_size=border_buffer
-                )
+                all_nuclei = skimage.segmentation.clear_border(all_nuclei, buffer_size=border_buffer)
                 all_nuclei = skimage.segmentation.relabel_sequential(all_nuclei)[0]
-
+            if label_exp_size is not None:
+                all_nuclei = skimage.segmentation.expand_labels(all_nuclei, distance=label_exp_size)
+            
             return all_nuclei
 
 
