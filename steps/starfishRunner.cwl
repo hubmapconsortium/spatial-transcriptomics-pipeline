@@ -71,7 +71,6 @@ inputs:
         filtered_results:
           type: boolean?
           doc: Automatically remove genes that do not match a target and do not meet criteria.
-          default: True
         decoder:
           type:
             - type: record
