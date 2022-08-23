@@ -253,7 +253,7 @@ def cli(
     clip_min: float = 0,
     clip_max: float = 99.9,
     level_method: str = "",
-    is_volume: bool = True,
+    is_volume: bool = False,
     aux_name: str = None,
     ch_per_reg: int = 1,
     background_name: str = None,

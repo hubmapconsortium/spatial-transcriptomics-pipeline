@@ -441,7 +441,7 @@ def segmentByDensity(
     nuclei,
     decoded_targets,
     cyto_seg=False,
-    correct_seg=True,
+    correct_seg=False,
     border_buffer=None,
     area_thresh=1.05,
     thresh_block_size=51,

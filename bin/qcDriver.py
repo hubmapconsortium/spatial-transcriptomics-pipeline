@@ -19,6 +19,7 @@ import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
 import numpy as np
 import pandas as pd
+import skimage.io
 import starfish
 import starfish.data
 import yaml
@@ -43,7 +44,10 @@ def filterSpots(spots, mask, oneIndex=False, invert=False):
     # takes a SpotFindingResults, ImageStack, and BinaryMaskCollection
     # to return a set of SpotFindingResults that are masked by the binary mask
     spot_attributes_list = []
-    maskMat = mask.to_label_image().xarray.values
+    if isinstance(mask, BinaryMaskCollection):
+        maskMat = mask.to_label_image().xarray.values
+    else:
+        maskMat = mask
     maskMat[maskMat > 1] = 1
     if invert:
         maskMat = 1 - maskMat
@@ -400,6 +404,7 @@ def getTranscriptsPerCell(segmented, pdf=False):
         plt.axhline(y=mid, color="black", label="Median")
         plt.axhline(y=q3, dashes=(2, 2), color="black")
         plt.axhline(y=mid + iqr_scale * (q3 - q1), dashes=(1, 1), color="gray")
+        plt.ylim(0)
         plt.title("Transcript count per cell")
         plt.ylabel("Transcript count")
         plt.xlabel("Cells")
@@ -581,10 +586,18 @@ def runFOV(
         spotRes = {}
         print("finding spot metrics")
         relevSpots = spots
-        if segmask:
+        if segmask is not None:
             relevSpots = filterSpots(spots, segmask, True)
+            if relevSpots.count_total_spots() == 0:
+                print("No spots inside segmentation area, are you sure the params are set right?")
+                return None
 
         ts = time()
+        spotRes["spot_counts"] = {
+            "total_count": spots.count_total_spots(),
+            "segmented_count": relevSpots.count_total_spots(),
+            "ratio": relevSpots.count_total_spots() / spots.count_total_spots(),
+        }
         spotRes["density"] = getSpotDensity(relevSpots, codebook)
 
         t1 = time()
@@ -680,13 +693,15 @@ def run(
                 spot = spots[f]
             if segmentation:
                 segmentOne = segmentation[f]
+            if segmask:
+                segmaskOne = segmask[f]
             results[f] = runFOV(
                 output_dir=fov_dir,
                 transcripts=transcripts[f],
                 codebook=codebook,
                 size=size,
                 spots=spot,
-                segmask=segmask,
+                segmask=segmaskOne,
                 segmentation=segmentOne,
                 doRipley=doRipley,
                 savePdf=savePdf,
@@ -757,6 +772,15 @@ if __name__ == "__main__":
             roi = BinaryMaskCollection.from_fiji_roi_set(
                 path_to_roi_set_zip=args.roi, original_image=img
             )
+        elif args.segmentation_loc:
+            exp = starfish.core.experiment.experiment.Experiment.from_json(
+                str(args.codebook_exp) + "/experiment.json"
+            )
+            roi = {}
+            for f in exp.keys():
+                maskloc = "{}/{}/mask.tiff".format(args.segmentation_loc, f)
+                roi[f] = skimage.io.imread(maskloc)
+
     elif args.codebook_pkl:
         codebook = pickle.load(open(args.codebook_pkl, "rb"))
 

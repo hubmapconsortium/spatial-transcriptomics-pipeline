@@ -7,7 +7,7 @@ from datetime import datetime
 from functools import partialmethod
 from os import cpu_count, makedirs, path
 from pathlib import Path
-from typing import Callable, Mapping, Set, Tuple
+from typing import Callable, Mapping, Set, Tuple, Union
 
 import numpy as np
 import pandas as pd
@@ -37,11 +37,11 @@ from tqdm import tqdm
 def blobRunner(
     img: ImageStack,
     ref_img: ImageStack = None,
-    min_sigma: Tuple[float, float, float] = (0.5, 0.5, 0.5),
-    max_sigma: Tuple[float, float, float] = (8, 8, 8),
+    min_sigma: Union[Tuple[float, float, float], Tuple[float, float]] = (0.5, 0.5),
+    max_sigma: Union[Tuple[float, float, float], Tuple[float, float]] = (8, 8),
     num_sigma: int = 5,
     threshold: float = 0.1,
-    is_volume: bool = True,
+    is_volume: bool = False,
     detector_method: str = "blob_log",
     overlap: float = 0.5,
 ) -> SpotFindingResults:
