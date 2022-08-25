@@ -7,7 +7,7 @@ from datetime import datetime
 from functools import partialmethod
 from os import cpu_count, makedirs, path
 from pathlib import Path
-from typing import Callable, Mapping, Set, Tuple, Union
+from typing import Callable, Mapping, Optional, Set, Tuple, Union
 
 import numpy as np
 import pandas as pd
@@ -21,7 +21,7 @@ from starfish import (
     ImageStack,
     IntensityTable,
 )
-from starfish.core.types import SpotAttributes, SpotFindingResults
+from starfish.core.types import Number, SpotAttributes, SpotFindingResults
 from starfish.spots import AssignTargets
 from starfish.types import (
     Axes,
@@ -37,8 +37,8 @@ from tqdm import tqdm
 def blobRunner(
     img: ImageStack,
     ref_img: ImageStack = None,
-    min_sigma: Union[Tuple[float, float, float], Tuple[float, float]] = (0.5, 0.5),
-    max_sigma: Union[Tuple[float, float, float], Tuple[float, float]] = (8, 8),
+    min_sigma: Union[Number, Tuple[Number, ...]] = 0.5,
+    max_sigma: Union[Number, Tuple[Number, ...]] = 8,
     num_sigma: int = 5,
     threshold: float = 0.1,
     is_volume: bool = False,
@@ -436,11 +436,12 @@ def run(
     sys.stderr = reporter
 
     print(
-        "output_dir: {}\nexp: {}\nblob_based: {}\nuse_ref: {}\nrescale: {}\nblobrunner: {}\ndecoderunner: {}\npixelrunner: {}\n".format(
+        "output_dir: {}\nexp: {}\nblob_based: {}\nuse_ref: {}\nanchor: {}\nrescale: {}\nblobrunner: {}\ndecoderunner: {}\npixelrunner: {}\n".format(
             output_dir,
             experiment,
             blob_based,
             use_ref,
+            anchor_name,
             rescale,
             blobRunnerKwargs,
             decodeRunnerKwargs,
@@ -464,6 +465,10 @@ def run(
                 .get_image(anchor_name)
                 .reduce({Axes.CH, Axes.ROUND, Axes.ZPLANE}, func="max")
             )
+            clip = starfish.image.Filter.ClipPercentileToZero(
+                p_min=20, p_max=99.9, is_volume=is_volume, level_method=Levels.SCALE_BY_CHUNK
+            )
+            clip.run(ref_img, in_place=True)
 
         if rescale:
             img = scale_img(img, experiment.codebook, pixelRunnerKwargs, level_method, is_volume)
@@ -597,18 +602,14 @@ if __name__ == "__main__":
         # in the event of a mismatch.
         if args.min_sigma:
             minlen = len(tuple(args.min_sigma))
-        else:
-            minlen = 2
 
         if args.max_sigma:
             maxlen = len(tuple(args.max_sigma))
-        else:
-            maxlen = 2
 
         if args.is_volume:
             vol = args.is_volume
 
-        if not (vol + 2 == minlen and vol + 2 == maxlen):
+        if not (args.min_sigma and vol + 2 == minlen) and (args.max_sigma and vol + 2 == maxlen):
             raise Exception(
                 f"is_volume is set to {vol}, but sigma dimensions are of length {minlen} and {maxlen}"
             )
