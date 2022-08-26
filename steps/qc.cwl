@@ -102,6 +102,10 @@ inputs:
             type: int
             doc: number of z-stacks
 
+  spot_threshold:
+    type: float?
+    doc: If has_spots is true and this is provided, spots with an intensity lower than this will not be included in qc metrics
+
   find_ripley:
     type: boolean?
     doc: If true, will run ripley K estimates to find spatial density measures.  Can be slow.
@@ -148,7 +152,7 @@ steps:
     in:
       datafile: parameter_json
       schema: read_schema/data
-    out: [find_ripley, save_pdf, fov_positioning_x_shape, fov_positioning_y_shape, fov_positioning_z_shape, decoding_decode_method]
+    out: [find_ripley, save_pdf, fov_positioning_x_shape, fov_positioning_y_shape, fov_positioning_z_shape, decoding_decode_method, decoding_decoder_min_intensity]
     when: $(inputs.datafile != null)
 
   execute_qc:
@@ -231,6 +235,11 @@ steps:
                 inputBinding:
                   prefix: --z-size
 
+        spot_threshold:
+          type: float?
+          inputBinding:
+            prefix: --spot-threshold
+
         find_ripley:
           type: boolean?
           inputBinding:
@@ -298,6 +307,16 @@ steps:
                 "z_size": self[3]
               };
             }
+          }
+      spot_threshold:
+        source: [stage_qc/decoding_decoder_min_intensity, spot_threshold]
+        valueFrom: |
+          ${
+             if((self[0] && self[0].length) || self[1]){
+               return true;
+             } else {
+               return false;
+             }
           }
       find_ripley:
         source: [stage_qc/find_ripley, find_ripley]

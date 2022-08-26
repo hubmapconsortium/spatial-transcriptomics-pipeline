@@ -15,7 +15,15 @@
 		"decoding":[
 			[],
 			[
-				"decode_method"
+				"decode_method",
+				{
+					"decoder": [
+						[],
+						[
+							"min_intensity"
+						]
+					]
+				}
 			]
 		]
 	}

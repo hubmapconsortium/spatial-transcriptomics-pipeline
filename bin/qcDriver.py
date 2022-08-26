@@ -40,6 +40,28 @@ from tqdm import tqdm
 # utility methods
 
 
+def thresholdSpots(spots, spotThreshold):
+    # takes a SpotFindingResults and removes all spots that have 'intensity'
+    # beneath spotThreshold. Useful when a reference image is used.
+    spot_attributes_list = []
+    for k, v in spots.items():
+        data = v.spot_attrs.data
+        data = data[data["intensity"] > spotThreshold]
+        data = data.reset_index(drop=True)
+        spotResults = PerImageSliceSpotResults(spot_attrs=SpotAttributes(data), extras=None)
+        spot_attributes_list.append((spotResults, {Axes.ROUND: k[0], Axes.CH: k[1]}))
+
+    newCoords = {}
+    renameAxes = {"x": Coordinates.X.value, "y": Coordinates.Y.value, "z": Coordinates.Z.value}
+    for k in renameAxes.keys():
+        newCoords[renameAxes[k]] = spots.physical_coord_ranges[k]
+
+    newSpots = SpotFindingResults(
+        imagestack_coords=newCoords, log=starfish.Log(), spot_attributes_list=spot_attributes_list
+    )
+    return newSpots
+
+
 def filterSpots(spots, mask, oneIndex=False, invert=False):
     # takes a SpotFindingResults, ImageStack, and BinaryMaskCollection
     # to return a set of SpotFindingResults that are masked by the binary mask
@@ -405,6 +427,7 @@ def getTranscriptsPerCell(segmented, pdf=False):
         plt.axhline(y=q3, dashes=(2, 2), color="black")
         plt.axhline(y=mid + iqr_scale * (q3 - q1), dashes=(1, 1), color="gray")
         plt.ylim(0)
+        plt.xlim(0)
         plt.title("Transcript count per cell")
         plt.ylabel("Transcript count")
         plt.xlabel("Cells")
@@ -567,6 +590,7 @@ def runFOV(
     codebook,
     size,
     spots=None,
+    spotThreshold=None,
     segmask=None,
     segmentation=None,
     doRipley=False,
@@ -585,6 +609,10 @@ def runFOV(
     if spots:
         spotRes = {}
         print("finding spot metrics")
+
+        if spotThreshold is not None:
+            spots = thresholdSpots(spots, spotThreshold)
+
         relevSpots = spots
         if segmask is not None:
             relevSpots = filterSpots(spots, segmask, True)
@@ -664,6 +692,7 @@ def run(
     size,
     fovs=None,
     spots=None,
+    spot_threshold=None,
     segmask=None,
     segmentation=None,
     doRipley=False,
@@ -701,6 +730,7 @@ def run(
                 codebook=codebook,
                 size=size,
                 spots=spot,
+                spotThreshold=spot_threshold,
                 segmask=segmaskOne,
                 segmentation=segmentOne,
                 doRipley=doRipley,
@@ -713,6 +743,7 @@ def run(
             codebook=codebook,
             size=size,
             spots=spots,
+            spotThreshold=spot_threshold,
             segmask=segmask,
             segmentation=segmentation,
             doRipley=doRipley,
@@ -750,6 +781,7 @@ if __name__ == "__main__":
     p.add_argument("--x-size", type=int, nargs="?")
     p.add_argument("--y-size", type=int, nargs="?")
     p.add_argument("--z-size", type=int, nargs="?")
+    p.add_argument("--spot-threshold", type=float, nargs="?")
     p.add_argument("--run-ripley", dest="run_ripley", action="store_true")
     p.add_argument("--save-pdf", dest="save_pdf", action="store_true")
     args = p.parse_args()
@@ -817,6 +849,10 @@ if __name__ == "__main__":
                 "{}/spots/{}_SpotFindingResults.json".format(args.exp_output, k)
             )
 
+    spot_threshold = None
+    if args.spot_threshold:
+        spot_threshold = args.spot_threshold
+
     size = [0, 0, 0]
     if args.x_size:  # specify in CWL that all or none must be specified, only needed when doRipley
         size[0] = args.x_size
@@ -833,6 +869,7 @@ if __name__ == "__main__":
         size=size,
         fovs=fovs,
         spots=spots,
+        spot_threshold=spot_threshold,
         segmask=roi,
         segmentation=segmentation,
         doRipley=args.run_ripley,

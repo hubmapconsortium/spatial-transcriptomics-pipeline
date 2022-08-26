@@ -888,6 +888,16 @@ steps:
               return null;
             }
           }
+      spot_threshold:
+        source: decoding_blob
+        valueFrom: |
+          ${
+             if(self && 'decoder' in self && 'min_intensity' in self['decoder']){
+               return self['decoder']['min_intensity'];
+             } else {
+               return null;
+             }
+          }
       find_ripley: find_ripley
       save_pdf: save_pdf
       data:
