@@ -894,6 +894,8 @@ steps:
           ${
              if(self && 'decoder' in self && 'min_intensity' in self['decoder']){
                return self['decoder']['min_intensity'];
+             } else if(self && 'magnitude_threshold' in self){
+               return self['mangitude_threshold'];
              } else {
                return null;
              }

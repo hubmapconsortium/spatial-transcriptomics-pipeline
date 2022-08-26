@@ -152,7 +152,7 @@ steps:
     in:
       datafile: parameter_json
       schema: read_schema/data
-    out: [find_ripley, save_pdf, fov_positioning_x_shape, fov_positioning_y_shape, fov_positioning_z_shape, decoding_decode_method, decoding_decoder_min_intensity]
+    out: [find_ripley, save_pdf, fov_positioning_x_shape, fov_positioning_y_shape, fov_positioning_z_shape, decoding_decode_method, decoding_magnitude_threshold, decoding_decoder_min_intensity]
     when: $(inputs.datafile != null)
 
   execute_qc:
@@ -309,13 +309,17 @@ steps:
             }
           }
       spot_threshold:
-        source: [stage_qc/decoding_decoder_min_intensity, spot_threshold]
+        source: [stage_qc/decoding_decoder_min_intensity, stage_qc/decoding_magnitude_threshold, spot_threshold]
         valueFrom: |
           ${
-             if((self[0] && self[0].length) || self[1]){
-               return true;
+             if(self[0]){
+               return self[0];
+             } else if(self[1]) {
+               return self[1];
+             } else if(self[2]){
+               return self[2];
              } else {
-               return false;
+               return null;
              }
           }
       find_ripley:
