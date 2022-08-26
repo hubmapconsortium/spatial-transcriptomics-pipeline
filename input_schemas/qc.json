@@ -16,6 +16,7 @@
 			[],
 			[
 				"decode_method",
+				"magnitude_threshold?",
 				{
 					"decoder": [
 						[],
