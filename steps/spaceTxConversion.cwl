@@ -360,6 +360,11 @@ steps:
                   inputBinding:
                     prefix: --z-pos-voxel
 
+          add_blanks:
+            type: boolean
+            inputBinding:
+              prefix: --add-blanks
+
       outputs:
         spaceTx_converted:
           type: Directory
