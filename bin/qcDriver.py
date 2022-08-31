@@ -120,7 +120,7 @@ def monteCarloEnvelope(Kest, r, p, n, count):
     return (top, mid, bot)
 
 
-def plotRipleyResults(pdf, results, key, doMonte=False, title=None):
+def plotRipleyResults(pdf, results, key, doMonte=False, text=None):
     if doMonte:
         res, mon = results
         monte = mon[key]
@@ -138,8 +138,8 @@ def plotRipleyResults(pdf, results, key, doMonte=False, title=None):
     else:
         ax.plot(r, csr, "-r", label="CSR")
 
-    if title:
-        ax.title(title)
+    if text is not None:
+        ax.set_title(str(text))
     ax.set_ylabel("Ripley's K score")
     ax.set_xlabel("Radius (px)")
     ax.legend()
@@ -277,37 +277,6 @@ def percentMoreClustered(results):
     return mean, planeWise
 
 
-def plotRipleyResults(pdf, results, key, doMonte=False):
-    if doMonte:
-        res, mon = results
-        monte = mon[key]
-        kv, csr, r = res[key]
-    else:
-        kv, csr, r = results[key]
-
-    fig, ax = plt.subplots()
-
-    ax.plot(r, kv, label="Data")
-    if doMonte:
-        ax.plot(r, monte[0], "--r")
-        ax.plot(r, monte[1], "-r", label="median monte carlo")
-        ax.plot(r, monte[2], "--r")
-    else:
-        ax.plot(r, csr, "-r", label="CSR")
-
-    ax.set_title(key)
-    ax.set_ylabel("Ripley's K score")
-    ax.set_xlabel("Radius (px)")
-    ax.legend()
-
-    x0, x1 = ax.get_xlim()
-    y0, y1 = ax.get_ylim()
-    ax.set_aspect(abs(x1 - x0) / abs(y1 - y0))
-
-    pdf.savefig(fig)
-    plt.close()
-
-
 def getSpotRoundDist(spots, pdf=False):
     roundTallies = {}
     for k, v in spots.items():
@@ -374,8 +343,16 @@ def maskedSpatialDensity(masked, unmasked, imgsize, steps, pdf=False):
 
     if pdf:
         for k in unmaskedDens[0].keys():
-            plotRipleyResults(pdf, unmaskedDens, k, True, "Unmasked {}".format(str(key)))
-            plotRipleyResults(pdf, maskedDens, k, True, "Masked {}".format(str(key)))
+            plotRipleyResults(
+                pdf=pdf,
+                results=unmaskedDens,
+                key=k,
+                doMonte=True,
+                text="Unmasked {}".format(str(k)),
+            )
+            plotRipleyResults(
+                pdf=pdf, results=maskedDens, key=k, doMonte=True, text="Masked {}".format(str(k))
+            )
 
     maskedPer = percentMoreClustered(maskedDens)[0]
     unmaskedPer = percentMoreClustered(unmaskedDens)[0]
@@ -644,12 +621,12 @@ def runFOV(
         if doRipley:
             t = time()
             print("\n\tstarting ripley estimates")
-            spatDens = getSpatitalDensity(spots, size, doMonte=True)
+            spatDens = getSpatialDensity(spots, size, doMonte=True)
             spotRes["spatial_density"] = percentMoreClustered(spatDens)
             if savePdf:
                 for k in spatDens[0].keys():
-                    plotRipleyResults(pdf, spatDens, key, True)
-            if segmask:
+                    plotRipleyResults(pdf, spatDens, k, True, str(k))
+            if segmask is not None:
                 invRelevSpots = filterSpots(spots, segmask, invert=True)
                 spotRes["masked_spatial_density"] = maskedSpatialDensity(
                     relevSpots, invRelevSpots, size, 10, pdf
