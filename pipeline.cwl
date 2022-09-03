@@ -36,6 +36,22 @@ inputs:
     type: File?
     doc: Flattened json input, refer to record entry.
 
+  mask_roi_files:
+    type: Directory?
+    doc: Flattened directory input, refer to record entry "binary_mask"
+
+  mask_roi_formats:
+    type: string?
+    doc: Flattened record input, refer to record entry "binary_mask"
+
+  mask_labeled_files:
+    type: Directory?
+    doc: Flattened file input, refer to record entry "binary_mask"
+
+  mask_labeled_formats:
+    type: string?
+    doc: Flattened record input, refer to record entry "binary_mask"
+
   codebook:
     type:
       - 'null'
@@ -825,7 +841,26 @@ steps:
       parameter_json: parameter_json
       aux_name: aux_name
       fov_count: fov_count
-      binary_mask: binary_mask
+      binary_mask:
+        source: [binary_mask, mask_roi_files, mask_roi_formats, mask_labeled_files, mask_labeled_formats]
+        valueFrom: |
+          ${
+            if(self[0]){
+              return self[0];
+            } else if(self[1] && self[2]){
+              return {
+                "roi_set": self[1],
+                "file_formats": self[2]
+              };
+            } else if(self[3] && self[4]){
+              return {
+                "labeled_image": self[3],
+                "file_formats_labeled": self[4]
+              };
+            } else {
+              return null;
+            }
+          }
     out:
       [segmented]
 
