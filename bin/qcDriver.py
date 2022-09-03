@@ -277,6 +277,23 @@ def percentMoreClustered(results):
     return mean, planeWise
 
 
+def percentLessClustered(results):
+    # assumes results has monte included
+    # returns list with % of each (r,ch,z) plane where calculated
+    #    Kest < 95% monte null hypothesis
+    planeWise = {}
+    mean = 0
+    for k in results[0].keys():
+        botend = results[1][k][2]
+        calc = results[0][k][0]
+        planeWise[k] = sum([1 if botend[i] < calc[i] else 0 for i in range(len(botend))]) / len(
+            botend
+        )
+        mean += planeWise[k]
+    mean = mean / len(planeWise.keys())
+    return mean, planeWise
+
+
 def getSpotRoundDist(spots, pdf=False):
     roundTallies = {}
     for k, v in spots.items():
@@ -301,6 +318,14 @@ def getSpotRoundDist(spots, pdf=False):
         plt.title("Spots per round")
         plt.xlabel("Round number")
         plt.ylabel("Spot count")
+
+        avg = np.mean(tally)
+        offset = (ax.get_ylim()[1] - ax.get_ylim()[0]) * 0.005
+        plt.axhline(avg, color="black")
+        plt.text(0, avg + offset, f"Average: {avg:.2f}")
+        plt.axhline(avg + std, dashes=(2, 2), color="black")
+        plt.axhline(avg - std, dashes=(2, 2), color="black")
+        plt.text(0, avg - std + offset, f"Standard Deviation: {std:.2f}")
 
         pdf.savefig(fig)
         plt.close()
@@ -332,6 +357,15 @@ def getSpotChannelDist(spots, pdf=False):
         plt.title("Spots per channel")
         plt.xlabel("Channel number")
         plt.ylabel("Fraction of spots")
+
+        avg = np.mean(tally)
+        offset = (ax.get_ylim()[1] - ax.get_ylim()[0]) * 0.005
+        plt.axhline(avg, color="black")
+        plt.text(0, avg + offset, f"Average: {avg:.2f}")
+        plt.axhline(avg + std, dashes=(2, 2), color="black")
+        plt.axhline(avg - std, dashes=(2, 2), color="black")
+        plt.text(0, avg - std + offset, f"Standard Deviation: {std:.2f}")
+
         pdf.savefig(fig)
         plt.close()
     return {"tally": tally, "stdev": std, "skew": skw}
@@ -354,10 +388,20 @@ def maskedSpatialDensity(masked, unmasked, imgsize, steps, pdf=False):
                 pdf=pdf, results=maskedDens, key=k, doMonte=True, text="Masked {}".format(str(k))
             )
 
-    maskedPer = percentMoreClustered(maskedDens)[0]
-    unmaskedPer = percentMoreClustered(unmaskedDens)[0]
+    result = {}
+    for val in ["more clustered", "less clustered"]:
+        func = percentMoreClustered
+        if val == "less clustered":
+            func = percentLessClustered
 
-    return {"ratio": unmaskedPer / maskedPer, "unmasked": unmaskedPer, "masked": maskedPer}
+        maskedPer = func(maskedDens)[0]
+        unmaskedPer = func(unmaskedDens)[0]
+        result[val] = {
+            "ratio": unmaskedPer / maskedPer,
+            "unmasked": unmaskedPer,
+            "masked": maskedPer,
+        }
+    return result
 
 
 # Transcript metrics
@@ -444,6 +488,14 @@ def getTranscriptRoundDist(transcripts, pdf=False):
         plt.ylabel("Spot count")
         plt.xlabel("Round ID")
 
+        avg = np.mean(counts)
+        offset = (ax.get_ylim()[1] - ax.get_ylim()[0]) * 0.005
+        plt.axhline(avg, color="black")
+        plt.text(0, avg + offset, f"Average: {avg:.2f}")
+        plt.axhline(avg + std, dashes=(2, 2), color="black")
+        plt.axhline(avg - std, dashes=(2, 2), color="black")
+        plt.text(0, avg - std + offset, f"Standard Deviation: {std:.2f}")
+
         pdf.savefig(fig)
         plt.close()
     return {"counts": counts, "stdev": std, "skew": skw}
@@ -466,6 +518,14 @@ def getTranscriptChannelDist(transcripts, pdf=False):
         plt.title("Transcript source spot distribution across channels")
         plt.ylabel("Fraction of spots")
         plt.xlabel("Channel ID")
+
+        avg = np.mean(counts)
+        offset = (ax.get_ylim()[1] - ax.get_ylim()[0]) * 0.005
+        plt.axhline(avg, color="black")
+        plt.text(0, avg + offset, f"Average: {avg:.2f}")
+        plt.axhline(avg + std, dashes=(2, 2), color="black")
+        plt.axhline(avg - std, dashes=(2, 2), color="black")
+        plt.text(0, avg - std + offset, f"Standard Deviation: {std:.2f}")
 
         pdf.savefig(fig)
         plt.close()
@@ -544,6 +604,29 @@ def getFPR(segmentation, pdf=False):
         plt.close()
 
     return results
+
+
+def plotSpotRatio(spots, transcripts, name, pdf):
+    # Plots the channel/round distribution of spots and transcript sources on one graph
+    fig, ax = plt.subplots()
+
+    for axis in [ax.xaxis, ax.yaxis]:
+        axis.set_major_locator(ticker.MaxNLocator(integer=True))
+
+    avg = np.mean(spots)
+    plt.scatter(
+        [i for i in range(len(transcripts))], transcripts, label="spots used for transcripts"
+    )
+    plt.scatter([i for i in range(len(spots))], spots, label="all spots")
+    plt.axhline(avg, color="black", lw=1)
+    plt.ylim(0)
+    plt.title(f"Comparison of spots and source spots for transcripts across {name}s")
+    plt.ylabel("Fraction of spots")
+    plt.xlabel(f"{name} ID")
+    plt.legend()
+
+    pdf.savefig(fig)
+    plt.close()
 
 
 def simplifyDict(ob):
@@ -649,6 +732,16 @@ def runFOV(
         trRes["fraction_spots_used"] = getFractionSpotsUsed(relevSpots, transcripts)
     trRes["round_dist"] = getTranscriptRoundDist(transcripts, pdf)
     trRes["channel_dist"] = getTranscriptChannelDist(transcripts, pdf)
+    if spots and pdf:
+        plotSpotRatio(
+            results["spots"]["channel_dist"]["tally"],
+            trRes["channel_dist"]["counts"],
+            "channel",
+            pdf,
+        )
+        plotSpotRatio(
+            results["spots"]["round_dist"]["tally"], trRes["round_dist"]["counts"], "round", pdf
+        )
 
     results["transcripts"] = trRes
     t = time()
