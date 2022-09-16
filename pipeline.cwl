@@ -747,7 +747,7 @@ steps:
               };
             } else if(self[1]) {
               var count = self[5];
-              if(self[0]){
+              if(self[0] && self[0].aux_channel_count){
                 count = self[0].aux_channel_count;
               }
               return {
