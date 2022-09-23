@@ -308,7 +308,7 @@ inputs:
                   type: int?
                   doc: Anchor round for comparison.
                 search_radius:
-                  type: int?
+                  type: float?
                   doc: Distance to search for matching spots.
                 return_original_intensities:
                   type: boolean?
@@ -323,13 +323,13 @@ inputs:
                   type: int?
                   doc: Round to refer to.  Required for nearest_neighbor.
                 search_radius:
-                  type: int?
+                  type: float?
                   doc: Distance to search for matching spots.
             - type: record
               name: check_all
               fields:
                 search_radius:
-                  type: int?
+                  type: float?
                   doc: Distance to search for matching spots.
                 error_rounds:
                   type: int?
