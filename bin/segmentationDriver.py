@@ -183,9 +183,7 @@ def segment_nuclei(
     cc_labels = skimage.measure.label(binary)
     props = skimage.measure.regionprops(cc_labels)
     areas = [p.area for p in props]
-    outlier = np.percentile(areas, 25) - 1.5 * (
-        np.percentile(areas, 75) - np.percentile(areas, 25)
-    )
+    outlier = 100
     area_small = [p.area < outlier for p in props]
     for x in range(1, len(area_small) + 1):
         if area_small[x - 1]:
@@ -193,7 +191,7 @@ def segment_nuclei(
     cc_labels = skimage.segmentation.relabel_sequential(cc_labels)[0]
 
     # Convert back to binary
-    binary = (cc_labels > 1).astype("int16")
+    binary = (cc_labels >= 1).astype("int16")
 
     # Find all non-overlapping nuclei (aka "good" nuclei)
 
@@ -226,16 +224,17 @@ def segment_nuclei(
 
     # Remove big
     props = skimage.measure.regionprops(good_nuclei)
-    areas = [p.area for p in props]
-    outlier = np.percentile(areas, 75) + 1.5 * (
-        np.percentile(areas, 75) - np.percentile(areas, 25)
-    )
-    area_big = [p.area > outlier for p in props]
+    if len(props) > 0:
+        areas = [p.area for p in props]
+        outlier = np.percentile(areas, 75) + 1.5 * (
+            np.percentile(areas, 75) - np.percentile(areas, 25)
+        )
+        area_big = [p.area > outlier for p in props]
 
-    for x in range(1, len(area_big) + 1):
-        if area_big[x - 1]:
-            good_nuclei[good_nuclei == x] = 0
-    good_nuclei = skimage.segmentation.relabel_sequential(good_nuclei)[0]
+        for x in range(1, len(area_big) + 1):
+            if area_big[x - 1]:
+                good_nuclei[good_nuclei == x] = 0
+        good_nuclei = skimage.segmentation.relabel_sequential(good_nuclei)[0]
 
     # Segment all nuclei
 
@@ -255,7 +254,7 @@ def segment_nuclei(
     # Calculate number of pixels to set as threshold for merging objects. Need to set as a constant pixel
     # number and not ratio of areas to prevent large objects from blobbing up.
     # Calculated as (area_thresh - 1) * (average good nuclei area)
-    props = skimage.measure.regionprops(good_nuclei.astype("int16"))
+    props = skimage.measure.regionprops(all_nuclei.astype("int16"))
     areas = [p.area for p in props]
     px_area_thresh = np.mean(areas) * (area_thresh - 1)
 
@@ -266,13 +265,13 @@ def segment_nuclei(
         pairs = {}
         for x in range(1, xmax - 1):
             for y in range(1, ymax - 1):
-                value = all_nuclei[x, y]
+                value = all_nuclei[y, x]
                 if value != 0:
                     neighbors = []
-                    neighbors.append(all_nuclei[x - 1, y])
-                    neighbors.append(all_nuclei[x + 1, y])
-                    neighbors.append(all_nuclei[x, y - 1])
-                    neighbors.append(all_nuclei[x, y + 1])
+                    neighbors.append(all_nuclei[y - 1, x])
+                    neighbors.append(all_nuclei[y + 1, x])
+                    neighbors.append(all_nuclei[y, x - 1])
+                    neighbors.append(all_nuclei[y, x + 1])
                     neighbors = [n for n in neighbors if n != 0]
                     for neighbor in neighbors:
                         if neighbor != value:
