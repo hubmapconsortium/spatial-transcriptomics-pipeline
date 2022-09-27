@@ -202,6 +202,10 @@ inputs:
     type: string?
     doc: The name of the auxillary view to be used for background subtraction.  Background will be estimated if not provided.
 
+  register_background:
+    type: boolean?
+    doc: If true, `background_view` will be aligned to `aux_name`.
+
   anchor_view:
     type: string?
     doc: The name of the auxillary view to be processed in parallel with primary view, such as for anchor round in ISS processing. Will not be included if not provided.
@@ -805,6 +809,7 @@ steps:
             }
           }
       background_view: background_view
+      register_background: register_background
       anchor_view: anchor_view
       high_sigma: high_sigma
       deconvolve_iter: deconvolve_iter

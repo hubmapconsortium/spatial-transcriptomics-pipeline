@@ -46,6 +46,10 @@ inputs:
     type: string?
     doc: The name of the auxillary view to be used for background subtraction.  Background will be estimated if not provided.
 
+  register_background:
+    type: boolean?
+    doc: If true, the `background_view` will be aligned to the `aux_view`.
+
   anchor_view:
     type: string?
     doc: The name of the auxillary view to be processed in parallel with primary view, such as for anchor round in ISS processing. Will not be included if not provided.
@@ -118,7 +122,7 @@ steps:
     in:
       datafile: parameter_json
       schema: read_schema/data
-    out: [clip_min, clip_max, level_method, rescale, register_aux_view, channels_per_reg, background_view, anchor_view, high_sigma, deconvolve_iter, deconvolve_sigma, low_sigma, rolling_radius, match_histogram, tophat_radius, channel_count, aux_tilesets_aux_names, aux_tilesets_aux_channel_count, is_volume]
+    out: [clip_min, clip_max, level_method, rescale, register_aux_view, channels_per_reg, background_view, register_background, anchor_view, high_sigma, deconvolve_iter, deconvolve_sigma, low_sigma, rolling_radius, match_histogram, tophat_radius, channel_count, aux_tilesets_aux_names, aux_tilesets_aux_channel_count, is_volume]
     when: $(inputs.datafile != null)
 
   execute_processing:
@@ -178,6 +182,12 @@ steps:
           inputBinding:
             prefix: --background-view
           doc: The name of the auxillary view to be used for background subtraction.  Background will be estimated if not provided.
+
+        register_background:
+          type: boolean?
+          inputBinding:
+            prefix: --register-background
+          doc: If true, the `background_view` will be aligned to the `aux_name`.
 
         anchor_view:
           type: string?
@@ -328,6 +338,18 @@ steps:
           }
       background_view:
         source: [stage_processing/background_view, background_view]
+        valueFrom: |
+          ${
+            if(self[0]){
+              return self[0];
+            } else if(self[1]) {
+              return self[1];
+            } else {
+              return null;
+            }
+          }
+      register_background:
+        source: [stage_processing/register_background, register_background]
         valueFrom: |
           ${
             if(self[0]){

@@ -55,6 +55,7 @@ outputs:
   register_aux_view: string
   channels_per_reg: int
   background_view: string
+  register_background: boolean
   anchor_view: string
   high_sigma: int
   deconvolve_iter: int

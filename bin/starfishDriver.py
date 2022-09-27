@@ -543,7 +543,7 @@ if __name__ == "__main__":
     p.add_argument("--norm-order", type=int, nargs="?")  # NOTE also used in pixelRunner
     p.add_argument("--anchor-round", type=int, nargs="?")  # also used in PerRoundMaxChannel
     p.add_argument(
-        "--search-radius", type=int, nargs="?"
+        "--search-radius", type=float, nargs="?"
     )  # also used in PerRoundMaxChannel, CheckAll
     p.add_argument("--return-original-intensities", type=bool, nargs="?")
     p.add_argument(

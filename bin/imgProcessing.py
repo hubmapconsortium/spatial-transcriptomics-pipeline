@@ -267,6 +267,7 @@ def cli(
     aux_name: str = None,
     ch_per_reg: int = 1,
     background_name: str = None,
+    register_background: bool = False,
     anchor_name: str = None,
     high_sigma: int = None,
     decon_iter: int = 15,
@@ -291,6 +292,8 @@ def cli(
     registration images match then keep set to 1 for 1-to-1 registration.
 
     background_name: name of the background view that will be subtracted, if provided.
+
+    register_background: if true, the background image will be registered to 'aux_name'
 
     anchor_name: name of the aux view anchor round to perform processing on, if provided.
 
@@ -360,10 +363,10 @@ def cli(
             # If a background image is provided, subtract it from the primary image.
             bg = exp[fov].get_image(background_name)
             print("\tremoving existing backgound...")
-            img = subtract_background(img, bg, register)
+            img = subtract_background(img, bg, register if register_background else None)
             if anchor_name:
                 print("\tremoving existing background from anchor image...")
-                anchor = subtract_background(anchor, bg, register)
+                anchor = subtract_background(anchor, bg, register if register_background else None)
         else:
             # If no background image is provided, estimate background using a large morphological
             # opening to subtract from primary images
@@ -463,6 +466,7 @@ if __name__ == "__main__":
     p.add_argument("--register-aux-view", type=str, nargs="?")
     p.add_argument("--ch-per-reg", type=int, nargs="?")
     p.add_argument("--background-view", type=str, nargs="?")
+    p.add_argument("--register-background", dest="register_background", action="store_true")
     p.add_argument("--anchor-view", type=str, nargs="?")
     p.add_argument("--high-sigma", type=int, nargs="?")
     p.add_argument("--decon-iter", type=int, nargs="?")
@@ -485,6 +489,7 @@ if __name__ == "__main__":
         aux_name=args.register_aux_view,
         ch_per_reg=args.ch_per_reg,
         background_name=args.background_view,
+        register_background=args.register_background,
         anchor_name=args.anchor_view,
         high_sigma=args.high_sigma,
         decon_iter=args.decon_iter,
