@@ -518,7 +518,7 @@ steps:
     in:
       datafile: parameter_json
       schema: read_schema/data
-    out: [skip_baysor, skip_processing, register_aux_view]
+    out: [skip_baysor, skip_processing, register_aux_view, fov_positioning_x_locs, fov_positioning_x_shape, fov_positioning_x_voxel, fov_positioning_y_locs, fov_positioning_y_shape, fov_positioning_y_voxel, fov_positioning_z_locs, fov_positioning_z_shape, fov_positioning_z_voxel]
     when: $(inputs.datafile != null)
 
   sorter:
@@ -762,6 +762,28 @@ steps:
                   aux_channel_count: count,
                   aux_channel_slope: self[6],
                   aux_channel_intercept: self[7]
+              };
+            } else {
+              return null;
+            }
+          }
+      fov_positioning:
+        source: [fov_positioning, stage/fov_positioning_x_locs, stage/fov_positioning_x_shape, stage/fov_positioning_x_voxel, stage/fov_positioning_y_locs, stage/fov_positioning_y_shape, stage/fov_positioning_y_voxel, stage/fov_positioning_z_locs, stage/fov_positioning_z_shape, stage/fov_positioning_z_voxel]
+        valueFrom: |
+          ${
+            if(self[0]){
+              return self[0];
+            } else if(self[1]) {
+              return {
+                x_locs: self[1],
+                x_shape: self[2],
+                x_voxel: self[3],
+                y_locs: self[4],
+                y_shape: self[5],
+                y_vocel: self[6],
+                z_locs: self[7],
+                z_shape: self[8],
+                z_voxel: self[9]
               };
             } else {
               return null;

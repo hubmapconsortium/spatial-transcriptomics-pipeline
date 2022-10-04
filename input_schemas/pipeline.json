@@ -1,5 +1,20 @@
 [
 	"skip_baysor",
 	"skip_processing",
-	"register_aux_view"
+	"register_aux_view",
+	{
+		"fov_positioning":[
+			[
+				"x_locs?",
+				"x_shape?",
+				"x_voxel?",
+				"y_locs?",
+				"y_shape?",
+				"y_voxel?",
+				"z_locs?",
+				"z_shape?",
+				"z_voxel?"
+			]
+		]
+	}
 ]
