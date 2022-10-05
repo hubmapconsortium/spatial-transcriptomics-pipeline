@@ -771,20 +771,20 @@ steps:
         source: [fov_positioning, stage/fov_positioning_x_locs, stage/fov_positioning_x_shape, stage/fov_positioning_x_voxel, stage/fov_positioning_y_locs, stage/fov_positioning_y_shape, stage/fov_positioning_y_voxel, stage/fov_positioning_z_locs, stage/fov_positioning_z_shape, stage/fov_positioning_z_voxel]
         valueFrom: |
           ${
-            if(self[0]){
-              return self[0];
-            } else if(self[1]) {
+            if(self[1]) {
               return {
                 x_locs: self[1],
                 x_shape: self[2],
                 x_voxel: self[3],
                 y_locs: self[4],
                 y_shape: self[5],
-                y_vocel: self[6],
+                y_voxel: self[6],
                 z_locs: self[7],
                 z_shape: self[8],
                 z_voxel: self[9]
               };
+            } else if (self[0]) {
+              return self[0];
             } else {
               return null;
             }
