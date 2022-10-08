@@ -15,6 +15,7 @@ from os import makedirs, path
 from pathlib import Path
 from time import time
 
+import matplotlib.patches as mpatches
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
 import numpy as np
@@ -606,6 +607,45 @@ def getFPR(segmentation, pdf=False):
     return results
 
 
+def plotBarcodeAbundance(decoded, pdf):
+    targets = decoded["target"].data.tolist()
+    blank_counts_full = [s for s in targets if "blank" in s]
+    real_counts_full = [s for s in targets if "blank" not in s]
+
+    blank_names = set(blank_counts_full)
+    blank_counts = []
+    while len(blank_names) > 0:
+        blank_counts.append(blank_counts_full.count(blank_names.pop()))
+
+    real_names = set(real_counts_full)
+    real_counts = []
+    while len(real_names) > 0:
+        real_counts.append(real_counts_full.count(real_names.pop()))
+
+    combined = blank_counts + real_counts
+    asrted = list(reversed(np.argsort(combined)))
+    bars = [combined[i] for i in asrted]
+    colors = [
+        (204 / 256, 51 / 256, 17 / 256) if i < len(blank_counts) else (0, 119 / 256, 187 / 256)
+        for i in asrted
+    ]
+
+    fig, ax = plt.subplots()
+
+    plt.bar(range(len(bars)), height=bars, color=colors, width=1, align="edge")
+    plt.xlim([0, len(combined)])
+    plt.ylim([0, max(combined) * 1.1])
+    plt.xlabel("Barcodes")
+    plt.ylabel("Total counts per barcode")
+    plt.title("Relative abundance of barcodes")
+    proxy_positive = mpatches.Patch(color=(0, 119 / 256, 187 / 256), label="positive")
+    proxy_blank = mpatches.Patch(color=(204 / 256, 51 / 256, 17 / 256), label="blank")
+    plt.legend(handles=[proxy_positive, proxy_blank])
+
+    pdf.savefig(fig)
+    plt.close()
+
+
 def plotSpotRatio(spots, transcripts, name, pdf):
     # Plots the channel/round distribution of spots and transcript sources on one graph
     fig, ax = plt.subplots()
@@ -732,6 +772,8 @@ def runFOV(
         trRes["fraction_spots_used"] = getFractionSpotsUsed(relevSpots, transcripts)
     trRes["round_dist"] = getTranscriptRoundDist(transcripts, pdf)
     trRes["channel_dist"] = getTranscriptChannelDist(transcripts, pdf)
+    if pdf:
+        plotBarcodeAbundance(transcripts, pdf)
     if spots and pdf:
         plotSpotRatio(
             results["spots"]["channel_dist"]["tally"],
