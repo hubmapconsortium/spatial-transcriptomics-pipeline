@@ -290,9 +290,7 @@ steps:
         source: [binary_mask, stage_segmentation/binary_mask_img_threshold, stage_segmentation/binary_mask_min_dist, stage_segmentation/binary_mask_min_allowed_size, stage_segmentation/binary_mask_max_allowed_size, stage_segmentation/binary_mask_masking_radius, stage_segmentation/binary_mask_nuclei_view, stage_segmentation/binary_mask_cyto_seg, stage_segmentation/binary_mask_correct_seg, stage_segmentation/binary_mask_border_buffer, stage_segmentation/binary_mask_area_thresh, stage_segmentation/binary_mask_thresh_block_size, stage_segmentation/binary_mask_watershed_footprint_size, stage_segmentation/binary_mask_label_exp_size, mask_roi_files, mask_roi_formats, mask_labeled_files, mask_labeled_formats]
         valueFrom: |
           ${
-            if(!self[1] && !self[6]){
-              return self[0]
-            } else if(self[14] && self[15]) {
+            if(self[14] && self[15]) {
               return {
                 "roi_set": self[14],
                 "file_formats": self[15]
@@ -302,6 +300,8 @@ steps:
                 "labeled_image": self[16],
                 "file_formats_labeled": self[17]
               };
+            } else if(!self[1] && !self[6]){
+              return self[0];
             } else if(self[1]){
               return {
                 "img_threshold": self[1],
