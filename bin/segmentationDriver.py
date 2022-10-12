@@ -82,7 +82,7 @@ def masksFromLabeledImages(
         Binary masks for each FOV.
     """
     masks = []
-    for i in range(len()):
+    for i in range(len(img_stack)):
         label_name = ("{}/" + file_formats_labeled).format(labeled_image, i)
         masks.append(BinaryMaskCollection.from_external_labeled_image(label_name, img_stack[i]))
     return masks
@@ -642,7 +642,7 @@ def run(
     else:
         img_stack = []
         for key in exp.keys():
-            print("looking at " + key + ", " + aux_name)
+            print(f"looking at {key}, {aux_name}")
             cur_img = exp[key].get_image(aux_name)
             img_stack.append(cur_img)
         # determine how we generate mask, then make it

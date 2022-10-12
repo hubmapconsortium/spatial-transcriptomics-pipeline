@@ -3,6 +3,7 @@
 	"fov_count",
 	{
 		"binary_mask":[
+			[],
 			[
 				"img_threshold",
 				"min_dist",
