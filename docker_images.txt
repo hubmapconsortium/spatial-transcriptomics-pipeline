@@ -1,4 +1,5 @@
 #hubmap/starfish docker/starfish/Dockerfile base_directory_build
 hubmap/starfish-custom docker/starfish-custom/Dockerfile base_directory_build
+docker.pkg.github.com/hubmapconsortium/spatial-transcriptomics-pipeline/starfish-docker-runner docker/starfish-docker-runner/Dockerfile base_directory_build
 #docker.pkg.github.com/hubmapconsortium/spatial-transcriptomics-pipeline/starfish-custom-dev docker/starfish-custom-dev/Dockerfile base_directory_build
 hubmap/baysor docker/baysor/Dockerfile base_directory_build
