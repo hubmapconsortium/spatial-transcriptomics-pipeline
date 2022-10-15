@@ -15,9 +15,12 @@ from os import makedirs, path
 from pathlib import Path
 from time import time
 
+import matplotlib.patches as mpatches
 import matplotlib.pyplot as plt
+import matplotlib.ticker as ticker
 import numpy as np
 import pandas as pd
+import skimage.io
 import starfish
 import starfish.data
 import yaml
@@ -38,11 +41,36 @@ from tqdm import tqdm
 # utility methods
 
 
+def thresholdSpots(spots, spotThreshold):
+    # takes a SpotFindingResults and removes all spots that have 'intensity'
+    # beneath spotThreshold. Useful when a reference image is used.
+    spot_attributes_list = []
+    for k, v in spots.items():
+        data = v.spot_attrs.data
+        data = data[data["intensity"] > spotThreshold]
+        data = data.reset_index(drop=True)
+        spotResults = PerImageSliceSpotResults(spot_attrs=SpotAttributes(data), extras=None)
+        spot_attributes_list.append((spotResults, {Axes.ROUND: k[0], Axes.CH: k[1]}))
+
+    newCoords = {}
+    renameAxes = {"x": Coordinates.X.value, "y": Coordinates.Y.value, "z": Coordinates.Z.value}
+    for k in renameAxes.keys():
+        newCoords[renameAxes[k]] = spots.physical_coord_ranges[k]
+
+    newSpots = SpotFindingResults(
+        imagestack_coords=newCoords, log=starfish.Log(), spot_attributes_list=spot_attributes_list
+    )
+    return newSpots
+
+
 def filterSpots(spots, mask, oneIndex=False, invert=False):
     # takes a SpotFindingResults, ImageStack, and BinaryMaskCollection
     # to return a set of SpotFindingResults that are masked by the binary mask
     spot_attributes_list = []
-    maskMat = mask.to_label_image().xarray.values
+    if isinstance(mask, BinaryMaskCollection):
+        maskMat = mask.to_label_image().xarray.values
+    else:
+        maskMat = mask
     maskMat[maskMat > 1] = 1
     if invert:
         maskMat = 1 - maskMat
@@ -53,8 +81,19 @@ def filterSpots(spots, mask, oneIndex=False, invert=False):
 
         selRow = []
         for ind, row in selectedSpots.iterrows():
-            if maskMat[int(row["y"]) - oneIndex][int(row["x"]) - oneIndex] == 1:
+            if (
+                len(maskMat.shape) == 2
+                and maskMat[int(row["y"]) - oneIndex][int(row["x"]) - oneIndex] == 1
+            ) or (
+                len(maskMat.shape) == 3
+                and maskMat[int(row["y"]) - oneIndex][int(row["x"]) - oneIndex][
+                    int(row["z"] - oneIndex)
+                ]
+                == 1
+            ):
                 selRow.append(ind)
+            elif len(maskMat.shape) != 2 and len(maskMat.shape) != 3:
+                raise Exception("Mask is not of 2 or 3 dimensions.")
 
         selectedSpots = selectedSpots.iloc[selRow]
         selectedSpots = selectedSpots.drop_duplicates()  # unsure why the query necessitates this
@@ -93,7 +132,7 @@ def monteCarloEnvelope(Kest, r, p, n, count):
     return (top, mid, bot)
 
 
-def plotRipleyResults(pdf, results, key, doMonte=False, title=None):
+def plotRipleyResults(pdf, results, key, doMonte=False, text=None):
     if doMonte:
         res, mon = results
         monte = mon[key]
@@ -111,8 +150,8 @@ def plotRipleyResults(pdf, results, key, doMonte=False, title=None):
     else:
         ax.plot(r, csr, "-r", label="CSR")
 
-    if title:
-        ax.title(title)
+    if text is not None:
+        ax.set_title(str(text))
     ax.set_ylabel("Ripley's K score")
     ax.set_xlabel("Radius (px)")
     ax.legend()
@@ -250,35 +289,21 @@ def percentMoreClustered(results):
     return mean, planeWise
 
 
-def plotRipleyResults(pdf, results, key, doMonte=False):
-    if doMonte:
-        res, mon = results
-        monte = mon[key]
-        kv, csr, r = res[key]
-    else:
-        kv, csr, r = results[key]
-
-    fig, ax = plt.subplots()
-
-    ax.plot(r, kv, label="Data")
-    if doMonte:
-        ax.plot(r, monte[0], "--r")
-        ax.plot(r, monte[1], "-r", label="median monte carlo")
-        ax.plot(r, monte[2], "--r")
-    else:
-        ax.plot(r, csr, "-r", label="CSR")
-
-    ax.set_title(key)
-    ax.set_ylabel("Ripley's K score")
-    ax.set_xlabel("Radius (px)")
-    ax.legend()
-
-    x0, x1 = ax.get_xlim()
-    y0, y1 = ax.get_ylim()
-    ax.set_aspect(abs(x1 - x0) / abs(y1 - y0))
-
-    pdf.savefig(fig)
-    plt.close()
+def percentLessClustered(results):
+    # assumes results has monte included
+    # returns list with % of each (r,ch,z) plane where calculated
+    #    Kest < 95% monte null hypothesis
+    planeWise = {}
+    mean = 0
+    for k in results[0].keys():
+        botend = results[1][k][2]
+        calc = results[0][k][0]
+        planeWise[k] = sum([1 if botend[i] < calc[i] else 0 for i in range(len(botend))]) / len(
+            botend
+        )
+        mean += planeWise[k]
+    mean = mean / len(planeWise.keys())
+    return mean, planeWise
 
 
 def getSpotRoundDist(spots, pdf=False):
@@ -296,16 +321,28 @@ def getSpotRoundDist(spots, pdf=False):
     skw = skew(tally)
 
     if pdf:
-        fig = plt.figure()
+        fig, ax = plt.subplots()
+
+        for axis in [ax.xaxis, ax.yaxis]:
+            axis.set_major_locator(ticker.MaxNLocator(integer=True))
+
         plt.bar(list(range(len(tally))), tally)
         plt.title("Spots per round")
         plt.xlabel("Round number")
         plt.ylabel("Spot count")
 
+        avg = np.mean(tally)
+        offset = (ax.get_ylim()[1] - ax.get_ylim()[0]) * 0.005
+        plt.axhline(avg, color="black")
+        plt.text(0, avg + offset, f"Average: {avg:.2f}")
+        plt.axhline(avg + std, dashes=(2, 2), color="black")
+        plt.axhline(avg - std, dashes=(2, 2), color="black")
+        plt.text(0, avg - std + offset, f"Standard Deviation: {std:.2f}")
+
         pdf.savefig(fig)
         plt.close()
 
-    return tally, std, skw
+    return {"tally": tally, "stdev": std, "skew": skw}
 
 
 def getSpotChannelDist(spots, pdf=False):
@@ -323,14 +360,27 @@ def getSpotChannelDist(spots, pdf=False):
     skw = skew(tally)
 
     if pdf:
-        fig = plt.figure()
+        fig, ax = plt.subplots()
+
+        for axis in [ax.xaxis, ax.yaxis]:
+            axis.set_major_locator(ticker.MaxNLocator(integer=True))
+
         plt.bar(list(range(len(tally))), tally)
         plt.title("Spots per channel")
         plt.xlabel("Channel number")
-        plt.ylabel("Spot count")
+        plt.ylabel("Fraction of spots")
+
+        avg = np.mean(tally)
+        offset = (ax.get_ylim()[1] - ax.get_ylim()[0]) * 0.005
+        plt.axhline(avg, color="black")
+        plt.text(0, avg + offset, f"Average: {avg:.2f}")
+        plt.axhline(avg + std, dashes=(2, 2), color="black")
+        plt.axhline(avg - std, dashes=(2, 2), color="black")
+        plt.text(0, avg - std + offset, f"Standard Deviation: {std:.2f}")
+
         pdf.savefig(fig)
         plt.close()
-    return tally, std, skw
+    return {"tally": tally, "stdev": std, "skew": skw}
 
 
 def maskedSpatialDensity(masked, unmasked, imgsize, steps, pdf=False):
@@ -339,13 +389,31 @@ def maskedSpatialDensity(masked, unmasked, imgsize, steps, pdf=False):
 
     if pdf:
         for k in unmaskedDens[0].keys():
-            plotRipleyResults(pdf, unmaskedDens, k, True, "Unmasked {}".format(str(key)))
-            plotRipleyResults(pdf, maskedDens, k, True, "Masked {}".format(str(key)))
+            plotRipleyResults(
+                pdf=pdf,
+                results=unmaskedDens,
+                key=k,
+                doMonte=True,
+                text="Unmasked {}".format(str(k)),
+            )
+            plotRipleyResults(
+                pdf=pdf, results=maskedDens, key=k, doMonte=True, text="Masked {}".format(str(k))
+            )
 
-    maskedPer = percentMoreClustered(maskedDens)[0]
-    unmaskedPer = percentMoreClustered(unmaskedDens)[0]
+    result = {}
+    for val in ["more clustered", "less clustered"]:
+        func = percentMoreClustered
+        if val == "less clustered":
+            func = percentLessClustered
 
-    return (unmaskedPer / maskedPer, unmaskedPer, maskedPer)
+        maskedPer = func(maskedDens)[0]
+        unmaskedPer = func(unmaskedDens)[0]
+        result[val] = {
+            "ratio": unmaskedPer / maskedPer,
+            "unmasked": unmaskedPer,
+            "masked": maskedPer,
+        }
+    return result
 
 
 # Transcript metrics
@@ -373,11 +441,16 @@ def getTranscriptsPerCell(segmented, pdf=False):
         counts.append(len([x for x in cells if x == i]))
 
     counts.sort()
+    counts = np.flip(counts)
     q1, mid, q3 = np.percentile(counts, [25, 50, 75])
     iqr_scale = 1.5
 
     if pdf:
-        fig = plt.figure()
+        fig, ax = plt.subplots()
+
+        for axis in [ax.xaxis, ax.yaxis]:
+            axis.set_major_locator(ticker.MaxNLocator(integer=True))
+
         plt.bar(list(range(len(counts))), counts)
         plt.axhline(
             y=mid - iqr_scale * (q3 - q1), dashes=(1, 1), color="gray", label="Outlier Threshold"
@@ -386,13 +459,21 @@ def getTranscriptsPerCell(segmented, pdf=False):
         plt.axhline(y=mid, color="black", label="Median")
         plt.axhline(y=q3, dashes=(2, 2), color="black")
         plt.axhline(y=mid + iqr_scale * (q3 - q1), dashes=(1, 1), color="gray")
+        plt.ylim(0)
+        plt.xlim(0)
         plt.title("Transcript count per cell")
         plt.ylabel("Transcript count")
+        plt.xlabel("Cells")
         plt.legend()
 
         pdf.savefig(fig)
         plt.close()
-    return (counts, np.std(counts), skew(counts))
+    return {
+        "counts": counts,
+        "quartiles": (q1, mid, q3),
+        "stdev": np.std(counts),
+        "skew": skew(counts),
+    }
 
 
 def getFractionSpotsUsed(spots, transcripts):
@@ -409,15 +490,27 @@ def getTranscriptRoundDist(transcripts, pdf=False):
     skw = skew(counts)
 
     if pdf:
-        fig = plt.figure()
+        fig, ax = plt.subplots()
+
+        for axis in [ax.xaxis, ax.yaxis]:
+            axis.set_major_locator(ticker.MaxNLocator(integer=True))
+
         plt.bar(range(len(counts)), counts)
         plt.title("Transcript source spot distribution across rounds")
         plt.ylabel("Spot count")
         plt.xlabel("Round ID")
 
+        avg = np.mean(counts)
+        offset = (ax.get_ylim()[1] - ax.get_ylim()[0]) * 0.005
+        plt.axhline(avg, color="black")
+        plt.text(0, avg + offset, f"Average: {avg:.2f}")
+        plt.axhline(avg + std, dashes=(2, 2), color="black")
+        plt.axhline(avg - std, dashes=(2, 2), color="black")
+        plt.text(0, avg - std + offset, f"Standard Deviation: {std:.2f}")
+
         pdf.savefig(fig)
         plt.close()
-    return counts, std, skw
+    return {"counts": counts, "stdev": std, "skew": skw}
 
 
 def getTranscriptChannelDist(transcripts, pdf=False):
@@ -428,31 +521,56 @@ def getTranscriptChannelDist(transcripts, pdf=False):
     skw = skew(counts)
 
     if pdf:
-        fig = plt.figure()
+        fig, ax = plt.subplots()
+
+        for axis in [ax.xaxis, ax.yaxis]:
+            axis.set_major_locator(ticker.MaxNLocator(integer=True))
+
         plt.bar(range(len(counts)), counts)
         plt.title("Transcript source spot distribution across channels")
-        plt.ylabel("Spot count")
+        plt.ylabel("Fraction of spots")
         plt.xlabel("Channel ID")
+
+        avg = np.mean(counts)
+        offset = (ax.get_ylim()[1] - ax.get_ylim()[0]) * 0.005
+        plt.axhline(avg, color="black")
+        plt.text(0, avg + offset, f"Average: {avg:.2f}")
+        plt.axhline(avg + std, dashes=(2, 2), color="black")
+        plt.axhline(avg - std, dashes=(2, 2), color="black")
+        plt.text(0, avg - std + offset, f"Standard Deviation: {std:.2f}")
 
         pdf.savefig(fig)
         plt.close()
-    return counts, std, skw
+    return {"counts": counts, "stdev": std, "skew": skw}
 
 
 def getFPR(segmentation, pdf=False):
     # remove unassigned transcripts, if the columns to do so are present.
-    if "cell" in segmentation.keys():
-        transcripts = segmentation[segmentation["cell"] != "nan"]
-    elif "cell_id" in segmentation.keys():
-        transcripts = segmentation[segmentation["cell_id"] != "nan"]
 
-    blank_counts_full = segmentation[[col for col in segmentation.columns if "blank" in col]]
-    real_counts_full = segmentation[[col for col in segmentation.columns if "blank" not in col]]
+    # remove unassigned transcripts, if the columns to do so are present.
+    key = "cell"
+    if "cell_id" in segmentation.keys():
+        key = "cell_id"
 
-    real_per_cell_full = real_counts_full.sum(axis=1)
-    blank_per_cell_full = blank_counts_full.sum(axis=1)
-    sorted_reals_full = real_per_cell_full.sort_values(ascending=False)
-    sorted_blanks_full = blank_per_cell_full[sorted_reals_full.index]
+    segmentation = segmentation[segmentation[key].notnull()]
+
+    if len(segmentation) == 0:
+        return None
+
+    blank_counts_full = segmentation[segmentation["target"].str.contains("blank")]
+    real_counts_full = segmentation[~segmentation["target"].str.contains("blank")]
+
+    cell_count = int(real_counts_full[key].max()) + 1
+    real_per_cell_full = np.histogram(real_counts_full[key], bins=cell_count)[0]
+    blank_per_cell_full = np.histogram(blank_counts_full[key], bins=cell_count)[0]
+
+    sort_ind = np.argsort(real_per_cell_full)
+    sorted_reals_full = [
+        real_per_cell_full[sort_ind[len(sort_ind) - i - 1]] for i in range(len(sort_ind))
+    ]
+    sorted_blanks_full = [
+        blank_per_cell_full[sort_ind[len(sort_ind) - i - 1]] for i in range(len(sort_ind))
+    ]
 
     results = {
         "FP": sum(blank_per_cell_full),
@@ -461,26 +579,29 @@ def getFPR(segmentation, pdf=False):
     }
 
     if pdf:
-        fig = plt.figure()
+        fig, ax = plt.subplots()
 
         plt.bar(
             range(len(real_per_cell_full)),
             sorted_reals_full,
-            color="blue",
             width=1,
             label="On-target",
+            align="edge",
+            color=(0, 119 / 256, 187 / 256),
         )
         plt.bar(
             range(len(blank_per_cell_full)),
             sorted_blanks_full,
-            color="red",
             width=1,
             label="Off-target",
+            align="edge",
+            color=(204 / 256, 51 / 256, 17 / 256),
         )
         plt.plot(
             [0, len(real_per_cell_full)],
             [np.median(real_per_cell_full), np.median(real_per_cell_full)],
             color="black",
+            label="Median count",
             linewidth=3,
         )
         plt.xlabel("Cells")
@@ -495,6 +616,68 @@ def getFPR(segmentation, pdf=False):
         plt.close()
 
     return results
+
+
+def plotBarcodeAbundance(decoded, pdf):
+    targets = decoded["target"].data.tolist()
+    blank_counts_full = [s for s in targets if "blank" in s]
+    real_counts_full = [s for s in targets if "blank" not in s]
+
+    blank_names = set(blank_counts_full)
+    blank_counts = []
+    while len(blank_names) > 0:
+        blank_counts.append(blank_counts_full.count(blank_names.pop()))
+
+    real_names = set(real_counts_full)
+    real_counts = []
+    while len(real_names) > 0:
+        real_counts.append(real_counts_full.count(real_names.pop()))
+
+    combined = blank_counts + real_counts
+    asrted = list(reversed(np.argsort(combined)))
+    bars = [combined[i] for i in asrted]
+    colors = [
+        (204 / 256, 51 / 256, 17 / 256) if i < len(blank_counts) else (0, 119 / 256, 187 / 256)
+        for i in asrted
+    ]
+
+    fig, ax = plt.subplots()
+
+    plt.bar(range(len(bars)), height=bars, color=colors, width=1, align="edge")
+    plt.xlim([0, len(combined)])
+    plt.ylim([0, max(combined) * 1.1])
+    plt.xlabel("Barcodes")
+    plt.ylabel("Total counts per barcode")
+    plt.title("Relative abundance of barcodes")
+    proxy_positive = mpatches.Patch(color=(0, 119 / 256, 187 / 256), label="positive")
+    proxy_blank = mpatches.Patch(color=(204 / 256, 51 / 256, 17 / 256), label="blank")
+    plt.legend(handles=[proxy_positive, proxy_blank])
+
+    pdf.savefig(fig)
+    plt.close()
+
+
+def plotSpotRatio(spots, transcripts, name, pdf):
+    # Plots the channel/round distribution of spots and transcript sources on one graph
+    fig, ax = plt.subplots()
+
+    for axis in [ax.xaxis, ax.yaxis]:
+        axis.set_major_locator(ticker.MaxNLocator(integer=True))
+
+    avg = np.mean(spots)
+    plt.scatter(
+        [i for i in range(len(transcripts))], transcripts, label="spots used for transcripts"
+    )
+    plt.scatter([i for i in range(len(spots))], spots, label="all spots")
+    plt.axhline(avg, color="black", lw=1)
+    plt.ylim(0)
+    plt.title(f"Comparison of spots and source spots for transcripts across {name}s")
+    plt.ylabel("Fraction of spots")
+    plt.xlabel(f"{name} ID")
+    plt.legend()
+
+    pdf.savefig(fig)
+    plt.close()
 
 
 def simplifyDict(ob):
@@ -518,6 +701,7 @@ def runFOV(
     codebook,
     size,
     spots=None,
+    spotThreshold=None,
     segmask=None,
     segmentation=None,
     doRipley=False,
@@ -536,11 +720,23 @@ def runFOV(
     if spots:
         spotRes = {}
         print("finding spot metrics")
+
+        if spotThreshold is not None:
+            spots = thresholdSpots(spots, spotThreshold)
+
         relevSpots = spots
-        if segmask:
+        if segmask is not None:
             relevSpots = filterSpots(spots, segmask, True)
+            if relevSpots.count_total_spots() == 0:
+                print("No spots inside segmentation area, are you sure the params are set right?")
+                return None
 
         ts = time()
+        spotRes["spot_counts"] = {
+            "total_count": spots.count_total_spots(),
+            "segmented_count": relevSpots.count_total_spots(),
+            "ratio": relevSpots.count_total_spots() / spots.count_total_spots(),
+        }
         spotRes["density"] = getSpotDensity(relevSpots, codebook)
 
         t1 = time()
@@ -559,12 +755,12 @@ def runFOV(
         if doRipley:
             t = time()
             print("\n\tstarting ripley estimates")
-            spatDens = getSpatitalDensity(spots, size, doMonte=True)
+            spatDens = getSpatialDensity(spots, size, doMonte=True)
             spotRes["spatial_density"] = percentMoreClustered(spatDens)
             if savePdf:
                 for k in spatDens[0].keys():
-                    plotRipleyResults(pdf, spatDens, key, True)
-            if segmask:
+                    plotRipleyResults(pdf, spatDens, k, True, str(k))
+            if segmask is not None:
                 invRelevSpots = filterSpots(spots, segmask, invert=True)
                 spotRes["masked_spatial_density"] = maskedSpatialDensity(
                     relevSpots, invRelevSpots, size, 10, pdf
@@ -583,10 +779,22 @@ def runFOV(
         trRes["per_cell"] = getTranscriptsPerCell(segmentation, pdf)
         trRes["FPR"] = getFPR(segmentation, pdf)
     trRes["density"] = getTranscriptDensity(transcripts, codebook)
-    if spots is not None:
+    if spots:
         trRes["fraction_spots_used"] = getFractionSpotsUsed(relevSpots, transcripts)
     trRes["round_dist"] = getTranscriptRoundDist(transcripts, pdf)
     trRes["channel_dist"] = getTranscriptChannelDist(transcripts, pdf)
+    if pdf:
+        plotBarcodeAbundance(transcripts, pdf)
+    if spots and pdf:
+        plotSpotRatio(
+            results["spots"]["channel_dist"]["tally"],
+            trRes["channel_dist"]["counts"],
+            "channel",
+            pdf,
+        )
+        plotSpotRatio(
+            results["spots"]["round_dist"]["tally"], trRes["round_dist"]["counts"], "round", pdf
+        )
 
     results["transcripts"] = trRes
     t = time()
@@ -607,6 +815,7 @@ def run(
     size,
     fovs=None,
     spots=None,
+    spot_threshold=None,
     segmask=None,
     segmentation=None,
     doRipley=False,
@@ -636,13 +845,16 @@ def run(
                 spot = spots[f]
             if segmentation:
                 segmentOne = segmentation[f]
+            if segmask:
+                segmaskOne = segmask[f]
             results[f] = runFOV(
                 output_dir=fov_dir,
                 transcripts=transcripts[f],
                 codebook=codebook,
                 size=size,
                 spots=spot,
-                segmask=segmask,
+                spotThreshold=spot_threshold,
+                segmask=segmaskOne,
                 segmentation=segmentOne,
                 doRipley=doRipley,
                 savePdf=savePdf,
@@ -654,6 +866,7 @@ def run(
             codebook=codebook,
             size=size,
             spots=spots,
+            spotThreshold=spot_threshold,
             segmask=segmask,
             segmentation=segmentation,
             doRipley=doRipley,
@@ -691,6 +904,7 @@ if __name__ == "__main__":
     p.add_argument("--x-size", type=int, nargs="?")
     p.add_argument("--y-size", type=int, nargs="?")
     p.add_argument("--z-size", type=int, nargs="?")
+    p.add_argument("--spot-threshold", type=float, nargs="?")
     p.add_argument("--run-ripley", dest="run_ripley", action="store_true")
     p.add_argument("--save-pdf", dest="save_pdf", action="store_true")
     args = p.parse_args()
@@ -699,22 +913,6 @@ if __name__ == "__main__":
 
     codebook = False
     roi = False
-
-    if args.codebook_exp:
-        codebook = Codebook.open_json(str(args.codebook_exp) + "/codebook.json")
-
-        if (
-            args.roi
-        ):  # NOTE Going to assume 1 FOV for now. Largely used for debugging, not pipeline runs.
-            exp = starfish.core.experiment.experiment.Experiment.from_json(
-                str(args.codebook_exp) + "/experiment.json"
-            )
-            img = exp["fov_000"].get_image("primary")
-            roi = BinaryMaskCollection.from_fiji_roi_set(
-                path_to_roi_set_zip=args.roi, original_image=img
-            )
-    elif args.codebook_pkl:
-        codebook = pickle.load(open(args.codebook_pkl, "rb"))
 
     transcripts = False
     if args.transcript_pkl:
@@ -735,6 +933,8 @@ if __name__ == "__main__":
             segmentation[name] = pd.read_csv(
                 "{}/{}/segmentation.csv".format(args.segmentation_loc, name)
             )
+            # pre-filtering for nan targets, since this will crash QC code.
+            segmentation[name] = segmentation[name][~segmentation[name]["target"].isna()]
 
     spots = False
     if args.spots_pkl:
@@ -747,6 +947,35 @@ if __name__ == "__main__":
                 "{}/spots/{}_SpotFindingResults.json".format(args.exp_output, k)
             )
 
+    if args.codebook_exp:
+        codebook = Codebook.open_json(str(args.codebook_exp) + "/codebook.json")
+
+        if (
+            args.roi
+        ):  # NOTE Going to assume 1 FOV for now. Largely used for debugging, not pipeline runs.
+            exp = starfish.core.experiment.experiment.Experiment.from_json(
+                str(args.codebook_exp) + "/experiment.json"
+            )
+            img = exp["fov_000"].get_image("primary")
+            roi = BinaryMaskCollection.from_fiji_roi_set(
+                path_to_roi_set_zip=args.roi, original_image=img
+            )
+        elif args.segmentation_loc:
+            exp = starfish.core.experiment.experiment.Experiment.from_json(
+                str(args.codebook_exp) + "/experiment.json"
+            )
+            roi = {}
+            for f in transcripts.keys():
+                maskloc = "{}/{}/mask.tiff".format(args.segmentation_loc, f)
+                roi[f] = skimage.io.imread(maskloc)
+
+    elif args.codebook_pkl:
+        codebook = pickle.load(open(args.codebook_pkl, "rb"))
+
+    spot_threshold = None
+    if args.spot_threshold:
+        spot_threshold = args.spot_threshold
+
     size = [0, 0, 0]
     if args.x_size:  # specify in CWL that all or none must be specified, only needed when doRipley
         size[0] = args.x_size
@@ -758,5 +987,14 @@ if __name__ == "__main__":
         # reading in from experiment can have multiple FOVs
         fovs = [k for k in transcripts.keys()]
     run(
-        transcripts, codebook, size, fovs, spots, roi, segmentation, args.run_ripley, args.save_pdf
+        transcripts=transcripts,
+        codebook=codebook,
+        size=size,
+        fovs=fovs,
+        spots=spots,
+        spot_threshold=spot_threshold,
+        segmask=roi,
+        segmentation=segmentation,
+        doRipley=args.run_ripley,
+        savePdf=args.save_pdf,
     )

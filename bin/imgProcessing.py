@@ -38,7 +38,7 @@ def saveImg(loc: str, prefix: str, img: ImageStack):
         for c in range(img.num_chs):
             for z in range(img.num_zplanes):
                 tiff.imsave(
-                    "{}/{}-c{}-r{}-z{}.tiff".format(loc, prefix, c, r, z), img._data[r, c, z, :, :]
+                    "{}{}-c{}-r{}-z{}.tiff".format(loc, prefix, c, r, z), img._data[r, c, z, :, :]
                 )
 
 
@@ -110,42 +110,52 @@ def register_primary(img, reg_img, chs_per_reg):
     return img
 
 
-def subtract_background(img, background, reg_img=None, back_reg_ch=None):
+def subtract_background(img, background, reg_img=None):
     """
     Subtract real background image from primary images. Will register to same reference as primary images were
-    aligned to if reg_img and back_reg_ch are provided.
+    aligned to if reg_img is provided, assumes background is of same round/channel dimensions as reference.
     """
 
     # If a background registration channel is given register background images to primary images before subtracting.
-    if reg_img and back_reg_ch:
+    bg_dat = background.xarray.data
+    if reg_img:
 
         # Calculate registration shift for backround image
+        shifts = {}
+        # Reference is set arbitrarily to first round/channel}
         reference = reg_img.xarray.data[0, 0]
-        shift, error, diffphase = phase_cross_correlation(
-            reference, background[back_reg_ch], upsample_factor=100
-        )
-        shape = img.raw_shape
+        for r in range(reg_img.num_rounds):
+            for ch in range(reg_img.num_chs):
+                shift, error, diffphase = phase_cross_correlation(
+                    reference, bg_dat[r, ch], upsample_factor=100
+                )
+                shifts[(r, ch)] = shift
 
         # Create transformation matrices
-        tform = np.diag([1.0] * 4)
-        # Start from 1
-        for i in range(1, 3):
-            tform[i, 3] = shift[i]
+        shape = img.raw_shape
+        tforms = {}
+        for (r, ch) in shifts:
+            tform = np.diag([1.0] * 4)
+            # Start from 1 because we don't want to shift in the z direction (if there is one)
+            for i in range(1, 3):
+                tform[i, 3] = shifts[(r, ch)][i]
+            tforms[(r, ch)] = tform
 
-        # Register background images
-        for ch in range(background.shape[0] - 1):
-            background[ch] = ndimage.affine_transform(
-                background[ch], np.linalg.inv(tform), output_shape=shape[2:]
-            )
+        # Register primary images
+        for r in range(background.num_rounds):
+            for ch in range(background.num_chs):
+                bg_dat[r, ch] = ndimage.affine_transform(
+                    img.xarray.data[r, ch],
+                    np.linalg.inv(tforms[(r, ch)]),
+                    output_shape=shape[2:],
+                )
 
     # Subtract background images from primary
-    num_chs = background.shape[0]
-    if back_reg_ch is not None:
-        num_chs -= 1
+    num_chs = background.num_chs
     for r in range(img.num_rounds):
         for ch in range(img.num_chs):
             for z in range(img.num_zplanes):
-                img.xarray.data[r, ch, z] -= background[ch % num_chs, z] / (2**16)
+                img.xarray.data[r, ch, z] -= bg_dat[r, ch % num_chs, z] / (2**16)
             img.xarray.data[r, ch][img.xarray.data[r, ch] < 0] = 0
     return img
 
@@ -249,12 +259,15 @@ def white_top_hat(img, wth_rad):
 
 def cli(
     input_dir: Path,
-    output_dir: Path,
-    clip_min: float = 95,
+    output_dir: str,
+    clip_min: float = 0,
     clip_max: float = 99.9,
+    level_method: str = "",
+    is_volume: bool = False,
     aux_name: str = None,
     ch_per_reg: int = 1,
     background_name: str = None,
+    register_background: bool = False,
     anchor_name: str = None,
     high_sigma: int = None,
     decon_iter: int = 15,
@@ -263,9 +276,14 @@ def cli(
     rolling_rad: int = None,
     match_hist: bool = False,
     wth_rad: int = None,
+    inline_log: bool = False,
 ):
     """
     clip_min: minimum value for ClipPercentileToZero
+
+    is_volume: whether to treat the z-planes as a 3D image.
+
+    level_method: Which level method to be applied to the Clip filter.
 
     aux_name: name of the aux view to align registration to
 
@@ -274,6 +292,8 @@ def cli(
     registration images match then keep set to 1 for 1-to-1 registration.
 
     background_name: name of the background view that will be subtracted, if provided.
+
+    register_background: if true, the background image will be registered to 'aux_name'
 
     anchor_name: name of the aux view anchor round to perform processing on, if provided.
 
@@ -296,16 +316,28 @@ def cli(
 
     wth_rad: Radius for white top hat filter. Should be slightly larger than the expected spot radius.
     """
-    if not path.isdir(output_dir):
-        makedirs(output_dir)
 
-    reporter = open(
-        path.join(output_dir, datetime.now().strftime("%Y%m%d_%H%M_img_processing.log")), "w"
-    )
-    sys.stdout = reporter
-    sys.stderr = reporter
+    os.makedirs(output_dir, exist_ok=True)
+
+    if not inline_log:
+        reporter = open(
+            path.join(output_dir, datetime.now().strftime("%Y%m%d_%H%M_img_processing.log")), "w"
+        )
+        sys.stdout = reporter
+        sys.stderr = reporter
 
     tqdm.__init__ = partialmethod(tqdm.__init__, disable=True)
+
+    if level_method == "SCALE_BY_CHUNK":
+        level_method = Levels.SCALE_BY_CHUNK
+    elif level_method == "SCALE_BY_IMAGE":
+        level_method = Levels.SCALE_BY_IMAGE
+    elif level_method == "SCALE_SATURATED_BY_CHUNK":
+        level_method = Levels.SCALE_SATURATED_BY_CHUNK
+    elif level_method == "SCALE_SATURATED_BY_IMAGE":
+        level_method = Levels.SCALE_SATURATED_BY_IMAGE
+    else:
+        level_method = Levels.SCALE_BY_CHUNK
 
     t0 = time()
 
@@ -331,10 +363,10 @@ def cli(
             # If a background image is provided, subtract it from the primary image.
             bg = exp[fov].get_image(background_name)
             print("\tremoving existing backgound...")
-            img = subtract_background(img, bg, register, 1)
+            img = subtract_background(img, bg, register if register_background else None)
             if anchor_name:
                 print("\tremoving existing background from anchor image...")
-                anchor = subtract_background(anchor, bg, register, 1)
+                anchor = subtract_background(anchor, bg, register if register_background else None)
         else:
             # If no background image is provided, estimate background using a large morphological
             # opening to subtract from primary images
@@ -342,7 +374,7 @@ def cli(
             img = subtract_background_estimate(img, cpu_count())
             if anchor_name:
                 print("\tremoving estimated background from anchor image...")
-                anchor = subtract_background(anchor, bg, register, 1)
+                anchor = subtract_background_estimate(anchor, cpu_count())
 
         if high_sigma:
             # Remove cellular autofluorescence w/ gaussian high-pass filter
@@ -391,11 +423,14 @@ def cli(
         print("\tclip and scaling...")
         # Scale image, clipping all but the highest intensities to zero
         clip = starfish.image.Filter.ClipPercentileToZero(
-            p_min=clip_min, p_max=clip_max, is_volume=True, level_method=Levels.SCALE_BY_CHUNK
+            p_min=clip_min, p_max=clip_max, is_volume=is_volume, level_method=level_method
         )
         clip.run(img, in_place=True)
         if anchor_name:
             print("\tapplying clip and scale to anchor image...")
+            clip = starfish.image.Filter.ClipPercentileToZero(
+                p_min=90, p_max=99.9, is_volume=is_volume, level_method=level_method
+            )
             clip.run(anchor, in_place=True)
 
         print(f"\tView {fov} complete")
@@ -419,16 +454,19 @@ def cli(
 
 if __name__ == "__main__":
 
-    output_dir = Path("3_processed")
+    output_dir = "3_processed/"
 
     p = ArgumentParser()
 
     p.add_argument("--input-dir", type=Path)
-    p.add_argument("--clip-min", type=float, default=95)
+    p.add_argument("--clip-min", type=float, default=0)
     p.add_argument("--clip-max", type=float, default=99.9)
+    p.add_argument("--level-method", type=str, nargs="?")
+    p.add_argument("--is-volume", dest="is_volume", action="store_true")
     p.add_argument("--register-aux-view", type=str, nargs="?")
     p.add_argument("--ch-per-reg", type=int, nargs="?")
     p.add_argument("--background-view", type=str, nargs="?")
+    p.add_argument("--register-background", dest="register_background", action="store_true")
     p.add_argument("--anchor-view", type=str, nargs="?")
     p.add_argument("--high-sigma", type=int, nargs="?")
     p.add_argument("--decon-iter", type=int, nargs="?")
@@ -436,6 +474,7 @@ if __name__ == "__main__":
     p.add_argument("--low-sigma", type=int, nargs="?")
     p.add_argument("--rolling-radius", type=int, nargs="?")
     p.add_argument("--match-histogram", dest="match_histogram", action="store_true")
+    p.add_argument("--inline-log", dest="inline_log", action="store_true")
     p.add_argument("--tophat-radius", type=int, nargs="?")
 
     args = p.parse_args()
@@ -445,9 +484,12 @@ if __name__ == "__main__":
         output_dir=output_dir,
         clip_min=args.clip_min,
         clip_max=args.clip_max,
+        level_method=args.level_method,
+        is_volume=args.is_volume,
         aux_name=args.register_aux_view,
         ch_per_reg=args.ch_per_reg,
         background_name=args.background_view,
+        register_background=args.register_background,
         anchor_name=args.anchor_view,
         high_sigma=args.high_sigma,
         decon_iter=args.decon_iter,
@@ -456,4 +498,5 @@ if __name__ == "__main__":
         rolling_rad=args.rolling_radius,
         match_hist=args.match_histogram,
         wth_rad=args.tophat_radius,
+        inline_log=args.inline_log,
     )

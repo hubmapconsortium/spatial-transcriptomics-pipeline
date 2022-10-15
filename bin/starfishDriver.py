@@ -7,7 +7,7 @@ from datetime import datetime
 from functools import partialmethod
 from os import cpu_count, makedirs, path
 from pathlib import Path
-from typing import Callable, Mapping, Set, Tuple
+from typing import Callable, Mapping, Optional, Set, Tuple, Union
 
 import numpy as np
 import pandas as pd
@@ -21,7 +21,7 @@ from starfish import (
     ImageStack,
     IntensityTable,
 )
-from starfish.core.types import SpotAttributes, SpotFindingResults
+from starfish.core.types import Number, SpotAttributes, SpotFindingResults
 from starfish.spots import AssignTargets
 from starfish.types import (
     Axes,
@@ -37,11 +37,11 @@ from tqdm import tqdm
 def blobRunner(
     img: ImageStack,
     ref_img: ImageStack = None,
-    min_sigma: Tuple[float, float, float] = (0.5, 0.5, 0.5),
-    max_sigma: Tuple[float, float, float] = (8, 8, 8),
+    min_sigma: Union[Number, Tuple[Number, ...]] = 0.5,
+    max_sigma: Union[Number, Tuple[Number, ...]] = 8,
     num_sigma: int = 5,
     threshold: float = 0.1,
-    is_volume: bool = True,
+    is_volume: bool = False,
     detector_method: str = "blob_log",
     overlap: float = 0.5,
 ) -> SpotFindingResults:
@@ -223,7 +223,6 @@ def optimize_scale(
         is_volume: Boolean whether to scale the image as a 3D volume or as individual 2D tiles.
         pixelRunnerKwargs: the parameters for running the decoder.
     """
-    tqdm.__init__ = partialmethod(tqdm.__init__, disable=True)
 
     # Apply scaling factors
     for r in range(img.num_rounds):
@@ -271,7 +270,9 @@ def optimize_scale(
     return scaling_mods
 
 
-def scale_img(img, codebook, pixelRunnerKwargs: dict, is_volume: bool = False):
+def scale_img(
+    img, codebook, pixelRunnerKwargs: dict, level_method: Levels, is_volume: bool = False
+):
     """
     Main method for image rescaling. Takes a set of images and rescales them to get the best
     pixel-based estimate.  Returns an ImageStack.
@@ -316,7 +317,7 @@ def scale_img(img, codebook, pixelRunnerKwargs: dict, is_volume: bool = False):
     pmin = 0
     pmax = 100
     clip = starfish.image.Filter.ClipPercentileToZero(
-        p_min=pmin, p_max=pmax, is_volume=is_volume, level_method=Levels.SCALE_BY_IMAGE
+        p_min=pmin, p_max=pmax, is_volume=is_volume, level_method=level_method
     )
     clip.run(img, in_place=True)
 
@@ -383,7 +384,9 @@ def run(
     experiment: Experiment,
     blob_based: bool,
     use_ref: bool,
+    anchor_name: str,
     rescale: bool,
+    level_method: Levels,
     is_volume: bool,
     blobRunnerKwargs: dict,
     decodeRunnerKwargs: dict,
@@ -402,6 +405,8 @@ def run(
         If true, use blob-detection and decoding methods. Else, use pixel-based methods.
     use_ref: bool
         If true, a reference image will be used and created by flattening the fov.
+    anchor_name: str
+        If provided, that aux view will be flattened and used as the reference image.
     rescale: bool
         If true, the image will be rescaled until convergence before running the decoder.
     blobRunnerKwargs: dict
@@ -431,11 +436,12 @@ def run(
     sys.stderr = reporter
 
     print(
-        "output_dir: {}\nexp: {}\nblob_based: {}\nuse_ref: {}\nrescale: {}\nblobrunner: {}\ndecoderunner: {}\npixelrunner: {}\n".format(
+        "output_dir: {}\nexp: {}\nblob_based: {}\nuse_ref: {}\nanchor: {}\nrescale: {}\nblobrunner: {}\ndecoderunner: {}\npixelrunner: {}\n".format(
             output_dir,
             experiment,
             blob_based,
             use_ref,
+            anchor_name,
             rescale,
             blobRunnerKwargs,
             decodeRunnerKwargs,
@@ -453,9 +459,19 @@ def run(
         ref_img = None
         if use_ref:
             ref_img = img.reduce({Axes.CH, Axes.ROUND, Axes.ZPLANE}, func="max")
+        if anchor_name:
+            ref_img = (
+                experiment[fov]
+                .get_image(anchor_name)
+                .reduce({Axes.CH, Axes.ROUND, Axes.ZPLANE}, func="max")
+            )
+            clip = starfish.image.Filter.ClipPercentileToZero(
+                p_min=20, p_max=99.9, is_volume=is_volume, level_method=Levels.SCALE_BY_CHUNK
+            )
+            clip.run(ref_img, in_place=True)
 
         if rescale:
-            img = scale_img(img, experiment.codebook, pixelRunnerKwargs, is_volume)
+            img = scale_img(img, experiment.codebook, pixelRunnerKwargs, level_method, is_volume)
 
         if blob_based:
             output_name = f"{output_dir}spots/{fov}_"
@@ -500,6 +516,8 @@ if __name__ == "__main__":
     p.add_argument("--exp-loc", type=Path)
     p.add_argument("--is-volume", dest="is_volume", action="store_true")
     p.add_argument("--rescale", dest="rescale", action="store_true")
+    p.add_argument("--level-method", type=str, nargs="?")
+    p.add_argument("--anchor-view", type=str, nargs="?")
 
     # blobRunner kwargs
     p.add_argument("--min-sigma", type=float, nargs="*")
@@ -525,11 +543,11 @@ if __name__ == "__main__":
     p.add_argument("--norm-order", type=int, nargs="?")  # NOTE also used in pixelRunner
     p.add_argument("--anchor-round", type=int, nargs="?")  # also used in PerRoundMaxChannel
     p.add_argument(
-        "--search-radius", type=int, nargs="?"
+        "--search-radius", type=float, nargs="?"
     )  # also used in PerRoundMaxChannel, CheckAll
     p.add_argument("--return-original-intensities", type=bool, nargs="?")
     p.add_argument(
-        "--filtered_results", dest="filtered_results", action="store_true"
+        "--filtered-results", dest="filtered_results", action="store_true"
     )  # defined by us
     p.set_defaults(filtered_results=False)
 
@@ -584,18 +602,14 @@ if __name__ == "__main__":
         # in the event of a mismatch.
         if args.min_sigma:
             minlen = len(tuple(args.min_sigma))
-        else:
-            minlen = 2
 
         if args.max_sigma:
             maxlen = len(tuple(args.max_sigma))
-        else:
-            maxlen = 2
 
         if args.is_volume:
             vol = args.is_volume
 
-        if not (vol + 2 == minlen and vol + 2 == maxlen):
+        if not (args.min_sigma and vol + 2 == minlen) and (args.max_sigma and vol + 2 == maxlen):
             raise Exception(
                 f"is_volume is set to {vol}, but sigma dimensions are of length {minlen} and {maxlen}"
             )
@@ -631,8 +645,11 @@ if __name__ == "__main__":
     addKwarg(args, decodeKwargs, "physical_coords")
     addKwarg(args, decodeKwargs, "max_distance")
     addKwarg(args, decodeKwargs, "min_intensity")
-    addKwarg(args, decodeKwargs, "metric")
-    addKwarg(args, decodeKwargs, "norm_order")
+    if method == starfish.spots.DecodeSpots.MetricDistance:
+        addKwarg(args, decodeKwargs, "metric")
+        addKwarg(args, decodeKwargs, "norm_order")
+        # notably including this when rescale is used with other decoders
+        # leads to bugs since these two params aren't' an accepted decoder arg
     addKwarg(args, decodeKwargs, "anchor_round")
     addKwarg(args, decodeKwargs, "search_radius")
 
@@ -646,14 +663,29 @@ if __name__ == "__main__":
     addKwarg(args, decodeRunnerKwargs, "return_original_intensities")
 
     use_ref = args.use_ref_img
+    anchor_name = args.anchor_view
     rescale = args.rescale
+
+    level_method = args.level_method
+    if level_method == "SCALE_BY_CHUNK":
+        level_method = Levels.SCALE_BY_CHUNK
+    elif level_method == "SCALE_BY_IMAGE":
+        level_method = Levels.SCALE_BY_IMAGE
+    elif level_method == "SCALE_SATURATED_BY_CHUNK":
+        level_method = Levels.SCALE_SATURATED_BY_CHUNK
+    elif level_method == "SCALE_SATURATED_BY_IMAGE":
+        level_method = Levels.SCALE_SATURATED_BY_IMAGE
+    else:
+        level_method = Levels.SCALE_BY_CHUNK
 
     run(
         output_dir,
         experiment,
         blob_based,
         use_ref,
+        anchor_name,
         rescale,
+        level_method,
         vol,
         blobRunnerKwargs,
         decodeRunnerKwargs,

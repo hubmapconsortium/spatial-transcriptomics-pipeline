@@ -51,9 +51,11 @@ outputs:
   skip_processing: boolean
   clip_min: float
   clip_max: float
+  level_method: string
   register_aux_view: string
   channels_per_reg: int
   background_view: string
+  register_background: boolean
   anchor_view: string
   high_sigma: int
   deconvolve_iter: int

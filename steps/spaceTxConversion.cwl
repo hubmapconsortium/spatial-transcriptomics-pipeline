@@ -14,8 +14,17 @@ inputs:
     type: Directory
     doc: The directory containing all .tiff files
 
+  codebook_csv:
+    type: File?
+    doc: Flattened csv input, refer to record entry.
+
+  codebook_json:
+    type: File?
+    doc: Flattened json input, refer to record entry.
+
   codebook:
     type:
+      - 'null'
       - type: record
         name: csv
         fields:
@@ -111,6 +120,12 @@ inputs:
   fov_positioning:
     - 'null'
     - type: record
+      name: dummy
+      fields:
+        dummy:
+          type: string?
+          doc: Added to prevent cli parsing of the fov_positioning record.
+    - type: record
       fields:
         - name: x_locs
           type: string
@@ -159,7 +174,7 @@ steps:
 
       requirements:
         DockerRequirement:
-          dockerPull: ghcr.io/hubmapconsortium/spatial-transcriptomics-pipeline/starfish-custom:latest
+          dockerPull: hubmap/starfish-custom:latest
 
       inputs:
         schema:
@@ -191,7 +206,7 @@ steps:
 
       requirements:
         DockerRequirement:
-            dockerPull: ghcr.io/hubmapconsortium/spatial-transcriptomics-pipeline/starfish-custom:latest
+            dockerPull: hubmap/starfish-custom:latest
       inputs:
           tiffs:
             type: Directory
@@ -345,6 +360,11 @@ steps:
                   inputBinding:
                     prefix: --z-pos-voxel
 
+          add_blanks:
+            type: boolean
+            inputBinding:
+              prefix: --add-blanks
+
       outputs:
         spaceTx_converted:
           type: Directory
@@ -352,7 +372,19 @@ steps:
             glob: "2_tx_converted/"
     in:
       tiffs: tiffs
-      codebook: codebook
+      codebook:
+        source: [codebook, codebook_csv, codebook_json]
+        linkMerge: merge_flattened
+        valueFrom: |
+          ${
+            if(self[0]){
+              return self[0];
+            } else if(self[1]){
+              return {csv: self[1]};
+            } else {
+              return {json: self[2]};
+            }
+          }
       round_count:
         source: [stage_conversion/round_count, round_count]
         pickValue: first_non_null

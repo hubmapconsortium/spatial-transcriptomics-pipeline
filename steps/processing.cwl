@@ -26,6 +26,14 @@ inputs:
     type: float?
     doc: Pixels above this percentile are set to 1.
 
+  level_method:
+    type: string?
+    doc: Levelling method for clip and scale application. Defaults to SCALE_BY_CHUNK. If rescaling is configured in parameter_json, will be set to SCALE_BY_CHUNK if true, SCALE_BY_IMAGE if false.
+
+  is_volume:
+    type: boolean?
+    doc: Whether to treat the zplanes as a 3D image.
+
   register_aux_view:
     type: string?
     doc: The name of the auxillary view to be used for image registration.
@@ -37,6 +45,10 @@ inputs:
   background_view:
     type: string?
     doc: The name of the auxillary view to be used for background subtraction.  Background will be estimated if not provided.
+
+  register_background:
+    type: boolean?
+    doc: If true, the `background_view` will be aligned to the `aux_view`.
 
   anchor_view:
     type: string?
@@ -70,6 +82,10 @@ inputs:
     type: int?
     doc: Radius for white top hat filter. Should be slightly larger than the expected spot radius. Will not be run if not provided.
 
+  inline_log:
+    type: boolean?
+    doc: If true, log will be sent to stdout instead of a file.
+
 outputs:
   processed_exp:
     type: Directory
@@ -84,7 +100,7 @@ steps:
 
       requirements:
         DockerRequirement:
-          dockerPull: ghcr.io/hubmapconsortium/spatial-transcriptomics-pipeline/starfish-custom:latest
+          dockerPull: hubmap/starfish-custom:latest
 
       inputs:
         schema:
@@ -106,7 +122,7 @@ steps:
     in:
       datafile: parameter_json
       schema: read_schema/data
-    out: [clip_min, clip_max, register_aux_view, channels_per_reg, background_view, anchor_view, high_sigma, deconvolve_iter, deconvolve_sigma, low_sigma, rolling_radius, match_histogram, tophat_radius, channel_count, aux_tilesets_aux_names, aux_tilesets_aux_channel_count]
+    out: [clip_min, clip_max, level_method, rescale, register_aux_view, channels_per_reg, background_view, register_background, anchor_view, high_sigma, deconvolve_iter, deconvolve_sigma, low_sigma, rolling_radius, match_histogram, tophat_radius, channel_count, aux_tilesets_aux_names, aux_tilesets_aux_channel_count, is_volume]
     when: $(inputs.datafile != null)
 
   execute_processing:
@@ -116,7 +132,7 @@ steps:
 
       requirements:
         DockerRequirement:
-            dockerPull: ghcr.io/hubmapconsortium/spatial-transcriptomics-pipeline/starfish-custom:latest
+            dockerPull: hubmap/starfish-custom:latest
 
       inputs:
         input_dir:
@@ -137,6 +153,18 @@ steps:
             prefix: --clip-max
           doc: Pixels above this percentile are set to 1. Defaults to 99.9.
 
+        level_method:
+          type: string?
+          inputBinding:
+            prefix: --level-method
+          doc: Levelling method for clip and scale application. Defaults to SCALE_BY_CHUNK.
+
+        is_volume:
+          type: boolean?
+          inputBinding:
+            prefix: --is-volume
+          doc: Whether to treat the zplanes as a 3D image.
+
         register_aux_view:
           type: string?
           inputBinding:
@@ -154,6 +182,12 @@ steps:
           inputBinding:
             prefix: --background-view
           doc: The name of the auxillary view to be used for background subtraction.  Background will be estimated if not provided.
+
+        register_background:
+          type: boolean?
+          inputBinding:
+            prefix: --register-background
+          doc: If true, the `background_view` will be aligned to the `aux_name`.
 
         anchor_view:
           type: string?
@@ -203,6 +237,12 @@ steps:
             prefix: --tophat-radius
           doc: Radius for white top hat filter. Should be slightly larger than the expected spot radius. Will not be run if not provided.
 
+        inline_log:
+          type: boolean?
+          inputBinding:
+            prefix: --inline-log
+          doc: If true, logs will be sent to stdout instead of a file.
+
       outputs:
         processed_exp:
           type: Directory
@@ -224,6 +264,34 @@ steps:
           }
       clip_max:
         source: [stage_processing/clip_max, clip_max]
+        valueFrom: |
+          ${
+            if(self[0]){
+              return self[0];
+            } else if(self[1]) {
+              return self[1];
+            } else {
+              return null;
+            }
+          }
+      level_method:
+        source: [stage_processing/rescale, stage_processing/level_method, level_method]
+        valueFrom: |
+          ${
+            if(self[0]){
+              return "SCALE_BY_CHUNK";
+            } else if(self[0] === false) {
+              return "SCALE_BY_IMAGE"
+            } else if(self[1]){
+              return self[1];
+            } else if(self[2]) {
+              return self[2];
+            } else {
+              return null;
+            }
+          }
+      is_volume:
+        source: [stage_processing/is_volume, is_volume]
         valueFrom: |
           ${
             if(self[0]){
@@ -270,6 +338,18 @@ steps:
           }
       background_view:
         source: [stage_processing/background_view, background_view]
+        valueFrom: |
+          ${
+            if(self[0]){
+              return self[0];
+            } else if(self[1]) {
+              return self[1];
+            } else {
+              return null;
+            }
+          }
+      register_background:
+        source: [stage_processing/register_background, register_background]
         valueFrom: |
           ${
             if(self[0]){
@@ -376,5 +456,6 @@ steps:
               return null;
             }
           }
+      inline_log: inline_log
     out: [processed_exp]
 

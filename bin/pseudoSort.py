@@ -118,7 +118,7 @@ def reformatter(
                             ),
                         )
                         print(varTable)
-                        img = skimage.io.imread(file_path)
+                        img = skimage.io.imread(file_path).astype("uint16")
                         # img_out = img
 
                         # figure out what slice to take.

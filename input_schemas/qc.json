@@ -12,8 +12,20 @@
 		]
 	},
 	{
-		"decoding":[[
-			"decode_method"
-		]]
+		"decoding":[
+			[],
+			[
+				"decode_method?",
+				"magnitude_threshold?",
+				{
+					"decoder": [
+						[],
+						[
+							"min_intensity"
+						]
+					]
+				}
+			]
+		]
 	}
 ]

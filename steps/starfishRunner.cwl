@@ -23,6 +23,10 @@ inputs:
     doc: Whether to generate a reference image and use it alongside spot detection.
     default: False
 
+  anchor_view:
+    type: string?
+    doc: The name of the auxillary view to be used as a reference view, such as for anchor round in ISS processing. Will not be included if not provided.
+
   is_volume:
     type: boolean?
     doc: Whether to treat the zplanes as a 3D image.
@@ -34,6 +38,12 @@ inputs:
 
   decoding_blob:
     - 'null'
+    - type: record
+      name: dummy
+      fields:
+        dummy:
+          type: string?
+          doc: Added to prevent cli parsing of the decoding_blob record.
     - type: record
       name: blob
       fields:
@@ -85,7 +95,7 @@ inputs:
                   type: int?
                   doc: Anchor round for comparison.
                 search_radius:
-                  type: int?
+                  type: float?
                   doc: Distance to search for matching spots.
                 return_original_intensities:
                   type: boolean?
@@ -100,13 +110,13 @@ inputs:
                   type: int?
                   doc: Round to refer to.  Required for nearest_neighbor.
                 search_radius:
-                  type: int?
+                  type: float?
                   doc: Distance to search for matching spots.
             - type: record
               name: check_all
               fields:
                 search_radius:
-                  type: int?
+                  type: float?
                   doc: Distance to search for matching spots.
                 error_rounds:
                   type: int?
@@ -116,11 +126,17 @@ inputs:
                   doc: Accuracy mode to run in.  Can be 'high', 'med', or 'low'.
                 physical_coords:
                   type: boolean?
-                  doc: Whether to use physical coordinates or pixel coordinates
+                  doc: Whether to use physical coordinates or pixel coordinates 
 
 
   decoding_pixel:
     - 'null'
+    - type: record
+      name: dummy
+      fields:
+        dummy:
+          type: string?
+          doc: Added to prevent cli parsing of the decoding_blob record.
     - type: record
       name: pixel
       fields:
@@ -157,7 +173,7 @@ steps:
 
       requirements:
         DockerRequirement:
-          dockerPull: ghcr.io/hubmapconsortium/spatial-transcriptomics-pipeline/starfish-custom:latest
+          dockerPull: hubmap/starfish-custom:latest
 
       inputs:
         schema:
@@ -179,7 +195,7 @@ steps:
     in:
       datafile: parameter_json
       schema: read_schema/data
-    out: [use_ref_img, is_volume, rescale, decoding_min_sigma, decoding_max_sigma, decoding_num_sigma, decoding_threshold, decoding_overlap, decoding_decode_method, decoding_filtered_results, decoding_decoder_trace_building_strategy, decoding_decoder_max_distance, decoding_decoder_min_intensity, decoding_decoder_metric, decoding_decoder_norm_order, decoding_decoder_anchor_round, decoding_decoder_search_radius, decoding_decoder_return_original_intensities, decoding_decoder_error_rounds, decoding_decoder_mode, decoding_decoder_physical_coords, decoding_metric, decoding_distance_threshold, decoding_magnitude_threshold, decoding_min_area, decoding_max_area, decoding_norm_order]
+    out: [use_ref_img, is_volume, anchor_view, rescale, decoding_min_sigma, decoding_max_sigma, decoding_num_sigma, decoding_threshold, decoding_overlap, decoding_decode_method, decoding_filtered_results, decoding_decoder_trace_building_strategy, decoding_decoder_max_distance, decoding_decoder_min_intensity, decoding_decoder_metric, decoding_decoder_norm_order, decoding_decoder_anchor_round, decoding_decoder_search_radius, decoding_decoder_return_original_intensities, decoding_decoder_error_rounds, decoding_decoder_mode, decoding_decoder_physical_coords, decoding_metric, decoding_distance_threshold, decoding_magnitude_threshold, decoding_min_area, decoding_max_area, decoding_norm_order]
     when: $(inputs.datafile != null)
 
   execute_runner:
@@ -190,7 +206,7 @@ steps:
 
       requirements:
         DockerRequirement:
-          dockerPull: ghcr.io/hubmapconsortium/spatial-transcriptomics-pipeline/starfish-custom:latest
+          dockerPull: hubmap/starfish-custom:latest
 
       inputs:
         exp_loc:
@@ -203,6 +219,11 @@ steps:
           inputBinding:
             prefix: --use-ref-img
 
+        anchor_view:
+          type: string?
+          inputBinding:
+            prefix: --anchor-view
+
         is_volume:
           type: boolean?
           inputBinding:
@@ -212,6 +233,11 @@ steps:
           type: boolean?
           inputBinding:
             prefix: --rescale
+
+        level_method:
+          type: string?
+          inputBinding:
+            prefix: --level-method
 
         decoding_blob:
           - 'null'
@@ -280,7 +306,7 @@ steps:
                         inputBinding:
                           prefix: --anchor-round
                       search_radius:
-                        type: int?
+                        type: float?
                         inputBinding:
                           prefix: --search-radius
                       return_original_intensities:
@@ -299,14 +325,14 @@ steps:
                         inputBinding:
                           prefix: --anchor-round
                       search_radius:
-                        type: int?
+                        type: float?
                         inputBinding:
                           prefix: --search-radius
                   - type: record
                     name: check_all
                     fields:
                       search_radius:
-                        type: int?
+                        type: float?
                         inputBinding:
                           prefix: --search-radius
                       error_rounds:
@@ -363,6 +389,18 @@ steps:
       use_ref_img:
         source: [stage_runner/use_ref_img, use_ref_img]
         pickValue: first_non_null
+      anchor_view:
+        source: [stage_runner/anchor_view, anchor_view]
+        valueFrom: |
+          ${
+            if(self[0]){
+              return self[0];
+            } else if(self[1]) {
+              return self[1];
+            } else {
+              return null;
+            }
+          }
       is_volume:
         source: [stage_runner/is_volume, is_volume]
         pickValue: first_non_null
@@ -374,6 +412,18 @@ steps:
               return self[0];
             } else if(self[1]) {
               return self[1];
+            } else {
+              return null;
+            }
+          }
+      level_method:
+        source: [stage_runner/rescale, rescale]
+        valueFrom: |
+          ${
+            if(self[0] || self[1]){
+              return "SCALE_BY_CHUNK";
+            } else if(self[0] === false || self[1] === false) {
+              return "SCALE_BY_IMAGE"
             } else {
               return null;
             }

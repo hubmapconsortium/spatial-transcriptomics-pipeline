@@ -36,6 +36,22 @@ inputs:
     type: File?
     doc: Flattened json input, refer to record entry.
 
+  mask_roi_files:
+    type: Directory?
+    doc: Flattened directory input, refer to record entry "binary_mask"
+
+  mask_roi_formats:
+    type: string?
+    doc: Flattened record input, refer to record entry "binary_mask"
+
+  mask_labeled_files:
+    type: Directory?
+    doc: Flattened file input, refer to record entry "binary_mask"
+
+  mask_labeled_formats:
+    type: string?
+    doc: Flattened record input, refer to record entry "binary_mask"
+
   codebook:
     type:
       - 'null'
@@ -174,6 +190,10 @@ inputs:
     type: float?
     doc: Pixels above this percentile are set to 1.
 
+  level_method:
+    type: string?
+    doc: Levelling method for clip and scale application. Defaults to SCALE_BY_CHUNK.
+
   register_aux_view:
     type: string?
     doc: The name of the auxillary view to be used for image registration.
@@ -181,6 +201,10 @@ inputs:
   background_view:
     type: string?
     doc: The name of the auxillary view to be used for background subtraction.  Background will be estimated if not provided.
+
+  register_background:
+    type: boolean?
+    doc: If true, `background_view` will be aligned to `aux_name`.
 
   anchor_view:
     type: string?
@@ -288,7 +312,7 @@ inputs:
                   type: int?
                   doc: Anchor round for comparison.
                 search_radius:
-                  type: int?
+                  type: float?
                   doc: Distance to search for matching spots.
                 return_original_intensities:
                   type: boolean?
@@ -303,13 +327,13 @@ inputs:
                   type: int?
                   doc: Round to refer to.  Required for nearest_neighbor.
                 search_radius:
-                  type: int?
+                  type: float?
                   doc: Distance to search for matching spots.
             - type: record
               name: check_all
               fields:
                 search_radius:
-                  type: int?
+                  type: float?
                   doc: Distance to search for matching spots.
                 error_rounds:
                   type: int?
@@ -472,7 +496,7 @@ steps:
 
       requirements:
         DockerRequirement:
-          dockerPull: ghcr.io/hubmapconsortium/spatial-transcriptomics-pipeline/starfish-custom:latest
+          dockerPull: hubmap/starfish-custom:latest
 
       inputs:
         schema:
@@ -494,7 +518,7 @@ steps:
     in:
       datafile: parameter_json
       schema: read_schema/data
-    out: [skip_baysor, skip_processing, register_aux_view]
+    out: [skip_baysor, skip_processing, register_aux_view, fov_positioning_x_locs, fov_positioning_x_shape, fov_positioning_x_voxel, fov_positioning_y_locs, fov_positioning_y_shape, fov_positioning_y_voxel, fov_positioning_z_locs, fov_positioning_z_shape, fov_positioning_z_voxel]
     when: $(inputs.datafile != null)
 
   sorter:
@@ -727,7 +751,7 @@ steps:
               };
             } else if(self[1]) {
               var count = self[5];
-              if(self[0]){
+              if(self[0] && self[0].aux_channel_count){
                 count = self[0].aux_channel_count;
               }
               return {
@@ -739,6 +763,28 @@ steps:
                   aux_channel_slope: self[6],
                   aux_channel_intercept: self[7]
               };
+            } else {
+              return null;
+            }
+          }
+      fov_positioning:
+        source: [fov_positioning, stage/fov_positioning_x_locs, stage/fov_positioning_x_shape, stage/fov_positioning_x_voxel, stage/fov_positioning_y_locs, stage/fov_positioning_y_shape, stage/fov_positioning_y_voxel, stage/fov_positioning_z_locs, stage/fov_positioning_z_shape, stage/fov_positioning_z_voxel]
+        valueFrom: |
+          ${
+            if(self[1]) {
+              return {
+                x_locs: self[1],
+                x_shape: self[2],
+                x_voxel: self[3],
+                y_locs: self[4],
+                y_shape: self[5],
+                y_voxel: self[6],
+                z_locs: self[7],
+                z_shape: self[8],
+                z_voxel: self[9]
+              };
+            } else if (self[0]) {
+              return self[0];
             } else {
               return null;
             }
@@ -763,6 +809,8 @@ steps:
       parameter_json: parameter_json
       clip_min: clip_min
       clip_max: clip_max
+      level_method: level_method
+      is_volume: is_volume
       register_aux_view: register_aux_view
       channels_per_reg:
         source: [stagedSorted/aux_names, stagedSorted/aux_channel_count, stagedSorted/channel_count, register_aux_view, stage/register_aux_view]
@@ -783,6 +831,7 @@ steps:
             }
           }
       background_view: background_view
+      register_background: register_background
       anchor_view: anchor_view
       high_sigma: high_sigma
       deconvolve_iter: deconvolve_iter
@@ -803,6 +852,7 @@ steps:
         pickValue: first_non_null
       parameter_json: parameter_json
       use_ref_img: use_ref_img
+      anchor_view: anchor_view
       is_volume: is_volume
       rescale: rescale
       decoding_blob: decoding_blob
@@ -818,7 +868,26 @@ steps:
       parameter_json: parameter_json
       aux_name: aux_name
       fov_count: fov_count
-      binary_mask: binary_mask
+      binary_mask:
+        source: [binary_mask, mask_roi_files, mask_roi_formats, mask_labeled_files, mask_labeled_formats]
+        valueFrom: |
+          ${
+            if(self[0]){
+              return self[0];
+            } else if(self[1] && self[2]){
+              return {
+                "roi_set": self[1],
+                "file_formats": self[2]
+              };
+            } else if(self[3] && self[4]){
+              return {
+                "labeled_image": self[3],
+                "file_formats_labeled": self[4]
+              };
+            } else {
+              return null;
+            }
+          }
     out:
       [segmented]
 
@@ -880,6 +949,18 @@ steps:
             } else {
               return null;
             }
+          }
+      spot_threshold:
+        source: decoding_blob
+        valueFrom: |
+          ${
+             if(self && 'decoder' in self && 'min_intensity' in self['decoder']){
+               return self['decoder']['min_intensity'];
+             } else if(self && 'magnitude_threshold' in self){
+               return self['mangitude_threshold'];
+             } else {
+               return null;
+             }
           }
       find_ripley: find_ripley
       save_pdf: save_pdf

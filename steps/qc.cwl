@@ -10,8 +10,18 @@ requirements:
    - class: MultipleInputFeatureRequirement
 
 inputs:
+
+  codebook_exp:
+    type: Directory?
+    doc: Flattened codebook input, refer to record entry.
+
+  codebook_pkl:
+    type: File?
+    doc: Flattened codebook input, refer to record entry.
+
   codebook:
     type:
+      - 'null'
       - type: record
         name: pkl
         fields:
@@ -28,8 +38,21 @@ inputs:
     type: Directory?
     doc: The location of the output from the segmentation step, if it was performed.
 
+  data_pkl_spots:
+    type: File?
+    doc: Flattened data input, refer to record entry.
+
+  data_pkl_transcripts:
+    type: File?
+    doc: Flattened data input, refer to record entry.
+
+  data_exp:
+    type: Directory?
+    doc: Flattened data input, refer to record entry.
+
   data:
     type:
+    - 'null'
     - type: record
       name: pkl
       fields:
@@ -62,6 +85,12 @@ inputs:
     type:
       - 'null'
       - type: record
+        name: dummy
+        fields:
+          dummy:
+            type: string?
+            doc: Added to prevent cli parsing of the fov_positioning record.
+      - type: record
         fields:
           - name: x_size
             type: int
@@ -72,6 +101,10 @@ inputs:
           - name: z_size
             type: int
             doc: number of z-stacks
+
+  spot_threshold:
+    type: float?
+    doc: If has_spots is true and this is provided, spots with an intensity lower than this will not be included in qc metrics
 
   find_ripley:
     type: boolean?
@@ -97,7 +130,7 @@ steps:
 
       requirements:
         DockerRequirement:
-          dockerPull: ghcr.io/hubmapconsortium/spatial-transcriptomics-pipeline/starfish-custom:latest
+          dockerPull: hubmap/starfish-custom:latest
 
       inputs:
         schema:
@@ -119,7 +152,7 @@ steps:
     in:
       datafile: parameter_json
       schema: read_schema/data
-    out: [find_ripley, save_pdf, fov_positioning_x_shape, fov_positioning_y_shape, fov_positioning_z_shape, decoding_decode_method]
+    out: [find_ripley, save_pdf, fov_positioning_x_shape, fov_positioning_y_shape, fov_positioning_z_shape, decoding_decode_method, decoding_magnitude_threshold, decoding_decoder_min_intensity]
     when: $(inputs.datafile != null)
 
   execute_qc:
@@ -129,7 +162,7 @@ steps:
 
       requirements:
         DockerRequirement:
-          dockerPull: ghcr.io/hubmapconsortium/spatial-transcriptomics-pipeline/starfish-custom:latest
+          dockerPull: hubmap/starfish-custom:latest
 
       inputs:
         codebook:
@@ -182,7 +215,7 @@ steps:
 
         roi:
           type: File?
-          inputBinding:
+          inputBinding: 
             prefix: --roi
 
         imagesize:
@@ -202,15 +235,22 @@ steps:
                 inputBinding:
                   prefix: --z-size
 
+        spot_threshold:
+          type: float?
+          inputBinding:
+            prefix: --spot-threshold
+
         find_ripley:
           type: boolean?
           inputBinding:
             prefix: --run-ripley
+          default: False
 
         save_pdf:
           type: boolean?
           inputBinding:
             prefix: --save-pdf
+          default: True
 
       outputs:
         qc_metrics:
@@ -218,19 +258,41 @@ steps:
           outputBinding:
             glob: "7_QC/"
     in:
-      codebook: codebook
+      codebook:
+        source: [codebook, codebook_exp, codebook_pkl]
+        valueFrom: |
+          ${
+            if(self[0]){
+              return self[0];
+            } else if(self[1]) {
+              return {exp: self[1]};
+            } else {
+              return {pkl: self[2]}
+            }
+          }
       segmentation_loc: segmentation_loc
       has_spots:
         source: [stage_qc/decoding_decode_method, has_spots]
         valueFrom: |
           ${
-             if(self[0] || self[1]){
+             if((self[0] && self[0].length) || self[1]){
                return true;
              } else {
                return false;
              }
           }
-      data: data
+      data:
+        source: [data, data_exp, data_pkl_spots, data_pkl_transcripts]
+        valueFrom: |
+          ${
+            if(self[0]){
+              return self[0];
+            } else if(self[1]) {
+              return {exp: self[1]};
+            } else {
+              return {pkl: {spots: self[2], transcripts: self[3]}};
+            }
+          }
       roi: roi
       imagesize:
         source: [imagesize, stage_qc/fov_positioning_x_shape, stage_qc/fov_positioning_y_shape, stage_qc/fov_positioning_z_shape]
@@ -245,6 +307,20 @@ steps:
                 "z_size": self[3]
               };
             }
+          }
+      spot_threshold:
+        source: [stage_qc/decoding_decoder_min_intensity, stage_qc/decoding_magnitude_threshold, spot_threshold]
+        valueFrom: |
+          ${
+             if(self[0]){
+               return self[0];
+             } else if(self[1]) {
+               return self[1];
+             } else if(self[2]){
+               return self[2];
+             } else {
+               return null;
+             }
           }
       find_ripley:
         source: [stage_qc/find_ripley, find_ripley]
