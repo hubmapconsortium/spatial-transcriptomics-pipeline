@@ -81,8 +81,19 @@ def filterSpots(spots, mask, oneIndex=False, invert=False):
 
         selRow = []
         for ind, row in selectedSpots.iterrows():
-            if maskMat[int(row["y"]) - oneIndex][int(row["x"]) - oneIndex] == 1:
+            if (
+                len(maskMat.shape) == 2
+                and maskMat[int(row["y"]) - oneIndex][int(row["x"]) - oneIndex] == 1
+            ) or (
+                len(maskMat.shape) == 3
+                and maskMat[int(row["y"]) - oneIndex][int(row["x"]) - oneIndex][
+                    int(row["z"] - oneIndex)
+                ]
+                == 1
+            ):
                 selRow.append(ind)
+            elif len(maskMat.shape) != 2 and len(maskMat.shape) != 3:
+                raise Exception("Mask is not of 2 or 3 dimensions.")
 
         selectedSpots = selectedSpots.iloc[selRow]
         selectedSpots = selectedSpots.drop_duplicates()  # unsure why the query necessitates this
@@ -903,31 +914,6 @@ if __name__ == "__main__":
     codebook = False
     roi = False
 
-    if args.codebook_exp:
-        codebook = Codebook.open_json(str(args.codebook_exp) + "/codebook.json")
-
-        if (
-            args.roi
-        ):  # NOTE Going to assume 1 FOV for now. Largely used for debugging, not pipeline runs.
-            exp = starfish.core.experiment.experiment.Experiment.from_json(
-                str(args.codebook_exp) + "/experiment.json"
-            )
-            img = exp["fov_000"].get_image("primary")
-            roi = BinaryMaskCollection.from_fiji_roi_set(
-                path_to_roi_set_zip=args.roi, original_image=img
-            )
-        elif args.segmentation_loc:
-            exp = starfish.core.experiment.experiment.Experiment.from_json(
-                str(args.codebook_exp) + "/experiment.json"
-            )
-            roi = {}
-            for f in exp.keys():
-                maskloc = "{}/{}/mask.tiff".format(args.segmentation_loc, f)
-                roi[f] = skimage.io.imread(maskloc)
-
-    elif args.codebook_pkl:
-        codebook = pickle.load(open(args.codebook_pkl, "rb"))
-
     transcripts = False
     if args.transcript_pkl:
         transcripts = pickle.load(open(args.transcript_pkl, "rb"))
@@ -960,6 +946,31 @@ if __name__ == "__main__":
             spots[k] = SpotFindingResults.load(
                 "{}/spots/{}_SpotFindingResults.json".format(args.exp_output, k)
             )
+
+    if args.codebook_exp:
+        codebook = Codebook.open_json(str(args.codebook_exp) + "/codebook.json")
+
+        if (
+            args.roi
+        ):  # NOTE Going to assume 1 FOV for now. Largely used for debugging, not pipeline runs.
+            exp = starfish.core.experiment.experiment.Experiment.from_json(
+                str(args.codebook_exp) + "/experiment.json"
+            )
+            img = exp["fov_000"].get_image("primary")
+            roi = BinaryMaskCollection.from_fiji_roi_set(
+                path_to_roi_set_zip=args.roi, original_image=img
+            )
+        elif args.segmentation_loc:
+            exp = starfish.core.experiment.experiment.Experiment.from_json(
+                str(args.codebook_exp) + "/experiment.json"
+            )
+            roi = {}
+            for f in transcripts.keys():
+                maskloc = "{}/{}/mask.tiff".format(args.segmentation_loc, f)
+                roi[f] = skimage.io.imread(maskloc)
+
+    elif args.codebook_pkl:
+        codebook = pickle.load(open(args.codebook_pkl, "rb"))
 
     spot_threshold = None
     if args.spot_threshold:
