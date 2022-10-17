@@ -484,7 +484,7 @@ def getFractionSpotsUsed(spots, transcripts):
 
 def getTranscriptRoundDist(transcripts, pdf=False):
     conv = np.where(transcripts.data > 0, 1, 0)
-    counts = np.sum(conv, axis=(0, 2))
+    counts = np.sum(conv, axis=(0, 1))
     counts = [c / sum(counts) for c in counts]
     std = np.std(counts)
     skw = skew(counts)
@@ -515,7 +515,7 @@ def getTranscriptRoundDist(transcripts, pdf=False):
 
 def getTranscriptChannelDist(transcripts, pdf=False):
     conv = np.where(transcripts.data > 0, 1, 0)
-    counts = np.sum(conv, axis=(0, 1))
+    counts = np.sum(conv, axis=(0, 2))
     counts = [c / sum(counts) for c in counts]
     std = np.std(counts)
     skw = skew(counts)
@@ -961,9 +961,6 @@ if __name__ == "__main__":
                 path_to_roi_set_zip=args.roi, original_image=img
             )
         elif args.segmentation_loc:
-            exp = starfish.core.experiment.experiment.Experiment.from_json(
-                str(args.codebook_exp) + "/experiment.json"
-            )
             roi = {}
             for f in transcripts.keys():
                 maskloc = "{}/{}/mask.tiff".format(args.segmentation_loc, f)
