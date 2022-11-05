@@ -441,7 +441,11 @@ steps:
         valueFrom: |
           ${
             if(!self[1] && self[0]){
-              return self[0];
+              if(self[0].x_locs && self[0].x_shape && self[0].x_voxel){
+                return self[0];
+              } else {
+                return null;
+              }
             } else if(self[1]){
               return {
                 x_locs: self[1],
