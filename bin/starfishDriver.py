@@ -321,6 +321,8 @@ def scale_img(
     )
     clip.run(img, in_place=True)
 
+    print(f"Rescaled image in {iters} iterations, final mod_mean: {mod_mean}")
+
     return img
 
 
@@ -377,6 +379,7 @@ def saveTable(table: DecodedIntensityTable, savename: str):
     # traces = table.stack(traces=(Axes.ROUND.value, Axes.CH.value))
     traces = traces.to_features_dataframe()
     traces.to_csv(savename)
+    print(f"Saved decoded csv file {savename}.")
 
 
 def run(
@@ -471,7 +474,10 @@ def run(
             clip.run(ref_img, in_place=True)
 
         if rescale:
-            img = scale_img(img, experiment.codebook, pixelRunnerKwargs, level_method, is_volume)
+            codebook_noblanks = exp.codebook[
+                ~exp.codebook["target"].str.contains("blank", case=False)
+            ]
+            img = scale_img(img, codebook_noblanks, pixelRunnerKwargs, level_method, is_volume)
 
         if blob_based:
             output_name = f"{output_dir}spots/{fov}_"
@@ -484,12 +490,15 @@ def run(
                 output_name,
             )
             del blobs  # this is saved within the driver now
+            print(f"Found {len(decoded)} transcripts with blobDriver")
         else:
             decoded = pixelDriver(img, experiment.codebook, **pixelRunnerKwargs)[0]
+            print(f"Found {len(decoded)} transcripts with pixelDriver")
 
         saveTable(decoded, output_dir + "csv/" + fov + "_decoded.csv")
         # decoded[fov].to_decoded_dataframe().save_csv(output_dir+fov+"_decoded.csv")
         decoded.to_netcdf(output_dir + "cdf/" + fov + "_decoded.cdf")
+        print(f"Saved cdf file {output_dir}cdf/{fov}_decoded.cdf")
 
         # can run into memory problems, doing this preemptively.
         del img
