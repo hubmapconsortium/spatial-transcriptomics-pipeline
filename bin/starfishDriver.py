@@ -317,7 +317,7 @@ def scale_img(
     pmin = 0
     pmax = 100
     clip = starfish.image.Filter.ClipPercentileToZero(
-        p_min=pmin, p_max=pmax, is_volume=is_volume, level_method=level_method
+        p_min=pmin, p_max=pmax, is_volume=is_volume, level_method=Levels.SCALE_BY_IMAGE
     )
     clip.run(img, in_place=True)
 
@@ -468,10 +468,6 @@ def run(
                 .get_image(anchor_name)
                 .reduce({Axes.CH, Axes.ROUND, Axes.ZPLANE}, func="max")
             )
-            clip = starfish.image.Filter.ClipPercentileToZero(
-                p_min=20, p_max=99.9, is_volume=is_volume, level_method=Levels.SCALE_BY_CHUNK
-            )
-            clip.run(ref_img, in_place=True)
 
         if rescale:
             codebook_noblanks = experiment.codebook[
