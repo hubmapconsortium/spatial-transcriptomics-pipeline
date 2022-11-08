@@ -475,7 +475,7 @@ def run(
 
         if rescale:
             codebook_noblanks = experiment.codebook[
-                ~exp.codebook["target"].str.contains("blank", case=False)
+                ~experiment.codebook["target"].str.contains("blank", case=False)
             ]
             img = scale_img(img, codebook_noblanks, pixelRunnerKwargs, level_method, is_volume)
 
