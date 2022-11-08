@@ -337,7 +337,7 @@ def cli(
     elif level_method == "SCALE_SATURATED_BY_IMAGE":
         level_method = Levels.SCALE_SATURATED_BY_IMAGE
     else:
-        level_method = Levels.SCALE_BY_CHUNK
+        level_method = Levels.SCALE_BY_IMAGE
 
     t0 = time()
 

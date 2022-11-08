@@ -851,6 +851,7 @@ steps:
         source: [processing/processed_exp, spaceTxConversion/spaceTx_converted]
         pickValue: first_non_null
       parameter_json: parameter_json
+      level_method: level_method
       use_ref_img: use_ref_img
       anchor_view: anchor_view
       is_volume: is_volume
