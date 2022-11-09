@@ -277,6 +277,7 @@ def cli(
     match_hist: bool = False,
     wth_rad: int = None,
     inline_log: bool = False,
+    rescale: bool = False,
 ):
     """
     clip_min: minimum value for ClipPercentileToZero
@@ -315,6 +316,9 @@ def cli(
     match_hist: If true, will perform histogram matching.
 
     wth_rad: Radius for white top hat filter. Should be slightly larger than the expected spot radius.
+
+    rescale: If true, will not run final clip and scale on image, because it is expected to rescale
+        the images in the following decoding step.
     """
 
     os.makedirs(output_dir, exist_ok=True)
@@ -420,18 +424,21 @@ def cli(
                 print("\tapplying histogram matching to anchor image...")
                 anchor = match_hist_2_min(anchor)
 
-        print("\tclip and scaling...")
-        # Scale image, clipping all but the highest intensities to zero
-        clip = starfish.image.Filter.ClipPercentileToZero(
-            p_min=clip_min, p_max=clip_max, is_volume=is_volume, level_method=level_method
-        )
-        clip.run(img, in_place=True)
-        if anchor_name:
-            print("\tapplying clip and scale to anchor image...")
+        if not rescale:
+            print("\tclip and scaling...")
+            # Scale image, clipping all but the highest intensities to zero
             clip = starfish.image.Filter.ClipPercentileToZero(
-                p_min=90, p_max=99.9, is_volume=is_volume, level_method=level_method
+                p_min=clip_min, p_max=clip_max, is_volume=is_volume, level_method=level_method
             )
-            clip.run(anchor, in_place=True)
+            clip.run(img, in_place=True)
+            if anchor_name:
+                print("\tapplying clip and scale to anchor image...")
+                clip = starfish.image.Filter.ClipPercentileToZero(
+                    p_min=90, p_max=99.9, is_volume=is_volume, level_method=level_method
+                )
+                clip.run(anchor, in_place=True)
+        else:
+            print("\tskipping clip and scale, will be performed during rescaling.")
 
         print(f"\tView {fov} complete")
         # save modified image
@@ -476,6 +483,7 @@ if __name__ == "__main__":
     p.add_argument("--match-histogram", dest="match_histogram", action="store_true")
     p.add_argument("--inline-log", dest="inline_log", action="store_true")
     p.add_argument("--tophat-radius", type=int, nargs="?")
+    p.add_argument("--rescale", dest="rescale", action="store_true")
 
     args = p.parse_args()
 
@@ -499,4 +507,5 @@ if __name__ == "__main__":
         match_hist=args.match_histogram,
         wth_rad=args.tophat_radius,
         inline_log=args.inline_log,
+        rescale=args.rescale,
     )

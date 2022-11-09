@@ -86,6 +86,10 @@ inputs:
     type: boolean?
     doc: If true, log will be sent to stdout instead of a file.
 
+  rescale:
+    type: boolean?
+    doc: Whether to iteratively rescale images before running the decoder. If true, will skip clip and scale at the end of this step.
+
 outputs:
   processed_exp:
     type: Directory
@@ -164,6 +168,11 @@ steps:
           inputBinding:
             prefix: --is-volume
           doc: Whether to treat the zplanes as a 3D image.
+
+        rescale:
+          type: boolean?
+          inputBinding:
+            prefix: --rescale
 
         register_aux_view:
           type: string?
@@ -292,6 +301,18 @@ steps:
           }
       is_volume:
         source: [stage_processing/is_volume, is_volume]
+        valueFrom: |
+          ${
+            if(self[0]){
+              return self[0];
+            } else if(self[1]) {
+              return self[1];
+            } else {
+              return null;
+            }
+          }
+      rescale:
+        source: [stage_processing/rescale, rescale]
         valueFrom: |
           ${
             if(self[0]){

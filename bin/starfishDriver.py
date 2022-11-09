@@ -311,6 +311,7 @@ def scale_img(
     # Scale with final factors
     for r in range(img.num_rounds):
         for ch in range(img.num_chs):
+            print(f"({r},{ch}): {scaling_factors[(r,ch)]}")
             img.xarray.data[r, ch] = img.xarray.data[r, ch] / scaling_factors[(r, ch)]
 
     # Scale image
