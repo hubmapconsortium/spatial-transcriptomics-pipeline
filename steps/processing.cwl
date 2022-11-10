@@ -284,17 +284,13 @@ steps:
             }
           }
       level_method:
-        source: [stage_processing/rescale, stage_processing/level_method, level_method]
+        source: [stage_processing/level_method, level_method]
         valueFrom: |
           ${
             if(self[0]){
-              return "SCALE_BY_CHUNK";
-            } else if(self[0] === false) {
-              return "SCALE_BY_IMAGE"
-            } else if(self[1]){
+              return self[0];
+            } else if(self[1]) {
               return self[1];
-            } else if(self[2]) {
-              return self[2];
             } else {
               return null;
             }
