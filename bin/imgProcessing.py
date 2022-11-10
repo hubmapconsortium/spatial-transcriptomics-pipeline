@@ -386,6 +386,9 @@ def cli(
             ghp = starfish.image.Filter.GaussianHighPass(sigma=high_sigma)
             # ghp.run(img, verbose=False, in_place=True)
             ghp.run(img, verbose=False, in_place=True, n_processes=cpu_count())
+            if anchor_name:
+                print("\trunning high pass filter on anchor image...")
+                ghp.run(anchor, verbose=False, in_place=True, n_processes=cpu_count())
 
         if decon_sigma:
             # Increase resolution by deconvolving w/ point spread function
@@ -393,6 +396,9 @@ def cli(
             dpsf = starfish.image.Filter.DeconvolvePSF(num_iter=decon_iter, sigma=decon_sigma)
             # dpsf.run(img, verbose=False, in_place=True)
             dpsf.run(img, verbose=False, in_place=True, n_processes=cpu_count())
+            if anchor_name:
+                print("\tdeconvolving point spread function on anchor image...")
+                dpsf.run(anchor, verbose=False, in_place=True, n_processes=cpu_count())
 
         if low_sigma:
             # Blur image with lowpass filter
@@ -412,6 +418,9 @@ def cli(
             # Apply rolling ball background subtraction method to even out intensities through each 2D image
             print("\tapplying rolling ball background subtraction...")
             img = rolling_ball(img, rolling_rad=rolling_rad, num_threads=cpu_count())
+            if anchor_name:
+                print("\tapplying rolling ball background subtraction to anchor image...")
+                anchor = rolling_ball(anchor, rolling_rad=rolling_rad, num_threads=cpu_count())
 
         if match_hist:
             # Use histogram matching to lower the intensities of each 3D image down to the same
