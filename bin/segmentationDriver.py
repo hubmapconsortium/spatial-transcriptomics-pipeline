@@ -730,7 +730,7 @@ if __name__ == "__main__":
 
     # for density-based segmentation
     p.add_argument("--nuclei-view", type=str, nargs="?")
-    p.add_argument("--cyto-seg", type=str, nargs="?")
+    p.add_argument("--cyto-seg", dest="cyto_seg", action="store_true")
     p.add_argument("--correct-seg", dest="correct_seg", action="store_true")
     p.add_argument("--border-buffer", type=int, nargs="?")
     p.add_argument("--area-thresh", type=float, nargs="?")
