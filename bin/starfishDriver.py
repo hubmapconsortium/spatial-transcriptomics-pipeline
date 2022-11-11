@@ -115,9 +115,7 @@ def decodeRunner(
         results = decoder.run(spots=spots, n_processes=n_processes)
     else:
         results = decoder.run(spots=spots)
-    if filtered_results:
-        results = results.loc[results[Features.PASSES_THRESHOLDS]]
-        results = results[results.target != "nan"]
+
     return results
 
 
@@ -277,25 +275,29 @@ def scale_img(
     Main method for image rescaling. Takes a set of images and rescales them to get the best
     pixel-based estimate.  Returns an ImageStack.
     """
+    
+    # Crop edges
+    crop = 40
+    cropped_img = deepcopy(img.sel({Axes.Y: (crop, img.shape[Axes.Y]-crop), Axes.X: (crop, img.shape[Axes.X]-crop)}))
 
     # Initialize scaling factors
-    local_scale = init_scale(img)
+    local_scale = init_scale(cropped_img)
 
     # Optimize scaling factors until convergence
     scaling_factors = deepcopy(local_scale)
-    og_img = deepcopy(img)
+    og_img = deepcopy(cropped_img)
     mod_mean = 1
     iters = 0
     while mod_mean > 0.01:
 
-        scaling_mods = optimize_scale(img, scaling_factors, codebook, pixelRunnerKwargs, is_volume)
+        scaling_mods = optimize_scale(cropped_img, scaling_factors, codebook, pixelRunnerKwargs, is_volume)
 
         # Apply modifications to scaling_factors
         for key in sorted(scaling_factors):
             scaling_factors[key] = scaling_factors[key] * scaling_mods[key]
 
         # Replace image with unscaled version
-        img = deepcopy(og_img)
+        cropped_img = deepcopy(og_img)
 
         # Update mod_mean and add to iteration number. If iters reaches 20 return current scaling factors
         # and print message
@@ -372,10 +374,7 @@ def saveTable(table: DecodedIntensityTable, savename: str):
     """
     Reformats and saves a DecodedIntensityTable.
     """
-    if Features.PASSES_THRESHOLDS in table:
-        intensities = IntensityTable(table.where(table[Features.PASSES_THRESHOLDS], drop=True))
-    else:  # SimpleLookupDecoder will not have PASSES_THRESHOLDS
-        intensities = IntensityTable(table)
+    intensities = IntensityTable(table)
     traces = intensities.stack(traces=(Axes.ROUND.value, Axes.CH.value))
     # traces = table.stack(traces=(Axes.ROUND.value, Axes.CH.value))
     traces = traces.to_features_dataframe()
@@ -471,10 +470,7 @@ def run(
             )
 
         if rescale:
-            codebook_noblanks = experiment.codebook[
-                ~experiment.codebook["target"].str.contains("blank", case=False)
-            ]
-            img = scale_img(img, codebook_noblanks, pixelRunnerKwargs, level_method, is_volume)
+            img = scale_img(img, experiment.codebook, pixelRunnerKwargs, level_method, is_volume)
 
         if blob_based:
             output_name = f"{output_dir}spots/{fov}_"
@@ -491,6 +487,11 @@ def run(
         else:
             decoded = pixelDriver(img, experiment.codebook, **pixelRunnerKwargs)[0]
             print(f"Found {len(decoded)} transcripts with pixelDriver")
+         
+         # SimpleLookupDecoder will not have PASSES_THRESHOLDS
+         if Features.PASSES_THRESHOLDS in decoded.coords and decodeRunnerKwargs['filtered_results']:
+            decoded = decoded.where(decoded[Features.PASSES_THRESHOLDS], drop=True)
+            decoded = decoded[decoded.target != "nan"]
 
         saveTable(decoded, output_dir + "csv/" + fov + "_decoded.csv")
         # decoded[fov].to_decoded_dataframe().save_csv(output_dir+fov+"_decoded.csv")
@@ -555,7 +556,7 @@ if __name__ == "__main__":
     p.add_argument(
         "--filtered-results", dest="filtered_results", action="store_true"
     )  # defined by us
-    p.set_defaults(filtered_results=False)
+    p.set_defaults(filtered_results=True)
 
     ## CheckAll
     p.add_argument("--error-rounds", type=int, nargs="?")
