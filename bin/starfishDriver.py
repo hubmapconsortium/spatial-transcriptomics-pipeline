@@ -86,7 +86,6 @@ def decodeRunner(
     codebook: Codebook,
     decoderKwargs: dict,
     callableDecoder: Callable = starfish.spots.DecodeSpots.PerRoundMaxChannel,
-    filtered_results: bool = False,
     n_processes: int = None,
 ) -> DecodedIntensityTable:
     """
@@ -102,8 +101,6 @@ def decodeRunner(
         Dictionary with optional arguments to be passed to the decoder object.
     callabeDecoder: Callable
         The method for creating a decoder of the desired type. Defaults to PerRoundMaxChannel.
-    filtered_results: bool
-        If true, rows with no target or that do not pass thresholds will be removed.
 
     Returns
     -------
@@ -115,9 +112,7 @@ def decodeRunner(
         results = decoder.run(spots=spots, n_processes=n_processes)
     else:
         results = decoder.run(spots=spots)
-    if filtered_results:
-        results = results.loc[results[Features.PASSES_THRESHOLDS]]
-        results = results[results.target != "nan"]
+
     return results
 
 
@@ -278,24 +273,34 @@ def scale_img(
     pixel-based estimate.  Returns an ImageStack.
     """
 
+    # Crop edges
+    crop = 40
+    cropped_img = deepcopy(
+        img.sel(
+            {Axes.Y: (crop, img.shape[Axes.Y] - crop), Axes.X: (crop, img.shape[Axes.X] - crop)}
+        )
+    )
+
     # Initialize scaling factors
-    local_scale = init_scale(img)
+    local_scale = init_scale(cropped_img)
 
     # Optimize scaling factors until convergence
     scaling_factors = deepcopy(local_scale)
-    og_img = deepcopy(img)
+    og_img = deepcopy(cropped_img)
     mod_mean = 1
     iters = 0
     while mod_mean > 0.01:
 
-        scaling_mods = optimize_scale(img, scaling_factors, codebook, pixelRunnerKwargs, is_volume)
+        scaling_mods = optimize_scale(
+            cropped_img, scaling_factors, codebook, pixelRunnerKwargs, is_volume
+        )
 
         # Apply modifications to scaling_factors
         for key in sorted(scaling_factors):
             scaling_factors[key] = scaling_factors[key] * scaling_mods[key]
 
         # Replace image with unscaled version
-        img = deepcopy(og_img)
+        cropped_img = deepcopy(og_img)
 
         # Update mod_mean and add to iteration number. If iters reaches 20 return current scaling factors
         # and print message
@@ -372,10 +377,7 @@ def saveTable(table: DecodedIntensityTable, savename: str):
     """
     Reformats and saves a DecodedIntensityTable.
     """
-    if Features.PASSES_THRESHOLDS in table:
-        intensities = IntensityTable(table.where(table[Features.PASSES_THRESHOLDS], drop=True))
-    else:  # SimpleLookupDecoder will not have PASSES_THRESHOLDS
-        intensities = IntensityTable(table)
+    intensities = IntensityTable(table)
     traces = intensities.stack(traces=(Axes.ROUND.value, Axes.CH.value))
     # traces = table.stack(traces=(Axes.ROUND.value, Axes.CH.value))
     traces = traces.to_features_dataframe()
@@ -392,6 +394,7 @@ def run(
     rescale: bool,
     level_method: Levels,
     is_volume: bool,
+    not_filtered_results: bool,
     blobRunnerKwargs: dict,
     decodeRunnerKwargs: dict,
     pixelRunnerKwargs: dict,
@@ -413,6 +416,8 @@ def run(
         If provided, that aux view will be flattened and used as the reference image.
     rescale: bool
         If true, the image will be rescaled until convergence before running the decoder.
+    not_filtered_results: bool
+        If true, rows with no target or that do not pass thresholds will not be removed.
     blobRunnerKwargs: dict
         Dictionary with arguments for blob detection. Refer to blobRunner.
     decodeRunnerKwargs: dict
@@ -471,10 +476,7 @@ def run(
             )
 
         if rescale:
-            codebook_noblanks = experiment.codebook[
-                ~experiment.codebook["target"].str.contains("blank", case=False)
-            ]
-            img = scale_img(img, codebook_noblanks, pixelRunnerKwargs, level_method, is_volume)
+            img = scale_img(img, experiment.codebook, pixelRunnerKwargs, level_method, is_volume)
 
         if blob_based:
             output_name = f"{output_dir}spots/{fov}_"
@@ -491,6 +493,11 @@ def run(
         else:
             decoded = pixelDriver(img, experiment.codebook, **pixelRunnerKwargs)[0]
             print(f"Found {len(decoded)} transcripts with pixelDriver")
+
+        # SimpleLookupDecoder will not have PASSES_THRESHOLDS
+        if Features.PASSES_THRESHOLDS in decoded.coords and not not_filtered_results:
+            decoded = decoded.where(decoded[Features.PASSES_THRESHOLDS], drop=True)
+            decoded = decoded[decoded.target != "nan"]
 
         saveTable(decoded, output_dir + "csv/" + fov + "_decoded.csv")
         # decoded[fov].to_decoded_dataframe().save_csv(output_dir+fov+"_decoded.csv")
@@ -524,6 +531,7 @@ if __name__ == "__main__":
     p.add_argument("--rescale", dest="rescale", action="store_true")
     p.add_argument("--level-method", type=str, nargs="?")
     p.add_argument("--anchor-view", type=str, nargs="?")
+    p.add_argument("--not-filtered-results", dest="not_filtered_results", action="store_true")
 
     # blobRunner kwargs
     p.add_argument("--min-sigma", type=float, nargs="*")
@@ -552,10 +560,6 @@ if __name__ == "__main__":
         "--search-radius", type=float, nargs="?"
     )  # also used in PerRoundMaxChannel, CheckAll
     p.add_argument("--return-original-intensities", type=bool, nargs="?")
-    p.add_argument(
-        "--filtered-results", dest="filtered_results", action="store_true"
-    )  # defined by us
-    p.set_defaults(filtered_results=False)
 
     ## CheckAll
     p.add_argument("--error-rounds", type=int, nargs="?")
@@ -662,7 +666,6 @@ if __name__ == "__main__":
     decodeRunnerKwargs = {
         "decoderKwargs": decodeKwargs,
         "callableDecoder": method,
-        "filtered_results": args.filtered_results,
     }
     if method == starfish.spots.DecodeSpots.CheckAll:
         decodeRunnerKwargs["n_processes"] = cpu_count()
@@ -671,6 +674,7 @@ if __name__ == "__main__":
     use_ref = args.use_ref_img
     anchor_name = args.anchor_view
     rescale = args.rescale
+    not_filtered_results = args.not_filtered_results
 
     level_method = args.level_method
     if level_method == "SCALE_BY_CHUNK":
@@ -693,6 +697,7 @@ if __name__ == "__main__":
         rescale,
         level_method,
         vol,
+        not_filtered_results,
         blobRunnerKwargs,
         decodeRunnerKwargs,
         pixelRunnerKwargs,

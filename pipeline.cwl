@@ -253,6 +253,10 @@ inputs:
     type: boolean?
     doc: Whether to rescale images before running decoding.
 
+  not_filtered_results:
+    type: boolean?
+    doc: Pipeline will not remove genes that do not match a target and do not meet criteria.
+
   decoding_blob:
     - 'null'
     - type: record
@@ -285,9 +289,6 @@ inputs:
         decode_method:
           type: string
           doc: Method name for spot decoding. Refer to starfish documentation.
-        filtered_results:
-          type: boolean?
-          doc: Automatically remove genes that do not match a target and do not meet criteria.
         decoder:
           type:
             - type: record
@@ -856,6 +857,7 @@ steps:
       anchor_view: anchor_view
       is_volume: is_volume
       rescale: rescale
+      not_filtered_results: not_filtered_results
       decoding_blob: decoding_blob
       decoding_pixel: decoding_pixel
     out:
