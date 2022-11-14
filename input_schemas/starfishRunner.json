@@ -4,7 +4,6 @@
 	"is_volume?",
 	"rescale?",
 	"anchor_view?",
-	"not_filtered_results?",
 	{
 		"decoding":[
 			[
@@ -14,6 +13,7 @@
 				"threshold?",
 				"overlap?",
 				"decode_method?",
+				"filtered_results?",
 				"metric?",
 				"distance_threshold?",
 				"magnitude_threshold?",
