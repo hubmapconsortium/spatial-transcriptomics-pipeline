@@ -519,7 +519,7 @@ steps:
     in:
       datafile: parameter_json
       schema: read_schema/data
-    out: [skip_baysor, skip_processing, register_aux_view, fov_positioning_x_locs, fov_positioning_x_shape, fov_positioning_x_voxel, fov_positioning_y_locs, fov_positioning_y_shape, fov_positioning_y_voxel, fov_positioning_z_locs, fov_positioning_z_shape, fov_positioning_z_voxel]
+    out: [skip_baysor, skip_processing, register_aux_view, fov_positioning_x_locs, fov_positioning_x_shape, fov_positioning_x_voxel, fov_positioning_y_locs, fov_positioning_y_shape, fov_positioning_y_voxel, fov_positioning_z_locs, fov_positioning_z_shape, fov_positioning_z_voxel, add_blanks]
     when: $(inputs.datafile != null)
 
   sorter:
@@ -790,7 +790,18 @@ steps:
               return null;
             }
           }
-      add_blanks: add_blanks
+      add_blanks:
+        source: [add_blanks, stage/add_blanks]
+        valueFrom: |
+          ${
+            if(self[0]){
+              return self[0];
+            } else if(self[1]) {
+              return self[1];
+            } else {
+              return false;
+            }
+          }
     out: [spaceTx_converted]
 
   processing:
