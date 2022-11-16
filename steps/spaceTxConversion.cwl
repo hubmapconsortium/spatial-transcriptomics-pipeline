@@ -440,13 +440,9 @@ steps:
         source: [fov_positioning, stage_conversion/fov_positioning_x_locs, stage_conversion/fov_positioning_x_shape, stage_conversion/fov_positioning_x_voxel, stage_conversion/fov_positioning_y_locs, stage_conversion/fov_positioning_y_shape, stage_conversion/fov_positioning_y_voxel, stage_conversion/fov_positioning_z_locs, stage_conversion/fov_positioning_z_shape, stage_conversion/fov_positioning_z_voxel]
         valueFrom: |
           ${
-            if(!self[1] && self[0]){
-              if(self[0].x_locs && self[0].x_shape && self[0].x_voxel){
-                return self[0];
-              } else {
-                return null;
-              }
-            } else if(self[1]){
+            if(!self[1]){
+              return self[0];
+            } else {
               return {
                 x_locs: self[1],
                 x_shape: self[2],
@@ -458,9 +454,7 @@ steps:
                 z_shape: self[8],
                 z_voxel: self[9]
               };
-            } else {
-              return null;
-            };
+            }
           }
       add_blanks:
         source: [stage_conversion/add_blanks, add_blanks]
