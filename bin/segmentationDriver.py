@@ -2,6 +2,7 @@
 
 import sys
 from argparse import ArgumentParser
+from copy import deepcopy
 from datetime import datetime
 from functools import partialmethod
 from glob import glob
