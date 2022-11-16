@@ -62,7 +62,7 @@ Optional variables that describe the real-world locations of each fov and size o
   List of the n-axis start location per FOV index.
 - `x_shape`, `y_shape`, `z_shape` *int*
   Length of the n-axis across all FOVs.
-- `x_shape`, `y_shape`, `z_shape` *float*
+- `x_voxel`, `y_voxel`, `z_voxel` *float*
   Size of voxels along the n-axis.
 
 #### File Formatting
