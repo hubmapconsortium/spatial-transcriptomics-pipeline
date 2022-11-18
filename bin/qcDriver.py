@@ -783,6 +783,8 @@ def runFOV(
     if len(transcripts["target"].str.contains("blank", case=False)) > 0:
         targets.append("_noblank")
 
+    trRes["barcode_counts"] = plotBarcodeAbundance(transcripts, pdf)
+
     for t in targets:
         cur_trs = transcripts
         if t == "_noblank":
@@ -790,7 +792,6 @@ def runFOV(
         trDist = getTranscriptDist(cur_trs)
         for k, v in trDist.items():
             trRes[f"{k}{t}"] = v
-        trRes["barcode_counts"] = plotBarcodeAbundance(cur_trs, pdf)
         if pdf:
             plotTranscriptDist(trRes[f"rounds{t}"]["tally"], f"round{t}", pdf)
             plotTranscriptDist(trRes[f"channels{t}"]["tally"], f"channel{t}", pdf)
