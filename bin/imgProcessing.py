@@ -110,53 +110,21 @@ def register_primary(img, reg_img, chs_per_reg):
     return img
 
 
-def subtract_background(img, background, reg_img=None):
+def subtract_background(img, background):
     """
     Subtract real background image from primary images. Will register to same reference as primary images were
     aligned to if reg_img is provided, assumes background is of same round/channel dimensions as reference.
     """
 
-    # If a background registration channel is given register background images to primary images before subtracting.
-    bg_dat = background.xarray.data
-    if reg_img:
-
-        # Calculate registration shift for backround image
-        shifts = {}
-        # Reference is set arbitrarily to first round/channel}
-        reference = reg_img.xarray.data[0, 0]
-        for r in range(reg_img.num_rounds):
-            for ch in range(reg_img.num_chs):
-                shift, error, diffphase = phase_cross_correlation(
-                    reference, bg_dat[r, ch], upsample_factor=100
-                )
-                shifts[(r, ch)] = shift
-
-        # Create transformation matrices
-        shape = img.raw_shape
-        tforms = {}
-        for (r, ch) in shifts:
-            tform = np.diag([1.0] * 4)
-            # Start from 1 because we don't want to shift in the z direction (if there is one)
-            for i in range(1, 3):
-                tform[i, 3] = shifts[(r, ch)][i]
-            tforms[(r, ch)] = tform
-
-        # Register primary images
-        for r in range(background.num_rounds):
-            for ch in range(background.num_chs):
-                bg_dat[r, ch] = ndimage.affine_transform(
-                    img.xarray.data[r, ch],
-                    np.linalg.inv(tforms[(r, ch)]),
-                    output_shape=shape[2:],
-                )
-
     # Subtract background images from primary
+    bg_dat = background.xarray.data
     num_chs = background.num_chs
     for r in range(img.num_rounds):
         for ch in range(img.num_chs):
             for z in range(img.num_zplanes):
-                img.xarray.data[r, ch, z] -= bg_dat[r, ch % num_chs, z] / (2**16)
+                img.xarray.data[r, ch, z] -= bg_dat[r, ch % num_chs, z]
             img.xarray.data[r, ch][img.xarray.data[r, ch] < 0] = 0
+
     return img
 
 
@@ -352,11 +320,6 @@ def cli(
         img = exp[fov].get_image("primary")
         t1 = time()
         print("Fetched view " + fov)
-        if aux_name:
-            # If registration image is given calculate registration shifts for each image and apply them
-            register = exp[fov].get_image(aux_name)
-            print("\taligning to " + aux_name)
-            img = register_primary(img, register, ch_per_reg)
 
         anchor = None
         if anchor_name:
@@ -446,8 +409,15 @@ def cli(
                     p_min=90, p_max=99.9, is_volume=is_volume, level_method=level_method
                 )
                 clip.run(anchor, in_place=True)
+                
         else:
             print("\tskipping clip and scale, will be performed during rescaling.")
+            
+        if aux_name:
+            # If registration image is given calculate registration shifts for each image and apply them
+            register = exp[fov].get_image(aux_name)
+            print("\taligning to " + aux_name)
+            img = register_primary(img, register, ch_per_reg)
 
         print(f"\tView {fov} complete")
         # save modified image
