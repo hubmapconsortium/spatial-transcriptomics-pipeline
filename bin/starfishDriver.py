@@ -496,7 +496,7 @@ def run(
 
         # SimpleLookupDecoder will not have PASSES_THRESHOLDS
         if Features.PASSES_THRESHOLDS in decoded.coords and not not_filtered_results:
-            decoded = decoded.where(decoded[Features.PASSES_THRESHOLDS], drop=True)
+            decoded = decoded.loc[decoded[Features.PASSES_THRESHOLDS]]
             decoded = decoded[decoded.target != "nan"]
 
         saveTable(decoded, output_dir + "csv/" + fov + "_decoded.csv")
