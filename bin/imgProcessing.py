@@ -409,10 +409,10 @@ def cli(
                     p_min=90, p_max=99.9, is_volume=is_volume, level_method=level_method
                 )
                 clip.run(anchor, in_place=True)
-                
+
         else:
             print("\tskipping clip and scale, will be performed during rescaling.")
-            
+
         if aux_name:
             # If registration image is given calculate registration shifts for each image and apply them
             register = exp[fov].get_image(aux_name)
