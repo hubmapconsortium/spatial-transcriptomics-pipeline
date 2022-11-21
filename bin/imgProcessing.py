@@ -333,7 +333,7 @@ def cli(
             img = subtract_background(img, bg)
             if anchor_name:
                 print("\tremoving existing background from anchor image...")
-                anchor = subtract_background(anchor, bg, register if register_background else None)
+                anchor = subtract_background(anchor, bg)
         else:
             # If no background image is provided, estimate background using a large morphological
             # opening to subtract from primary images
