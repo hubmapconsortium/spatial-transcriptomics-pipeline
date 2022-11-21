@@ -330,7 +330,7 @@ def cli(
             # If a background image is provided, subtract it from the primary image.
             bg = exp[fov].get_image(background_name)
             print("\tremoving existing backgound...")
-            img = subtract_background(img, bg, register if register_background else None)
+            img = subtract_background(img, bg)
             if anchor_name:
                 print("\tremoving existing background from anchor image...")
                 anchor = subtract_background(anchor, bg, register if register_background else None)
