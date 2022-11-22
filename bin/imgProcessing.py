@@ -395,6 +395,12 @@ def cli(
             if anchor_name:
                 print("\tapplying histogram matching to anchor image...")
                 anchor = match_hist_2_min(anchor)
+                
+        if aux_name:
+            # If registration image is given calculate registration shifts for each image and apply them
+            register = exp[fov].get_image(aux_name)
+            print("\taligning to " + aux_name)
+            img = register_primary(img, register, ch_per_reg)
 
         if not rescale:
             print("\tclip and scaling...")
@@ -412,12 +418,6 @@ def cli(
 
         else:
             print("\tskipping clip and scale, will be performed during rescaling.")
-
-        if aux_name:
-            # If registration image is given calculate registration shifts for each image and apply them
-            register = exp[fov].get_image(aux_name)
-            print("\taligning to " + aux_name)
-            img = register_primary(img, register, ch_per_reg)
 
         print(f"\tView {fov} complete")
         # save modified image
