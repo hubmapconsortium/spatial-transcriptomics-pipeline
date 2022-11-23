@@ -395,7 +395,7 @@ def cli(
             if anchor_name:
                 print("\tapplying histogram matching to anchor image...")
                 anchor = match_hist_2_min(anchor)
-                
+
         if aux_name:
             # If registration image is given calculate registration shifts for each image and apply them
             register = exp[fov].get_image(aux_name)
