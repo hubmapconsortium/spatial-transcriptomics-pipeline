@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 import sys
+import time
 from argparse import ArgumentParser
 from copy import deepcopy
 from datetime import datetime
@@ -32,7 +33,7 @@ from starfish.types import (
     TraceBuildingStrategies,
 )
 from tqdm import tqdm
-import time
+
 
 def blobRunner(
     img: ImageStack,
@@ -152,7 +153,7 @@ def blobDriver(
     """
     start = time.time()
     blob = blobRunner(img, ref_img=ref_img if ref_img else None, **blobRunnerKwargs)
-    print('blobRunner', time.time()-start)
+    print("blobRunner", time.time() - start)
     print("found total spots {}".format(blob.count_total_spots()))
     # if ref_img:
     #    # Starfish doesn't apply threshold correctly when a ref image is used
@@ -172,7 +173,7 @@ def blobDriver(
         print("spots saved.")
     start = time.time()
     decoded = decodeRunner(blob, codebook, **decodeRunnerKwargs)
-    print('decodeRunner', time.time()-start)
+    print("decodeRunner", time.time() - start)
     return blob, decoded
 
 
@@ -468,11 +469,11 @@ def run(
     for fov in experiment.keys():
         start0 = time.time()
         print("fov", fov)
-        
+
         # we need to do this per fov to save memory
         start = time.time()
         img = experiment[fov].get_image("primary")
-        print("Load Image", time.time()-start)
+        print("Load Image", time.time() - start)
 
         ref_img = None
         if use_ref:
@@ -517,7 +518,7 @@ def run(
         del img
         del ref_img
         del decoded
-        print("Total driver time", time.time()-start0)
+        print("Total driver time", time.time() - start0)
     sys.stdout = sys.__stdout__
     return 0
 
