@@ -32,7 +32,7 @@ from starfish.types import (
     TraceBuildingStrategies,
 )
 from tqdm import tqdm
-
+import time
 
 def blobRunner(
     img: ImageStack,
@@ -150,7 +150,9 @@ def blobDriver(
     Mapping[str, DecodedIntensityTable]:
         A dictionary with the decoded tables stored by FOV name.
     """
+    start = time.time()
     blob = blobRunner(img, ref_img=ref_img if ref_img else None, **blobRunnerKwargs)
+    print('blobRunner', time.time()-start)
     print("found total spots {}".format(blob.count_total_spots()))
     # if ref_img:
     #    # Starfish doesn't apply threshold correctly when a ref image is used
@@ -168,7 +170,9 @@ def blobDriver(
     if output_dir:
         blob.save(output_name)
         print("spots saved.")
+    start = time.time()
     decoded = decodeRunner(blob, codebook, **decodeRunnerKwargs)
+    print('decodeRunner', time.time()-start)
     return blob, decoded
 
 
@@ -462,8 +466,13 @@ def run(
     tqdm.__init__ = partialmethod(tqdm.__init__, disable=True)
 
     for fov in experiment.keys():
+        start0 = time.time()
+        print("fov", fov)
+        
         # we need to do this per fov to save memory
+        start = time.time()
         img = experiment[fov].get_image("primary")
+        print("Load Image", time.time()-start)
 
         ref_img = None
         if use_ref:
@@ -508,7 +517,7 @@ def run(
         del img
         del ref_img
         del decoded
-
+        print("Total driver time", time.time()-start0)
     sys.stdout = sys.__stdout__
     return 0
 
