@@ -6,12 +6,13 @@ from argparse import ArgumentParser
 from copy import deepcopy
 from datetime import datetime
 from functools import partialmethod
-from os import cpu_count, makedirs, path
+from os import makedirs, path
 from pathlib import Path
 from typing import Callable, Mapping, Optional, Set, Tuple, Union
 
 import numpy as np
 import pandas as pd
+import psutil
 import starfish
 import starfish.data
 import xarray as xr
@@ -575,6 +576,7 @@ if __name__ == "__main__":
     p.add_argument("--error-rounds", type=int, nargs="?")
     p.add_argument("--mode", type=str, nargs="?")
     p.add_argument("--physical-coords", dest="physical_coords", action="store_true")
+    p.add_argument("--n-processes", type=int, nargs="?")
 
     # pixelRunner kwargs
     p.add_argument("--distance-threshold", type=float, nargs="?")
@@ -678,7 +680,10 @@ if __name__ == "__main__":
         "callableDecoder": method,
     }
     if method == starfish.spots.DecodeSpots.CheckAll:
-        decodeRunnerKwargs["n_processes"] = cpu_count()
+        if args.n_processes:
+            addKwarg(args, decodeRunnerKwargs, "n_processes")
+        else:
+            decodeRunnerKwargs["n_processes"] = len(psutil.Process().cpu_affinity())
     addKwarg(args, decodeRunnerKwargs, "return_original_intensities")
 
     use_ref = args.use_ref_img

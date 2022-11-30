@@ -257,6 +257,10 @@ inputs:
     type: boolean?
     doc: Pipeline will not remove genes that do not match a target and do not meet criteria.
 
+  n_processes:
+    type: int?
+    doc: If provided, the number of processes that will be spawned for processing. Otherwise, the maximum number of available CPUs will be used.
+
   decoding_blob:
     - 'null'
     - type: record
@@ -852,6 +856,7 @@ steps:
       rolling_radius: rolling_radius
       match_histogram: match_histogram
       tophat_radius: tophat_radius
+      n_processes: n_processes
     when: $(inputs.skip_processing == false)
     out:
       [processed_exp]
@@ -869,6 +874,7 @@ steps:
       is_volume: is_volume
       rescale: rescale
       not_filtered_results: not_filtered_results
+      n_processes: n_processes
       decoding_blob: decoding_blob
       decoding_pixel: decoding_pixel
     out:

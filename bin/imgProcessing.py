@@ -11,13 +11,14 @@ from concurrent.futures.process import ProcessPoolExecutor
 from copy import deepcopy
 from datetime import datetime
 from functools import partial, partialmethod
-from os import cpu_count, makedirs, path
+from os import makedirs, path
 from pathlib import Path
 from time import time
 
 import cv2
 import numpy as np
 import pandas as pd
+import psutil
 import skimage
 import starfish
 import tifffile as tiff
@@ -228,6 +229,7 @@ def white_top_hat(img, wth_rad):
 def cli(
     input_dir: Path,
     output_dir: str,
+    n_processes: int,
     clip_min: float = 0,
     clip_max: float = 99.9,
     level_method: str = "",
@@ -248,6 +250,9 @@ def cli(
     rescale: bool = False,
 ):
     """
+    n_processes: If provided, the number of threads to use for processing. Otherwise, the max number of
+        available CPUs will be used.
+
     clip_min: minimum value for ClipPercentileToZero
 
     is_volume: whether to treat the z-planes as a 3D image.
@@ -338,37 +343,37 @@ def cli(
             # If no background image is provided, estimate background using a large morphological
             # opening to subtract from primary images
             print("\tremoving estimated background...")
-            img = subtract_background_estimate(img, cpu_count())
+            img = subtract_background_estimate(img, n_processes)
             if anchor_name:
                 print("\tremoving estimated background from anchor image...")
-                anchor = subtract_background_estimate(anchor, cpu_count())
+                anchor = subtract_background_estimate(anchor, n_processes)
 
         if high_sigma:
             # Remove cellular autofluorescence w/ gaussian high-pass filter
             print("\trunning high pass filter...")
             ghp = starfish.image.Filter.GaussianHighPass(sigma=high_sigma)
             # ghp.run(img, verbose=False, in_place=True)
-            ghp.run(img, verbose=False, in_place=True, n_processes=cpu_count())
+            ghp.run(img, verbose=False, in_place=True, n_processes=n_processes)
             if anchor_name:
                 print("\trunning high pass filter on anchor image...")
-                ghp.run(anchor, verbose=False, in_place=True, n_processes=cpu_count())
+                ghp.run(anchor, verbose=False, in_place=True, n_processes=n_processes)
 
         if decon_sigma:
             # Increase resolution by deconvolving w/ point spread function
             print("\tdeconvolving point spread function...")
             dpsf = starfish.image.Filter.DeconvolvePSF(num_iter=decon_iter, sigma=decon_sigma)
             # dpsf.run(img, verbose=False, in_place=True)
-            dpsf.run(img, verbose=False, in_place=True, n_processes=cpu_count())
+            dpsf.run(img, verbose=False, in_place=True, n_processes=n_processes)
             if anchor_name:
                 print("\tdeconvolving point spread function on anchor image...")
-                dpsf.run(anchor, verbose=False, in_place=True, n_processes=cpu_count())
+                dpsf.run(anchor, verbose=False, in_place=True, n_processes=n_processes)
 
         if low_sigma:
             # Blur image with lowpass filter
             print("\trunning low pass filter...")
             glp = starfish.image.Filter.GaussianLowPass(sigma=low_sigma)
             # glp.run(img, verbose=False, in_place=True)
-            glp.run(img, verbose=False, in_place=True, n_processes=cpu_count())
+            glp.run(img, verbose=False, in_place=True, n_processes=n_processes)
 
         if wth_rad:
             print("\trunning white tophat filter...")
@@ -380,10 +385,10 @@ def cli(
         if rolling_rad:
             # Apply rolling ball background subtraction method to even out intensities through each 2D image
             print("\tapplying rolling ball background subtraction...")
-            img = rolling_ball(img, rolling_rad=rolling_rad, num_threads=cpu_count())
+            img = rolling_ball(img, rolling_rad=rolling_rad, num_threads=n_processes)
             if anchor_name:
                 print("\tapplying rolling ball background subtraction to anchor image...")
-                anchor = rolling_ball(anchor, rolling_rad=rolling_rad, num_threads=cpu_count())
+                anchor = rolling_ball(anchor, rolling_rad=rolling_rad, num_threads=n_processes)
 
         if match_hist:
             # Use histogram matching to lower the intensities of each 3D image down to the same
@@ -463,8 +468,14 @@ if __name__ == "__main__":
     p.add_argument("--inline-log", dest="inline_log", action="store_true")
     p.add_argument("--tophat-radius", type=int, nargs="?")
     p.add_argument("--rescale", dest="rescale", action="store_true")
+    p.add_argument("--n-processes", type=int, nargs="?")
 
     args = p.parse_args()
+
+    if args.n_processes:
+        n_processes = args.n_processes
+    else:
+        n_processes = len(psutil.Process().cpu_affinity())
 
     cli(
         input_dir=args.input_dir,
@@ -487,4 +498,5 @@ if __name__ == "__main__":
         wth_rad=args.tophat_radius,
         inline_log=args.inline_log,
         rescale=args.rescale,
+        n_processes=n_processes,
     )

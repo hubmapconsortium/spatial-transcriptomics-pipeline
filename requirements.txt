@@ -6,3 +6,4 @@ astropy
 tifffile
 matplotlib
 opencv-python-headless
+psutil
