@@ -511,16 +511,7 @@ steps:
                 };
               };
               return decode;
-                /* pixel decoding */
-                return {
-                  metric: self[18],
-                  distance_threshold: self[19],
-                  magnitude_threshold: self[20],
-                  min_area: self[21],
-                  max_area: self[22],
-                  norm_order: self[23]
-                };
-            }
+            };
           }
       decoding_pixel:
         source: [decoding_pixel, stage_runner/decoding_metric, stage_runner/decoding_distance_threshold, stage_runner/decoding_magnitude_threshold, stage_runner/decoding_min_area, stage_runner/decoding_max_area, stage_runner/decoding_norm_order]
