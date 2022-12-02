@@ -17,6 +17,7 @@
 	"match_histogram?",
 	"tophat_radius?",
 	"channel_count",
+	"n_processes?",
 	{
 		"aux_tilesets":[
 			[

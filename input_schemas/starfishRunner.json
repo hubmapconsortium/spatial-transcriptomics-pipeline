@@ -5,6 +5,7 @@
 	"rescale?",
 	"anchor_view?",
 	"not_filtered_results?",
+	"n_processes?",
 	{
 		"decoding":[
 			[
