@@ -12,7 +12,6 @@ from typing import Callable, Mapping, Optional, Set, Tuple, Union
 
 import numpy as np
 import pandas as pd
-import psutil
 import starfish
 import starfish.data
 import xarray as xr
@@ -683,7 +682,11 @@ if __name__ == "__main__":
         if args.n_processes:
             addKwarg(args, decodeRunnerKwargs, "n_processes")
         else:
-            decodeRunnerKwargs["n_processes"] = len(psutil.Process().cpu_affinity())
+            try:
+                # the following line is not guaranteed to work on non-linux systems
+                decodeRunnerKwargs["n_processes"] = len(os.sched_getaffinity(os.getpid()))
+            except Error:
+                decodeRunnerKwargs["n_processes"] = 1
     addKwarg(args, decodeRunnerKwargs, "return_original_intensities")
 
     use_ref = args.use_ref_img

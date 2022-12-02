@@ -18,7 +18,6 @@ from time import time
 import cv2
 import numpy as np
 import pandas as pd
-import psutil
 import skimage
 import starfish
 import tifffile as tiff
@@ -475,7 +474,11 @@ if __name__ == "__main__":
     if args.n_processes:
         n_processes = args.n_processes
     else:
-        n_processes = len(psutil.Process().cpu_affinity())
+        try:
+            # the following line is not guaranteed to work on non-linux machines.
+            n_processes = len(os.sched_getaffinity(os.getpid()))
+        except Error:
+            n_processes = 1
 
     cli(
         input_dir=args.input_dir,
