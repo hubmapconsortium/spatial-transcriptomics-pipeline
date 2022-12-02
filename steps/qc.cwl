@@ -91,6 +91,7 @@ inputs:
             type: string?
             doc: Added to prevent cli parsing of the fov_positioning record.
       - type: record
+        name: fov_positioning
         fields:
           - name: x_size
             type: int

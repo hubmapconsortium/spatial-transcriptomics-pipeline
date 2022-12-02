@@ -79,6 +79,7 @@ inputs:
   aux_tilesets:
     - 'null'
     - type: record
+      name: aux_tilesets
       fields:
         aux_names:
           type: string[]?
@@ -93,8 +94,8 @@ inputs:
           type: string[]?
           doc: Order of non x,y dimensions within each image. One entry per aux_name, with semicolon-delimited vars.
         aux_channel_count:
-          type: int[]?
-          doc: Count of channels in each aux image
+          type: float[]?
+          doc: Count of channels in each aux image.
         aux_channel_slope:
           type: float[]?
           doc: Used to convert 0-indexed channel IDs to the channel index within the image.  Calculated as (image index) = int(index*slope) + intercept
