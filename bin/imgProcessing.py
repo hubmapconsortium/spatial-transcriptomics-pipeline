@@ -300,6 +300,8 @@ def cli(
     sys.stdout = reporter
     sys.stderr = reporter
 
+    print(locals())
+
     tqdm.__init__ = partialmethod(tqdm.__init__, disable=True)
 
     if level_method == "SCALE_BY_CHUNK":
@@ -474,7 +476,7 @@ if __name__ == "__main__":
         try:
             # the following line is not guaranteed to work on non-linux machines.
             n_processes = len(os.sched_getaffinity(os.getpid()))
-        except Error:
+        except Exception:
             n_processes = 1
 
     cli(

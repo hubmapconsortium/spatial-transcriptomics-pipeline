@@ -685,7 +685,7 @@ if __name__ == "__main__":
             try:
                 # the following line is not guaranteed to work on non-linux systems
                 decodeRunnerKwargs["n_processes"] = len(os.sched_getaffinity(os.getpid()))
-            except Error:
+            except Exception:
                 decodeRunnerKwargs["n_processes"] = 1
     addKwarg(args, decodeRunnerKwargs, "return_original_intensities")
 
