@@ -82,10 +82,6 @@ inputs:
     type: int?
     doc: Radius for white top hat filter. Should be slightly larger than the expected spot radius. Will not be run if not provided.
 
-  inline_log:
-    type: boolean?
-    doc: If true, log will be sent to stdout instead of a file.
-
   rescale:
     type: boolean?
     doc: Whether to iteratively rescale images before running the decoder. If true, will skip clip and scale at the end of this step.
@@ -249,12 +245,6 @@ steps:
           inputBinding:
             prefix: --tophat-radius
           doc: Radius for white top hat filter. Should be slightly larger than the expected spot radius. Will not be run if not provided.
-
-        inline_log:
-          type: boolean?
-          inputBinding:
-            prefix: --inline-log
-          doc: If true, logs will be sent to stdout instead of a file.
 
         n_processes:
           type: int?
@@ -495,6 +485,5 @@ steps:
               return null;
             }
           }
-      inline_log: inline_log
     out: [processed_exp]
 
