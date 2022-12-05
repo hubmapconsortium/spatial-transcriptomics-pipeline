@@ -300,20 +300,20 @@ def cli(
     sys.stdout = reporter
     sys.stderr = reporter
 
-    print(locals())
-
     tqdm.__init__ = partialmethod(tqdm.__init__, disable=True)
 
-    if level_method == "SCALE_BY_CHUNK":
+    if level_method.upper() == "SCALE_BY_CHUNK":
         level_method = Levels.SCALE_BY_CHUNK
-    elif level_method == "SCALE_BY_IMAGE":
+    elif level_method.upper() == "SCALE_BY_IMAGE":
         level_method = Levels.SCALE_BY_IMAGE
-    elif level_method == "SCALE_SATURATED_BY_CHUNK":
+    elif level_method.upper() == "SCALE_SATURATED_BY_CHUNK":
         level_method = Levels.SCALE_SATURATED_BY_CHUNK
-    elif level_method == "SCALE_SATURATED_BY_IMAGE":
+    elif level_method.upper() == "SCALE_SATURATED_BY_IMAGE":
         level_method = Levels.SCALE_SATURATED_BY_IMAGE
     else:
         level_method = Levels.SCALE_BY_IMAGE
+
+    print(locals())
 
     t0 = time()
 
