@@ -63,6 +63,7 @@ def blobRunner(
         Starfish wrapper for an xarray with the spot data.
 
     """
+    print(locals())
     bd = starfish.spots.FindSpots.BlobDetector(
         min_sigma=min_sigma,
         max_sigma=max_sigma,
@@ -108,6 +109,7 @@ def decodeRunner(
     DecodedIntensityTable:
         Starfish wrapper for an xarray with the labeled transcripts.
     """
+    print(locals())
     decoder = callableDecoder(codebook=codebook, **decoderKwargs)
     if n_processes:
         results = decoder.run(spots=spots, n_processes=n_processes)
@@ -151,6 +153,7 @@ def blobDriver(
     Mapping[str, DecodedIntensityTable]:
         A dictionary with the decoded tables stored by FOV name.
     """
+    print(locals())
     start = time.time()
     blob = blobRunner(img, ref_img=ref_img if ref_img else None, **blobRunnerKwargs)
     print("blobRunner", time.time() - start)
@@ -449,19 +452,7 @@ def run(
     sys.stdout = reporter
     sys.stderr = reporter
 
-    print(
-        "output_dir: {}\nexp: {}\nblob_based: {}\nuse_ref: {}\nanchor: {}\nrescale: {}\nblobrunner: {}\ndecoderunner: {}\npixelrunner: {}\n".format(
-            output_dir,
-            experiment,
-            blob_based,
-            use_ref,
-            anchor_name,
-            rescale,
-            blobRunnerKwargs,
-            decodeRunnerKwargs,
-            pixelRunnerKwargs,
-        )
-    )
+    print(locals())
 
     # disabling tdqm for pipeline runs
     tqdm.__init__ = partialmethod(tqdm.__init__, disable=True)
