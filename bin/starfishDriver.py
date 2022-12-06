@@ -586,9 +586,15 @@ if __name__ == "__main__":
     # addKwarg(args, blobRunnerKwargs, "min_sigma")
     # addKwarg(args, blobRunnerKwargs, "max_sigma")
     if args.min_sigma:
-        blobRunnerKwargs["min_sigma"] = tuple(args.min_sigma)
+        if len(args.min_sigma) == 1:
+            blobRunnerKwargs["min_sigma"] = args.min_sigma[0]
+        else:
+            blobRunnerKwargs["min_sigma"] = tuple(args.min_sigma)
     if args.max_sigma:
-        blobRunnerKwargs["max_sigma"] = tuple(args.max_sigma)
+        if len(args.max_sigma) == 1:
+            blobRunnerKwargs["max_sigma"] = args.min_sigma[0]
+        else:
+            blobRunnerKwargs["max_sigma"] = tuple(args.max_sigma)
     addKwarg(args, blobRunnerKwargs, "num_sigma")
     addKwarg(args, blobRunnerKwargs, "threshold")
     addKwarg(args, blobRunnerKwargs, "overlap")
