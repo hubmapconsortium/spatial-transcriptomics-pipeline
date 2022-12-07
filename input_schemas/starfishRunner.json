@@ -1,8 +1,11 @@
 [
+	"level_method?",
 	"use_ref_img?",
 	"is_volume?",
 	"rescale?",
 	"anchor_view?",
+	"not_filtered_results?",
+	"n_processes?",
 	{
 		"decoding":[
 			[
@@ -12,7 +15,6 @@
 				"threshold?",
 				"overlap?",
 				"decode_method?",
-				"filtered_results?",
 				"metric?",
 				"distance_threshold?",
 				"magnitude_threshold?",

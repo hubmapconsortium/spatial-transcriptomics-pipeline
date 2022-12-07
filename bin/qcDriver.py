@@ -482,66 +482,51 @@ def getFractionSpotsUsed(spots, transcripts):
     return trspotCount / spotCount
 
 
-def getTranscriptRoundDist(transcripts, pdf=False):
-    conv = np.where(transcripts.data > 0, 1, 0)
-    counts = np.sum(conv, axis=(0, 2))
-    counts = [c / sum(counts) for c in counts]
+def getTranscriptDist(transcripts):
+    chlTally = [0 for i in range(len(transcripts.c))]
+    rndTally = [0 for i in range(len(transcripts.r))]
+    omitTally = [0 for i in range(len(transcripts.r))]
+    for tr in range(len(transcripts)):
+        for r in range(len(transcripts.r)):
+            rvals = transcripts[tr].isel(r=r).data
+            if not all(rvals == 0):
+                rndTally[r] += 1
+                chlTally[rvals.argmax()] += 1
+            else:
+                omitTally[r] += 1
+    rndTally = [r / sum(rndTally) for r in rndTally]
+    chlTally = [r / sum(chlTally) for r in chlTally]
+    if sum(omitTally) != 0:
+        omitTally = [r / sum(omitTally) for r in omitTally]
+    return {
+        "rounds": {"tally": rndTally, "stdev": np.std(rndTally), "skew": skew(rndTally)},
+        "channels": {"tally": chlTally, "stdev": np.std(chlTally), "skew": skew(chlTally)},
+        "omit_rounds": {"tally": omitTally, "stdev": np.std(omitTally), "skew": skew(omitTally)},
+    }
+
+
+def plotTranscriptDist(counts, name, pdf):
     std = np.std(counts)
-    skw = skew(counts)
+    fig, ax = plt.subplots()
 
-    if pdf:
-        fig, ax = plt.subplots()
+    for axis in [ax.xaxis, ax.yaxis]:
+        axis.set_major_locator(ticker.MaxNLocator(integer=True))
 
-        for axis in [ax.xaxis, ax.yaxis]:
-            axis.set_major_locator(ticker.MaxNLocator(integer=True))
+    plt.bar(range(len(counts)), counts)
+    plt.title(f"Transcript source spot distribution across {name}s")
+    plt.ylabel("Spot count")
+    plt.xlabel(f"{name} ID")
 
-        plt.bar(range(len(counts)), counts)
-        plt.title("Transcript source spot distribution across rounds")
-        plt.ylabel("Spot count")
-        plt.xlabel("Round ID")
+    avg = np.mean(counts)
+    offset = (ax.get_ylim()[1] - ax.get_ylim()[0]) * 0.005
+    plt.axhline(avg, color="black")
+    plt.text(0, avg + offset, f"Average: {avg:.2f}")
+    plt.axhline(avg + std, dashes=(2, 2), color="black")
+    plt.axhline(avg - std, dashes=(2, 2), color="black")
+    plt.text(0, avg - std + offset, f"Standard Deviation: {std:.2f}")
 
-        avg = np.mean(counts)
-        offset = (ax.get_ylim()[1] - ax.get_ylim()[0]) * 0.005
-        plt.axhline(avg, color="black")
-        plt.text(0, avg + offset, f"Average: {avg:.2f}")
-        plt.axhline(avg + std, dashes=(2, 2), color="black")
-        plt.axhline(avg - std, dashes=(2, 2), color="black")
-        plt.text(0, avg - std + offset, f"Standard Deviation: {std:.2f}")
-
-        pdf.savefig(fig)
-        plt.close()
-    return {"counts": counts, "stdev": std, "skew": skw}
-
-
-def getTranscriptChannelDist(transcripts, pdf=False):
-    conv = np.where(transcripts.data > 0, 1, 0)
-    counts = np.sum(conv, axis=(0, 1))
-    counts = [c / sum(counts) for c in counts]
-    std = np.std(counts)
-    skw = skew(counts)
-
-    if pdf:
-        fig, ax = plt.subplots()
-
-        for axis in [ax.xaxis, ax.yaxis]:
-            axis.set_major_locator(ticker.MaxNLocator(integer=True))
-
-        plt.bar(range(len(counts)), counts)
-        plt.title("Transcript source spot distribution across channels")
-        plt.ylabel("Fraction of spots")
-        plt.xlabel("Channel ID")
-
-        avg = np.mean(counts)
-        offset = (ax.get_ylim()[1] - ax.get_ylim()[0]) * 0.005
-        plt.axhline(avg, color="black")
-        plt.text(0, avg + offset, f"Average: {avg:.2f}")
-        plt.axhline(avg + std, dashes=(2, 2), color="black")
-        plt.axhline(avg - std, dashes=(2, 2), color="black")
-        plt.text(0, avg - std + offset, f"Standard Deviation: {std:.2f}")
-
-        pdf.savefig(fig)
-        plt.close()
-    return {"counts": counts, "stdev": std, "skew": skw}
+    pdf.savefig(fig)
+    plt.close()
 
 
 def getFPR(segmentation, pdf=False):
@@ -557,8 +542,8 @@ def getFPR(segmentation, pdf=False):
     if len(segmentation) == 0:
         return None
 
-    blank_counts_full = segmentation[segmentation["target"].str.contains("blank")]
-    real_counts_full = segmentation[~segmentation["target"].str.contains("blank")]
+    blank_counts_full = segmentation[segmentation["target"].str.contains("blank", case=False)]
+    real_counts_full = segmentation[~segmentation["target"].str.contains("blank", case=False)]
 
     cell_count = int(real_counts_full[key].max()) + 1
     real_per_cell_full = np.histogram(real_counts_full[key], bins=cell_count)[0]
@@ -620,8 +605,8 @@ def getFPR(segmentation, pdf=False):
 
 def plotBarcodeAbundance(decoded, pdf):
     targets = decoded["target"].data.tolist()
-    blank_counts_full = [s for s in targets if "blank" in s]
-    real_counts_full = [s for s in targets if "blank" not in s]
+    blank_counts_full = [s for s in targets if "blank" in s.lower()]
+    real_counts_full = [s for s in targets if "blank" not in s.lower()]
 
     blank_names = set(blank_counts_full)
     blank_counts = []
@@ -641,11 +626,21 @@ def plotBarcodeAbundance(decoded, pdf):
         for i in asrted
     ]
 
+    avg_bl = np.average(blank_counts)
+    std_bl = max(1, np.std(blank_counts))
+    conf = norm.interval(0.95, loc=avg_bl, scale=std_bl)[1]
+    good_codes = sum([1 if i > conf else 0 for i in real_counts]) / len(real_counts)
+
     fig, ax = plt.subplots()
 
     plt.bar(range(len(bars)), height=bars, color=colors, width=1, align="edge")
+    plt.axhline(conf, color="black")
+    plt.text(
+        len(combined) / 3, conf + 1, f"{good_codes*100:.2f}% barcodes above {conf:.2f} threshold"
+    )
+    ax.set_yscale("log")
     plt.xlim([0, len(combined)])
-    plt.ylim([0, max(combined) * 1.1])
+    plt.ylim([0.9, max(combined) * 1.1])
     plt.xlabel("Barcodes")
     plt.ylabel("Total counts per barcode")
     plt.title("Relative abundance of barcodes")
@@ -655,6 +650,8 @@ def plotBarcodeAbundance(decoded, pdf):
 
     pdf.savefig(fig)
     plt.close()
+
+    return {"cutoff": conf, "barcode_average": avg_bl, "barcode_std_used": std_bl}
 
 
 def plotSpotRatio(spots, transcripts, name, pdf):
@@ -781,20 +778,36 @@ def runFOV(
     trRes["density"] = getTranscriptDensity(transcripts, codebook)
     if spots:
         trRes["fraction_spots_used"] = getFractionSpotsUsed(relevSpots, transcripts)
-    trRes["round_dist"] = getTranscriptRoundDist(transcripts, pdf)
-    trRes["channel_dist"] = getTranscriptChannelDist(transcripts, pdf)
-    if pdf:
-        plotBarcodeAbundance(transcripts, pdf)
-    if spots and pdf:
-        plotSpotRatio(
-            results["spots"]["channel_dist"]["tally"],
-            trRes["channel_dist"]["counts"],
-            "channel",
-            pdf,
-        )
-        plotSpotRatio(
-            results["spots"]["round_dist"]["tally"], trRes["round_dist"]["counts"], "round", pdf
-        )
+
+    targets = [""]
+    if len(transcripts["target"].str.contains("blank", case=False)) > 0:
+        targets.append("_noblank")
+
+    trRes["barcode_counts"] = plotBarcodeAbundance(transcripts, pdf)
+
+    for t in targets:
+        cur_trs = transcripts
+        if t == "_noblank":
+            cur_trs = transcripts[~transcripts["target"].str.contains("blank", case=False)]
+        trDist = getTranscriptDist(cur_trs)
+        for k, v in trDist.items():
+            trRes[f"{k}{t}"] = v
+        if pdf:
+            plotTranscriptDist(trRes[f"rounds{t}"]["tally"], f"round{t}", pdf)
+            plotTranscriptDist(trRes[f"channels{t}"]["tally"], f"channel{t}", pdf)
+        if spots and pdf:
+            plotSpotRatio(
+                results["spots"]["channel_dist"]["tally"],
+                trRes[f"channels{t}"]["tally"],
+                f"channel{t}",
+                pdf,
+            )
+            plotSpotRatio(
+                results["spots"]["round_dist"]["tally"],
+                trRes[f"rounds{t}"]["tally"],
+                f"round{t}",
+                pdf,
+            )
 
     results["transcripts"] = trRes
     t = time()
@@ -961,9 +974,6 @@ if __name__ == "__main__":
                 path_to_roi_set_zip=args.roi, original_image=img
             )
         elif args.segmentation_loc:
-            exp = starfish.core.experiment.experiment.Experiment.from_json(
-                str(args.codebook_exp) + "/experiment.json"
-            )
             roi = {}
             for f in transcripts.keys():
                 maskloc = "{}/{}/mask.tiff".format(args.segmentation_loc, f)

@@ -67,13 +67,14 @@ outputs:
   use_ref_img: boolean
   is_volume: boolean
   rescale: boolean
+  not_filtered_results: boolean
+  n_processes: int
   decoding_min_sigma: float[]
   decoding_max_sigma: float[]
   decoding_num_sigma: int
   decoding_threshold: float
   decoding_overlap: float
   decoding_decode_method: string
-  decoding_filtered_results: boolean
   decoding_decoder_trace_building_strategy: string
   decoding_decoder_max_distance: float
   decoding_decoder_min_intensity: float

@@ -96,7 +96,7 @@ steps:
 
       requirements:
         DockerRequirement:
-          dockerPull: hubmap/starfish-custom:2.10
+          dockerPull: hubmap/starfish-custom:latest
 
       inputs:
         schema:

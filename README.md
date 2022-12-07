@@ -6,6 +6,8 @@ A [CWL](https://www.commonwl.org/) pipeline for processing spatial transcriptomi
 
 ## Installation
 
+Currently, development is performed on the `master` branch, for the latest stable release use the `release` branch.
+
 To run this pipeline locally, you need [cwltool](https://pypi.org/project/cwltool/) and [Docker](https://docs.docker.com/engine/install/) installed.  The version of `cwltool` must be recent enough to read cwl 1.2, which means that it must be installed through `pip` and not `apt-get` (at the time of writing).
 
 To run this in a docker image, pull `ghcr.io/hubmapconsortium/spatial-transcriptomics-pipeline/starfish-docker-runner:latest` and invoke `cwltool --singularity` when running.
@@ -62,7 +64,7 @@ Optional variables that describe the real-world locations of each fov and size o
   List of the n-axis start location per FOV index.
 - `x_shape`, `y_shape`, `z_shape` *int*
   Length of the n-axis across all FOVs.
-- `x_shape`, `y_shape`, `z_shape` *float*
+- `x_voxel`, `y_voxel`, `z_voxel` *float*
   Size of voxels along the n-axis.
 
 #### File Formatting

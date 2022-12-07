@@ -142,6 +142,13 @@ inputs:
   fov_positioning:
     - 'null'
     - type: record
+      name: dummy
+      fields:
+        dummy:
+          type: string?
+          doc: Added to prevent cli parsing of the fov_positioning record.
+    - type: record
+      name: fov_positioning
       fields:
         - name: x_locs
           type: string?
@@ -253,6 +260,14 @@ inputs:
     type: boolean?
     doc: Whether to rescale images before running decoding.
 
+  not_filtered_results:
+    type: boolean?
+    doc: Pipeline will not remove genes that do not match a target and do not meet criteria.
+
+  n_processes:
+    type: int?
+    doc: If provided, the number of processes that will be spawned for processing. Otherwise, the maximum number of available CPUs will be used.
+
   decoding_blob:
     - 'null'
     - type: record
@@ -285,9 +300,6 @@ inputs:
         decode_method:
           type: string
           doc: Method name for spot decoding. Refer to starfish documentation.
-        filtered_results:
-          type: boolean?
-          doc: Automatically remove genes that do not match a target and do not meet criteria.
         decoder:
           type:
             - type: record
@@ -496,7 +508,7 @@ steps:
 
       requirements:
         DockerRequirement:
-          dockerPull: hubmap/starfish-custom:2.10
+          dockerPull: hubmap/starfish-custom:latest
 
       inputs:
         schema:
@@ -518,7 +530,7 @@ steps:
     in:
       datafile: parameter_json
       schema: read_schema/data
-    out: [skip_baysor, skip_processing, register_aux_view, fov_positioning_x_locs, fov_positioning_x_shape, fov_positioning_x_voxel, fov_positioning_y_locs, fov_positioning_y_shape, fov_positioning_y_voxel, fov_positioning_z_locs, fov_positioning_z_shape, fov_positioning_z_voxel]
+    out: [skip_baysor, skip_processing, register_aux_view, fov_positioning_x_locs, fov_positioning_x_shape, fov_positioning_x_voxel, fov_positioning_y_locs, fov_positioning_y_shape, fov_positioning_y_voxel, fov_positioning_z_locs, fov_positioning_z_shape, fov_positioning_z_voxel, add_blanks]
     when: $(inputs.datafile != null)
 
   sorter:
@@ -789,7 +801,18 @@ steps:
               return null;
             }
           }
-      add_blanks: add_blanks
+      add_blanks:
+        source: [add_blanks, stage/add_blanks]
+        valueFrom: |
+          ${
+            if(self[0]){
+              return self[0];
+            } else if(self[1]) {
+              return self[1];
+            } else {
+              return false;
+            }
+          }
     out: [spaceTx_converted]
 
   processing:
@@ -840,6 +863,7 @@ steps:
       rolling_radius: rolling_radius
       match_histogram: match_histogram
       tophat_radius: tophat_radius
+      n_processes: n_processes
     when: $(inputs.skip_processing == false)
     out:
       [processed_exp]
@@ -851,10 +875,13 @@ steps:
         source: [processing/processed_exp, spaceTxConversion/spaceTx_converted]
         pickValue: first_non_null
       parameter_json: parameter_json
+      level_method: level_method
       use_ref_img: use_ref_img
       anchor_view: anchor_view
       is_volume: is_volume
       rescale: rescale
+      not_filtered_results: not_filtered_results
+      n_processes: n_processes
       decoding_blob: decoding_blob
       decoding_pixel: decoding_pixel
     out:

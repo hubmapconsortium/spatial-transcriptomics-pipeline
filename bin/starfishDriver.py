@@ -1,11 +1,12 @@
 #!/usr/bin/env python
 
 import sys
+import time
 from argparse import ArgumentParser
 from copy import deepcopy
 from datetime import datetime
 from functools import partialmethod
-from os import cpu_count, makedirs, path
+from os import makedirs, path
 from pathlib import Path
 from typing import Callable, Mapping, Optional, Set, Tuple, Union
 
@@ -62,6 +63,7 @@ def blobRunner(
         Starfish wrapper for an xarray with the spot data.
 
     """
+    print(locals())
     bd = starfish.spots.FindSpots.BlobDetector(
         min_sigma=min_sigma,
         max_sigma=max_sigma,
@@ -86,7 +88,6 @@ def decodeRunner(
     codebook: Codebook,
     decoderKwargs: dict,
     callableDecoder: Callable = starfish.spots.DecodeSpots.PerRoundMaxChannel,
-    filtered_results: bool = False,
     n_processes: int = None,
 ) -> DecodedIntensityTable:
     """
@@ -102,22 +103,19 @@ def decodeRunner(
         Dictionary with optional arguments to be passed to the decoder object.
     callabeDecoder: Callable
         The method for creating a decoder of the desired type. Defaults to PerRoundMaxChannel.
-    filtered_results: bool
-        If true, rows with no target or that do not pass thresholds will be removed.
 
     Returns
     -------
     DecodedIntensityTable:
         Starfish wrapper for an xarray with the labeled transcripts.
     """
+    print(locals())
     decoder = callableDecoder(codebook=codebook, **decoderKwargs)
     if n_processes:
         results = decoder.run(spots=spots, n_processes=n_processes)
     else:
         results = decoder.run(spots=spots)
-    if filtered_results:
-        results = results.loc[results[Features.PASSES_THRESHOLDS]]
-        results = results[results.target != "nan"]
+
     return results
 
 
@@ -155,7 +153,10 @@ def blobDriver(
     Mapping[str, DecodedIntensityTable]:
         A dictionary with the decoded tables stored by FOV name.
     """
+    print(locals())
+    start = time.time()
     blob = blobRunner(img, ref_img=ref_img if ref_img else None, **blobRunnerKwargs)
+    print("blobRunner", time.time() - start)
     print("found total spots {}".format(blob.count_total_spots()))
     # if ref_img:
     #    # Starfish doesn't apply threshold correctly when a ref image is used
@@ -173,7 +174,9 @@ def blobDriver(
     if output_dir:
         blob.save(output_name)
         print("spots saved.")
+    start = time.time()
     decoded = decodeRunner(blob, codebook, **decodeRunnerKwargs)
+    print("decodeRunner", time.time() - start)
     return blob, decoded
 
 
@@ -278,24 +281,34 @@ def scale_img(
     pixel-based estimate.  Returns an ImageStack.
     """
 
+    # Crop edges
+    crop = 40
+    cropped_img = deepcopy(
+        img.sel(
+            {Axes.Y: (crop, img.shape[Axes.Y] - crop), Axes.X: (crop, img.shape[Axes.X] - crop)}
+        )
+    )
+
     # Initialize scaling factors
-    local_scale = init_scale(img)
+    local_scale = init_scale(cropped_img)
 
     # Optimize scaling factors until convergence
     scaling_factors = deepcopy(local_scale)
-    og_img = deepcopy(img)
+    og_img = deepcopy(cropped_img)
     mod_mean = 1
     iters = 0
     while mod_mean > 0.01:
 
-        scaling_mods = optimize_scale(img, scaling_factors, codebook, pixelRunnerKwargs, is_volume)
+        scaling_mods = optimize_scale(
+            cropped_img, scaling_factors, codebook, pixelRunnerKwargs, is_volume
+        )
 
         # Apply modifications to scaling_factors
         for key in sorted(scaling_factors):
             scaling_factors[key] = scaling_factors[key] * scaling_mods[key]
 
         # Replace image with unscaled version
-        img = deepcopy(og_img)
+        cropped_img = deepcopy(og_img)
 
         # Update mod_mean and add to iteration number. If iters reaches 20 return current scaling factors
         # and print message
@@ -311,15 +324,18 @@ def scale_img(
     # Scale with final factors
     for r in range(img.num_rounds):
         for ch in range(img.num_chs):
+            print(f"({r},{ch}): {scaling_factors[(r,ch)]}")
             img.xarray.data[r, ch] = img.xarray.data[r, ch] / scaling_factors[(r, ch)]
 
     # Scale image
     pmin = 0
     pmax = 100
     clip = starfish.image.Filter.ClipPercentileToZero(
-        p_min=pmin, p_max=pmax, is_volume=is_volume, level_method=level_method
+        p_min=pmin, p_max=pmax, is_volume=is_volume, level_method=Levels.SCALE_BY_IMAGE
     )
     clip.run(img, in_place=True)
+
+    print(f"Rescaled image in {iters} iterations, final mod_mean: {mod_mean}")
 
     return img
 
@@ -369,14 +385,12 @@ def saveTable(table: DecodedIntensityTable, savename: str):
     """
     Reformats and saves a DecodedIntensityTable.
     """
-    if Features.PASSES_THRESHOLDS in table:
-        intensities = IntensityTable(table.where(table[Features.PASSES_THRESHOLDS], drop=True))
-    else:  # SimpleLookupDecoder will not have PASSES_THRESHOLDS
-        intensities = IntensityTable(table)
+    intensities = IntensityTable(table)
     traces = intensities.stack(traces=(Axes.ROUND.value, Axes.CH.value))
     # traces = table.stack(traces=(Axes.ROUND.value, Axes.CH.value))
     traces = traces.to_features_dataframe()
     traces.to_csv(savename)
+    print(f"Saved decoded csv file {savename}.")
 
 
 def run(
@@ -388,6 +402,7 @@ def run(
     rescale: bool,
     level_method: Levels,
     is_volume: bool,
+    not_filtered_results: bool,
     blobRunnerKwargs: dict,
     decodeRunnerKwargs: dict,
     pixelRunnerKwargs: dict,
@@ -409,6 +424,8 @@ def run(
         If provided, that aux view will be flattened and used as the reference image.
     rescale: bool
         If true, the image will be rescaled until convergence before running the decoder.
+    not_filtered_results: bool
+        If true, rows with no target or that do not pass thresholds will not be removed.
     blobRunnerKwargs: dict
         Dictionary with arguments for blob detection. Refer to blobRunner.
     decodeRunnerKwargs: dict
@@ -435,26 +452,19 @@ def run(
     sys.stdout = reporter
     sys.stderr = reporter
 
-    print(
-        "output_dir: {}\nexp: {}\nblob_based: {}\nuse_ref: {}\nanchor: {}\nrescale: {}\nblobrunner: {}\ndecoderunner: {}\npixelrunner: {}\n".format(
-            output_dir,
-            experiment,
-            blob_based,
-            use_ref,
-            anchor_name,
-            rescale,
-            blobRunnerKwargs,
-            decodeRunnerKwargs,
-            pixelRunnerKwargs,
-        )
-    )
+    print(locals())
 
     # disabling tdqm for pipeline runs
     tqdm.__init__ = partialmethod(tqdm.__init__, disable=True)
 
     for fov in experiment.keys():
+        start0 = time.time()
+        print("fov", fov)
+
         # we need to do this per fov to save memory
+        start = time.time()
         img = experiment[fov].get_image("primary")
+        print("Load Image", time.time() - start)
 
         ref_img = None
         if use_ref:
@@ -465,10 +475,6 @@ def run(
                 .get_image(anchor_name)
                 .reduce({Axes.CH, Axes.ROUND, Axes.ZPLANE}, func="max")
             )
-            clip = starfish.image.Filter.ClipPercentileToZero(
-                p_min=20, p_max=99.9, is_volume=is_volume, level_method=Levels.SCALE_BY_CHUNK
-            )
-            clip.run(ref_img, in_place=True)
 
         if rescale:
             img = scale_img(img, experiment.codebook, pixelRunnerKwargs, level_method, is_volume)
@@ -484,18 +490,26 @@ def run(
                 output_name,
             )
             del blobs  # this is saved within the driver now
+            print(f"Found {len(decoded)} transcripts with blobDriver")
         else:
             decoded = pixelDriver(img, experiment.codebook, **pixelRunnerKwargs)[0]
+            print(f"Found {len(decoded)} transcripts with pixelDriver")
+
+        # SimpleLookupDecoder will not have PASSES_THRESHOLDS
+        if Features.PASSES_THRESHOLDS in decoded.coords and not not_filtered_results:
+            decoded = decoded.loc[decoded[Features.PASSES_THRESHOLDS]]
+            decoded = decoded[decoded.target != "nan"]
 
         saveTable(decoded, output_dir + "csv/" + fov + "_decoded.csv")
         # decoded[fov].to_decoded_dataframe().save_csv(output_dir+fov+"_decoded.csv")
         decoded.to_netcdf(output_dir + "cdf/" + fov + "_decoded.cdf")
+        print(f"Saved cdf file {output_dir}cdf/{fov}_decoded.cdf")
 
         # can run into memory problems, doing this preemptively.
         del img
         del ref_img
         del decoded
-
+        print("Total driver time", time.time() - start0)
     sys.stdout = sys.__stdout__
     return 0
 
@@ -518,6 +532,7 @@ if __name__ == "__main__":
     p.add_argument("--rescale", dest="rescale", action="store_true")
     p.add_argument("--level-method", type=str, nargs="?")
     p.add_argument("--anchor-view", type=str, nargs="?")
+    p.add_argument("--not-filtered-results", dest="not_filtered_results", action="store_true")
 
     # blobRunner kwargs
     p.add_argument("--min-sigma", type=float, nargs="*")
@@ -546,15 +561,12 @@ if __name__ == "__main__":
         "--search-radius", type=float, nargs="?"
     )  # also used in PerRoundMaxChannel, CheckAll
     p.add_argument("--return-original-intensities", type=bool, nargs="?")
-    p.add_argument(
-        "--filtered-results", dest="filtered_results", action="store_true"
-    )  # defined by us
-    p.set_defaults(filtered_results=False)
 
     ## CheckAll
     p.add_argument("--error-rounds", type=int, nargs="?")
     p.add_argument("--mode", type=str, nargs="?")
     p.add_argument("--physical-coords", dest="physical_coords", action="store_true")
+    p.add_argument("--n-processes", type=int, nargs="?")
 
     # pixelRunner kwargs
     p.add_argument("--distance-threshold", type=float, nargs="?")
@@ -574,9 +586,15 @@ if __name__ == "__main__":
     # addKwarg(args, blobRunnerKwargs, "min_sigma")
     # addKwarg(args, blobRunnerKwargs, "max_sigma")
     if args.min_sigma:
-        blobRunnerKwargs["min_sigma"] = tuple(args.min_sigma)
+        if len(args.min_sigma) == 1:
+            blobRunnerKwargs["min_sigma"] = args.min_sigma[0]
+        else:
+            blobRunnerKwargs["min_sigma"] = tuple(args.min_sigma)
     if args.max_sigma:
-        blobRunnerKwargs["max_sigma"] = tuple(args.max_sigma)
+        if len(args.max_sigma) == 1:
+            blobRunnerKwargs["max_sigma"] = args.min_sigma[0]
+        else:
+            blobRunnerKwargs["max_sigma"] = tuple(args.max_sigma)
     addKwarg(args, blobRunnerKwargs, "num_sigma")
     addKwarg(args, blobRunnerKwargs, "threshold")
     addKwarg(args, blobRunnerKwargs, "overlap")
@@ -656,15 +674,22 @@ if __name__ == "__main__":
     decodeRunnerKwargs = {
         "decoderKwargs": decodeKwargs,
         "callableDecoder": method,
-        "filtered_results": args.filtered_results,
     }
     if method == starfish.spots.DecodeSpots.CheckAll:
-        decodeRunnerKwargs["n_processes"] = cpu_count()
+        if args.n_processes:
+            addKwarg(args, decodeRunnerKwargs, "n_processes")
+        else:
+            try:
+                # the following line is not guaranteed to work on non-linux systems
+                decodeRunnerKwargs["n_processes"] = len(os.sched_getaffinity(os.getpid()))
+            except Exception:
+                decodeRunnerKwargs["n_processes"] = 1
     addKwarg(args, decodeRunnerKwargs, "return_original_intensities")
 
     use_ref = args.use_ref_img
     anchor_name = args.anchor_view
     rescale = args.rescale
+    not_filtered_results = args.not_filtered_results
 
     level_method = args.level_method
     if level_method == "SCALE_BY_CHUNK":
@@ -676,7 +701,7 @@ if __name__ == "__main__":
     elif level_method == "SCALE_SATURATED_BY_IMAGE":
         level_method = Levels.SCALE_SATURATED_BY_IMAGE
     else:
-        level_method = Levels.SCALE_BY_CHUNK
+        level_method = Levels.SCALE_BY_IMAGE
 
     run(
         output_dir,
@@ -687,6 +712,7 @@ if __name__ == "__main__":
         rescale,
         level_method,
         vol,
+        not_filtered_results,
         blobRunnerKwargs,
         decodeRunnerKwargs,
         pixelRunnerKwargs,

@@ -82,9 +82,13 @@ inputs:
     type: int?
     doc: Radius for white top hat filter. Should be slightly larger than the expected spot radius. Will not be run if not provided.
 
-  inline_log:
+  rescale:
     type: boolean?
-    doc: If true, log will be sent to stdout instead of a file.
+    doc: Whether to iteratively rescale images before running the decoder. If true, will skip clip and scale at the end of this step.
+
+  n_processes:
+    type: int?
+    doc: If provided, the number of processes that will be spawned for processing. Otherwise, the maximum number of available CPUs will be used.
 
 outputs:
   processed_exp:
@@ -100,7 +104,7 @@ steps:
 
       requirements:
         DockerRequirement:
-          dockerPull: hubmap/starfish-custom:2.10
+          dockerPull: hubmap/starfish-custom:latest
 
       inputs:
         schema:
@@ -122,7 +126,7 @@ steps:
     in:
       datafile: parameter_json
       schema: read_schema/data
-    out: [clip_min, clip_max, level_method, rescale, register_aux_view, channels_per_reg, background_view, register_background, anchor_view, high_sigma, deconvolve_iter, deconvolve_sigma, low_sigma, rolling_radius, match_histogram, tophat_radius, channel_count, aux_tilesets_aux_names, aux_tilesets_aux_channel_count, is_volume]
+    out: [clip_min, clip_max, level_method, rescale, register_aux_view, channels_per_reg, background_view, register_background, anchor_view, high_sigma, deconvolve_iter, deconvolve_sigma, low_sigma, rolling_radius, match_histogram, tophat_radius, channel_count, aux_tilesets_aux_names, aux_tilesets_aux_channel_count, is_volume, n_processes]
     when: $(inputs.datafile != null)
 
   execute_processing:
@@ -132,7 +136,7 @@ steps:
 
       requirements:
         DockerRequirement:
-            dockerPull: hubmap/starfish-custom:2.10
+            dockerPull: hubmap/starfish-custom:latest
 
       inputs:
         input_dir:
@@ -164,6 +168,11 @@ steps:
           inputBinding:
             prefix: --is-volume
           doc: Whether to treat the zplanes as a 3D image.
+
+        rescale:
+          type: boolean?
+          inputBinding:
+            prefix: --rescale
 
         register_aux_view:
           type: string?
@@ -237,11 +246,11 @@ steps:
             prefix: --tophat-radius
           doc: Radius for white top hat filter. Should be slightly larger than the expected spot radius. Will not be run if not provided.
 
-        inline_log:
-          type: boolean?
+        n_processes:
+          type: int?
           inputBinding:
-            prefix: --inline-log
-          doc: If true, logs will be sent to stdout instead of a file.
+            prefix: --n-processes
+          doc: If provided, the number of processes that will be spawned for processing. Otherwise, the maximum number of available CPUs will be used.
 
       outputs:
         processed_exp:
@@ -275,23 +284,31 @@ steps:
             }
           }
       level_method:
-        source: [stage_processing/rescale, stage_processing/level_method, level_method]
+        source: [stage_processing/level_method, level_method]
         valueFrom: |
           ${
             if(self[0]){
-              return "SCALE_BY_CHUNK";
-            } else if(self[0] === false) {
-              return "SCALE_BY_IMAGE"
-            } else if(self[1]){
+              return self[0];
+            } else if(self[1]) {
               return self[1];
-            } else if(self[2]) {
-              return self[2];
             } else {
               return null;
             }
           }
       is_volume:
         source: [stage_processing/is_volume, is_volume]
+        valueFrom: |
+          ${
+            if(self[0]){
+              return self[0];
+            } else if(self[1]) {
+              return self[1];
+            } else {
+              return null;
+            }
+          }
+      rescale:
+        source: [stage_processing/rescale, rescale]
         valueFrom: |
           ${
             if(self[0]){
@@ -456,6 +473,17 @@ steps:
               return null;
             }
           }
-      inline_log: inline_log
+      n_processes:
+        source: [stage_processing/n_processes, n_processes]
+        valueFrom: |
+          ${
+            if(self[0]){
+              return self[0];
+            } else if(self[1]) {
+              return self[1];
+            } else {
+              return null;
+            }
+          }
     out: [processed_exp]
 

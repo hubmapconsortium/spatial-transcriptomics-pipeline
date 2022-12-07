@@ -11,7 +11,7 @@ from concurrent.futures.process import ProcessPoolExecutor
 from copy import deepcopy
 from datetime import datetime
 from functools import partial, partialmethod
-from os import cpu_count, makedirs, path
+from os import makedirs, path
 from pathlib import Path
 from time import time
 
@@ -110,53 +110,21 @@ def register_primary(img, reg_img, chs_per_reg):
     return img
 
 
-def subtract_background(img, background, reg_img=None):
+def subtract_background(img, background):
     """
     Subtract real background image from primary images. Will register to same reference as primary images were
     aligned to if reg_img is provided, assumes background is of same round/channel dimensions as reference.
     """
 
-    # If a background registration channel is given register background images to primary images before subtracting.
-    bg_dat = background.xarray.data
-    if reg_img:
-
-        # Calculate registration shift for backround image
-        shifts = {}
-        # Reference is set arbitrarily to first round/channel}
-        reference = reg_img.xarray.data[0, 0]
-        for r in range(reg_img.num_rounds):
-            for ch in range(reg_img.num_chs):
-                shift, error, diffphase = phase_cross_correlation(
-                    reference, bg_dat[r, ch], upsample_factor=100
-                )
-                shifts[(r, ch)] = shift
-
-        # Create transformation matrices
-        shape = img.raw_shape
-        tforms = {}
-        for (r, ch) in shifts:
-            tform = np.diag([1.0] * 4)
-            # Start from 1 because we don't want to shift in the z direction (if there is one)
-            for i in range(1, 3):
-                tform[i, 3] = shifts[(r, ch)][i]
-            tforms[(r, ch)] = tform
-
-        # Register primary images
-        for r in range(background.num_rounds):
-            for ch in range(background.num_chs):
-                bg_dat[r, ch] = ndimage.affine_transform(
-                    img.xarray.data[r, ch],
-                    np.linalg.inv(tforms[(r, ch)]),
-                    output_shape=shape[2:],
-                )
-
     # Subtract background images from primary
+    bg_dat = background.xarray.data
     num_chs = background.num_chs
     for r in range(img.num_rounds):
         for ch in range(img.num_chs):
             for z in range(img.num_zplanes):
-                img.xarray.data[r, ch, z] -= bg_dat[r, ch % num_chs, z] / (2**16)
+                img.xarray.data[r, ch, z] -= bg_dat[r, ch % num_chs, z]
             img.xarray.data[r, ch][img.xarray.data[r, ch] < 0] = 0
+
     return img
 
 
@@ -260,6 +228,7 @@ def white_top_hat(img, wth_rad):
 def cli(
     input_dir: Path,
     output_dir: str,
+    n_processes: int,
     clip_min: float = 0,
     clip_max: float = 99.9,
     level_method: str = "",
@@ -276,9 +245,12 @@ def cli(
     rolling_rad: int = None,
     match_hist: bool = False,
     wth_rad: int = None,
-    inline_log: bool = False,
+    rescale: bool = False,
 ):
     """
+    n_processes: If provided, the number of threads to use for processing. Otherwise, the max number of
+        available CPUs will be used.
+
     clip_min: minimum value for ClipPercentileToZero
 
     is_volume: whether to treat the z-planes as a 3D image.
@@ -315,29 +287,33 @@ def cli(
     match_hist: If true, will perform histogram matching.
 
     wth_rad: Radius for white top hat filter. Should be slightly larger than the expected spot radius.
+
+    rescale: If true, will not run final clip and scale on image, because it is expected to rescale
+        the images in the following decoding step.
     """
 
     os.makedirs(output_dir, exist_ok=True)
 
-    if not inline_log:
-        reporter = open(
-            path.join(output_dir, datetime.now().strftime("%Y%m%d_%H%M_img_processing.log")), "w"
-        )
-        sys.stdout = reporter
-        sys.stderr = reporter
+    reporter = open(
+        path.join(output_dir, datetime.now().strftime("%Y%m%d_%H%M_img_processing.log")), "w"
+    )
+    sys.stdout = reporter
+    sys.stderr = reporter
 
     tqdm.__init__ = partialmethod(tqdm.__init__, disable=True)
 
-    if level_method == "SCALE_BY_CHUNK":
+    if level_method.upper() == "SCALE_BY_CHUNK":
         level_method = Levels.SCALE_BY_CHUNK
-    elif level_method == "SCALE_BY_IMAGE":
+    elif level_method.upper() == "SCALE_BY_IMAGE":
         level_method = Levels.SCALE_BY_IMAGE
-    elif level_method == "SCALE_SATURATED_BY_CHUNK":
+    elif level_method.upper() == "SCALE_SATURATED_BY_CHUNK":
         level_method = Levels.SCALE_SATURATED_BY_CHUNK
-    elif level_method == "SCALE_SATURATED_BY_IMAGE":
+    elif level_method.upper() == "SCALE_SATURATED_BY_IMAGE":
         level_method = Levels.SCALE_SATURATED_BY_IMAGE
     else:
-        level_method = Levels.SCALE_BY_CHUNK
+        level_method = Levels.SCALE_BY_IMAGE
+
+    print(locals())
 
     t0 = time()
 
@@ -348,11 +324,6 @@ def cli(
         img = exp[fov].get_image("primary")
         t1 = time()
         print("Fetched view " + fov)
-        if aux_name:
-            # If registration image is given calculate registration shifts for each image and apply them
-            register = exp[fov].get_image(aux_name)
-            print("\taligning to " + aux_name)
-            img = register_primary(img, register, ch_per_reg)
 
         anchor = None
         if anchor_name:
@@ -363,39 +334,45 @@ def cli(
             # If a background image is provided, subtract it from the primary image.
             bg = exp[fov].get_image(background_name)
             print("\tremoving existing backgound...")
-            img = subtract_background(img, bg, register if register_background else None)
+            img = subtract_background(img, bg)
             if anchor_name:
                 print("\tremoving existing background from anchor image...")
-                anchor = subtract_background(anchor, bg, register if register_background else None)
+                anchor = subtract_background(anchor, bg)
         else:
             # If no background image is provided, estimate background using a large morphological
             # opening to subtract from primary images
             print("\tremoving estimated background...")
-            img = subtract_background_estimate(img, cpu_count())
+            img = subtract_background_estimate(img, n_processes)
             if anchor_name:
                 print("\tremoving estimated background from anchor image...")
-                anchor = subtract_background_estimate(anchor, cpu_count())
+                anchor = subtract_background_estimate(anchor, n_processes)
 
         if high_sigma:
             # Remove cellular autofluorescence w/ gaussian high-pass filter
             print("\trunning high pass filter...")
             ghp = starfish.image.Filter.GaussianHighPass(sigma=high_sigma)
             # ghp.run(img, verbose=False, in_place=True)
-            ghp.run(img, verbose=False, in_place=True, n_processes=cpu_count())
+            ghp.run(img, verbose=False, in_place=True, n_processes=n_processes)
+            if anchor_name:
+                print("\trunning high pass filter on anchor image...")
+                ghp.run(anchor, verbose=False, in_place=True, n_processes=n_processes)
 
         if decon_sigma:
             # Increase resolution by deconvolving w/ point spread function
             print("\tdeconvolving point spread function...")
             dpsf = starfish.image.Filter.DeconvolvePSF(num_iter=decon_iter, sigma=decon_sigma)
             # dpsf.run(img, verbose=False, in_place=True)
-            dpsf.run(img, verbose=False, in_place=True, n_processes=cpu_count())
+            dpsf.run(img, verbose=False, in_place=True, n_processes=n_processes)
+            if anchor_name:
+                print("\tdeconvolving point spread function on anchor image...")
+                dpsf.run(anchor, verbose=False, in_place=True, n_processes=n_processes)
 
         if low_sigma:
             # Blur image with lowpass filter
             print("\trunning low pass filter...")
             glp = starfish.image.Filter.GaussianLowPass(sigma=low_sigma)
             # glp.run(img, verbose=False, in_place=True)
-            glp.run(img, verbose=False, in_place=True, n_processes=cpu_count())
+            glp.run(img, verbose=False, in_place=True, n_processes=n_processes)
 
         if wth_rad:
             print("\trunning white tophat filter...")
@@ -407,7 +384,10 @@ def cli(
         if rolling_rad:
             # Apply rolling ball background subtraction method to even out intensities through each 2D image
             print("\tapplying rolling ball background subtraction...")
-            img = rolling_ball(img, rolling_rad=rolling_rad, num_threads=cpu_count())
+            img = rolling_ball(img, rolling_rad=rolling_rad, num_threads=n_processes)
+            if anchor_name:
+                print("\tapplying rolling ball background subtraction to anchor image...")
+                anchor = rolling_ball(anchor, rolling_rad=rolling_rad, num_threads=n_processes)
 
         if match_hist:
             # Use histogram matching to lower the intensities of each 3D image down to the same
@@ -420,18 +400,28 @@ def cli(
                 print("\tapplying histogram matching to anchor image...")
                 anchor = match_hist_2_min(anchor)
 
-        print("\tclip and scaling...")
-        # Scale image, clipping all but the highest intensities to zero
-        clip = starfish.image.Filter.ClipPercentileToZero(
-            p_min=clip_min, p_max=clip_max, is_volume=is_volume, level_method=level_method
-        )
-        clip.run(img, in_place=True)
-        if anchor_name:
-            print("\tapplying clip and scale to anchor image...")
+        if aux_name:
+            # If registration image is given calculate registration shifts for each image and apply them
+            register = exp[fov].get_image(aux_name)
+            print("\taligning to " + aux_name)
+            img = register_primary(img, register, ch_per_reg)
+
+        if not rescale:
+            print("\tclip and scaling...")
+            # Scale image, clipping all but the highest intensities to zero
             clip = starfish.image.Filter.ClipPercentileToZero(
-                p_min=90, p_max=99.9, is_volume=is_volume, level_method=level_method
+                p_min=clip_min, p_max=clip_max, is_volume=is_volume, level_method=level_method
             )
-            clip.run(anchor, in_place=True)
+            clip.run(img, in_place=True)
+            if anchor_name:
+                print("\tapplying clip and scale to anchor image...")
+                clip = starfish.image.Filter.ClipPercentileToZero(
+                    p_min=90, p_max=99.9, is_volume=is_volume, level_method=level_method
+                )
+                clip.run(anchor, in_place=True)
+
+        else:
+            print("\tskipping clip and scale, will be performed during rescaling.")
 
         print(f"\tView {fov} complete")
         # save modified image
@@ -474,10 +464,20 @@ if __name__ == "__main__":
     p.add_argument("--low-sigma", type=int, nargs="?")
     p.add_argument("--rolling-radius", type=int, nargs="?")
     p.add_argument("--match-histogram", dest="match_histogram", action="store_true")
-    p.add_argument("--inline-log", dest="inline_log", action="store_true")
     p.add_argument("--tophat-radius", type=int, nargs="?")
+    p.add_argument("--rescale", dest="rescale", action="store_true")
+    p.add_argument("--n-processes", type=int, nargs="?")
 
     args = p.parse_args()
+
+    if args.n_processes:
+        n_processes = args.n_processes
+    else:
+        try:
+            # the following line is not guaranteed to work on non-linux machines.
+            n_processes = len(os.sched_getaffinity(os.getpid()))
+        except Exception:
+            n_processes = 1
 
     cli(
         input_dir=args.input_dir,
@@ -498,5 +498,6 @@ if __name__ == "__main__":
         rolling_rad=args.rolling_radius,
         match_hist=args.match_histogram,
         wth_rad=args.tophat_radius,
-        inline_log=args.inline_log,
+        rescale=args.rescale,
+        n_processes=n_processes,
     )

@@ -91,6 +91,7 @@ inputs:
             type: string?
             doc: Added to prevent cli parsing of the fov_positioning record.
       - type: record
+        name: fov_positioning
         fields:
           - name: x_size
             type: int
@@ -130,7 +131,7 @@ steps:
 
       requirements:
         DockerRequirement:
-          dockerPull: hubmap/starfish-custom:2.10
+          dockerPull: hubmap/starfish-custom:latest
 
       inputs:
         schema:
@@ -162,7 +163,7 @@ steps:
 
       requirements:
         DockerRequirement:
-          dockerPull: hubmap/starfish-custom:2.10
+          dockerPull: hubmap/starfish-custom:latest
 
       inputs:
         codebook:
@@ -215,7 +216,7 @@ steps:
 
         roi:
           type: File?
-          inputBinding:
+          inputBinding: 
             prefix: --roi
 
         imagesize:

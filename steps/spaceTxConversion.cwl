@@ -126,6 +126,7 @@ inputs:
           type: string?
           doc: Added to prevent cli parsing of the fov_positioning record.
     - type: record
+      name: fov_positioning
       fields:
         - name: x_locs
           type: string
@@ -174,7 +175,7 @@ steps:
 
       requirements:
         DockerRequirement:
-          dockerPull: hubmap/starfish-custom:2.10
+          dockerPull: hubmap/starfish-custom:latest
 
       inputs:
         schema:
@@ -206,7 +207,7 @@ steps:
 
       requirements:
         DockerRequirement:
-            dockerPull: hubmap/starfish-custom:2.10
+            dockerPull: hubmap/starfish-custom:latest
       inputs:
           tiffs:
             type: Directory
@@ -322,6 +323,7 @@ steps:
           fov_positioning:
             - 'null'
             - type: record
+              name: fov_positioning
               fields:
                 - name: x_locs
                   type: string
@@ -440,8 +442,12 @@ steps:
         source: [fov_positioning, stage_conversion/fov_positioning_x_locs, stage_conversion/fov_positioning_x_shape, stage_conversion/fov_positioning_x_voxel, stage_conversion/fov_positioning_y_locs, stage_conversion/fov_positioning_y_shape, stage_conversion/fov_positioning_y_voxel, stage_conversion/fov_positioning_z_locs, stage_conversion/fov_positioning_z_shape, stage_conversion/fov_positioning_z_voxel]
         valueFrom: |
           ${
-            if(!self[1]){
-              return self[0];
+            if(self[1] === null){
+              if(!(self[0].x_locs === null) && !(self[0].x_shape === null) && !(self[0].x_voxel === null)){
+                return self[0];
+              } else {
+                return null;
+              }
             } else {
               return {
                 x_locs: self[1],
