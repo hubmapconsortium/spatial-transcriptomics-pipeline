@@ -697,9 +697,9 @@ def _view_row_as_element(array: np.ndarray) -> np.ndarray:
 def blank_codebook(real_codebook, num_blanks):
     """
     From a codebook of real codes, creates a codebook of those original codes plus a set of blank codes that
-    follow the hamming distance > 1 rule. Resulting codebook will have num_blanks blank codes in addition to all
-    the original real codes. If num_blanks is greater than the total number of blank codes found then all blanks
-    will be added.
+    follow the hamming distance rule of the codebook (auto-detects hamming distance of real codes). Resulting
+    codebook will have num_blanks blank codes in addition to all the original real codes. If num_blanks is
+    greater than the total number of blank codes found then all blanks will be added.
     """
 
     # Extract dimensions and create empty xarray for barcodes
@@ -711,83 +711,128 @@ def blank_codebook(real_codebook, num_blanks):
         )
     )
 
+    # Check that codebook is one-hot
+    for row in real_codebook[0].data:
+        row_sum = sum(row == 0)
+        if row_sum == channelsN or row_sum == 0:
+            raise ValueError(
+                "Error: blank code generation only built for one-hot codebooks (codebooks where\
+                              each round has exactly one active channel)."
+            )
+
+    # Calculate hamming distance rule in codebook
+    codes = real_codebook.argmax(Axes.CH.value).data
+    hamming_distance = 100
+    for i in range(len(codes)):
+        tmp_codes = np.append(codes[:i], codes[i + 1 :], axis=0)
+        min_ham = np.min(roundsN - (codes[i] == tmp_codes).sum(axis=1))
+        if min_ham < hamming_distance:
+            hamming_distance = min_ham
+
     # Start from set of all possible codes
     barcode = [0] * roundsN
     for i in range(np.shape(allCombo)[0]):
         allCombo[i] = barcodeConv(barcode, channelsN)
         barcode = incrBarcode(barcode, channelsN)
 
-    # Remove codes that have hamming distance <= 1 to any code in the real codebook
-    cb_codes = real_codebook.argmax(Axes.CH.value)
-    drop_cb_codes = {}
-    rounds = [True] * roundsN
-    for r in range(roundsN):
-        rounds[r] = False
-        drop_codes = cb_codes.sel(r=rounds)
-        drop_codes.values = np.ascontiguousarray(drop_codes.values)
-        drop_codes = _view_row_as_element(drop_codes.values.reshape(drop_codes.shape[0], -1))
-        drop_cb_codes[r] = drop_codes
-        rounds[r] = True
+    # If hamming distance is 0, a code is duplicated and we can't accurate find the hamming distance rule
+    if hamming_distance == 0:
+        raise ValueError("Error: codebook contains duplicate codes")
 
-    drop_combos = {}
-    rounds = [True] * roundsN
-    for r in range(roundsN):
-        rounds[r] = False
+    # If hamming distance is 1, only need to drop real codes from list of all possible codes to get all blank codes
+    elif hamming_distance == 1:
+        keep = []
+        for i, combo in enumerate(allCombo):
+            if roundsN * channelsN not in (combo.data == real_codebook.data).sum(axis=1).sum(
+                axis=1
+            ):
+                keep.append(i)
+        blanks = allCombo[keep].data
+
+    # if hamming distance is 2, need to drop real codes and those with hamming distance equal to 1
+    elif hamming_distance == 2:
+
+        # Remove codes that have hamming distance <= 1 to any code in the real codebook
+        cb_codes = real_codebook.argmax(Axes.CH.value)
+        drop_cb_codes = {}
+        rounds = [True] * roundsN
+        for r in range(roundsN):
+            rounds[r] = False
+            drop_codes = cb_codes.sel(r=rounds)
+            drop_codes.values = np.ascontiguousarray(drop_codes.values)
+            drop_codes = _view_row_as_element(drop_codes.values.reshape(drop_codes.shape[0], -1))
+            drop_cb_codes[r] = drop_codes
+            rounds[r] = True
+
+        drop_combos = {}
+        rounds = [True] * roundsN
+        for r in range(roundsN):
+            rounds[r] = False
+            combo_codes = allCombo.argmax(Axes.CH.value)
+            combo_codes = combo_codes.sel(r=rounds)
+            combo_codes.values = np.ascontiguousarray(combo_codes.values)
+            combo_codes = _view_row_as_element(
+                combo_codes.values.reshape(combo_codes.shape[0], -1)
+            )
+            drop_combos[r] = combo_codes
+            rounds[r] = True
         combo_codes = allCombo.argmax(Axes.CH.value)
-        combo_codes = combo_codes.sel(r=rounds)
         combo_codes.values = np.ascontiguousarray(combo_codes.values)
         combo_codes = _view_row_as_element(combo_codes.values.reshape(combo_codes.shape[0], -1))
-        drop_combos[r] = combo_codes
-        rounds[r] = True
-    combo_codes = allCombo.argmax(Axes.CH.value)
-    combo_codes.values = np.ascontiguousarray(combo_codes.values)
-    combo_codes = _view_row_as_element(combo_codes.values.reshape(combo_codes.shape[0], -1))
 
-    drop = []
-    for i in range(len(combo_codes)):
+        drop = []
+        for i in range(len(combo_codes)):
+            for r in range(roundsN):
+                if np.any(drop_combos[r][i] == drop_cb_codes[r]):
+                    drop.append(i)
+                    break
+
+        drop = set(drop)
+        allCombo = allCombo[[x for x in range(len(combo_codes)) if x not in drop]]
+
+        # Find set of codes that all have hamming distance of more than 1 to each other
+
+        # Creates set of codebooks each with a different dropped round, can determine if two codes are 1 or fewer hamming
+        # distances from each other by seeing if they match exactly when the same round is dropped for each code
+        drop_combos = {}
+        rounds = [True] * roundsN
         for r in range(roundsN):
-            if np.any(drop_combos[r][i] == drop_cb_codes[r]):
-                drop.append(i)
-                break
-
-    drop = set(drop)
-    allCombo = allCombo[[x for x in range(len(combo_codes)) if x not in drop]]
-
-    # Find set of codes that all have hamming distance of more than 1 to each other
-
-    # Creates set of codebooks each with a different dropped round, can determine if two codes are 1 or fewer hamming
-    # distances from each other by seeing if they match exactly when the same round is dropped for each code
-    drop_combos = {}
-    rounds = [True] * roundsN
-    for r in range(roundsN):
-        rounds[r] = False
+            rounds[r] = False
+            combo_codes = allCombo.argmax(Axes.CH.value)
+            combo_codes = combo_codes.sel(r=rounds)
+            combo_codes.values = np.ascontiguousarray(combo_codes.values)
+            combo_codes = _view_row_as_element(
+                combo_codes.values.reshape(combo_codes.shape[0], -1)
+            )
+            drop_combos[r] = combo_codes
+            rounds[r] = True
         combo_codes = allCombo.argmax(Axes.CH.value)
-        combo_codes = combo_codes.sel(r=rounds)
         combo_codes.values = np.ascontiguousarray(combo_codes.values)
         combo_codes = _view_row_as_element(combo_codes.values.reshape(combo_codes.shape[0], -1))
-        drop_combos[r] = combo_codes
-        rounds[r] = True
-    combo_codes = allCombo.argmax(Axes.CH.value)
-    combo_codes.values = np.ascontiguousarray(combo_codes.values)
-    combo_codes = _view_row_as_element(combo_codes.values.reshape(combo_codes.shape[0], -1))
 
-    i = 0
-    while i < len(combo_codes):
-        drop = set()
-        for r in range(roundsN):
-            drop.update([x for x in np.nonzero(drop_combos[r][i] == drop_combos[r])[0]])
-        drop.remove(i)
-        inds = [x for x in range(len(combo_codes)) if x not in drop]
-        combo_codes = combo_codes[inds]
-        for r in range(roundsN):
-            drop_combos[r] = drop_combos[r][inds]
-        i += 1
+        i = 0
+        while i < len(combo_codes):
+            drop = set()
+            for r in range(roundsN):
+                drop.update([x for x in np.nonzero(drop_combos[r][i] == drop_combos[r])[0]])
+            drop.remove(i)
+            inds = [x for x in range(len(combo_codes)) if x not in drop]
+            combo_codes = combo_codes[inds]
+            for r in range(roundsN):
+                drop_combos[r] = drop_combos[r][inds]
+            i += 1
 
-    # Create Codebook object with blanks
-    blanks = np.zeros((len(combo_codes), roundsN, channelsN))
-    for i, code in enumerate(combo_codes):
-        for j, x in enumerate(code[0]):
-            blanks[i][j][x] = 1
+        # Create Codebook object with blanks
+        blanks = np.zeros((len(combo_codes), roundsN, channelsN))
+        for i, code in enumerate(combo_codes):
+            for j, x in enumerate(code[0]):
+                blanks[i][j][x] = 1
+
+    else:
+        raise ValueError(
+            "Error: can only generate blank codes for a one-hot codebook with a minimum hamming\
+                          distance of 1 or 2"
+        )
 
     blank_codebook = Codebook.from_numpy(
         code_names=["blank" + str(x) for x in range(len(blanks))],
