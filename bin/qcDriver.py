@@ -712,7 +712,7 @@ def plotBarcodeAbundance(decoded, pdf):
     )
 
     if "rounds_used" in decoded.coords:
-        rounds_used = set(segmentation["rounds_used"])
+        rounds_used = set(decoded["rounds_used"])
         targets = decoded[decoded["rounds_used"] == max(rounds_used)]["target"].data.tolist()
         full_counts = pd.Series(collections.Counter(targets)).sort_values(ascending=False)
         full_on_color = (0 / 256, 153 / 256, 136 / 256)
