@@ -585,6 +585,11 @@ def getFPR(segmentation, pdf=False):
     if pdf:
         fig, ax = plt.subplots()
 
+        all_on_color = (0 / 256, 153 / 256, 136 / 256)
+        all_off_color = (238 / 256, 119 / 256, 51 / 256)
+        full_on_color = (0 / 256, 119 / 256, 187 / 256)
+        full_off_color = (204 / 256, 51 / 256, 17 / 256)
+
         if "rounds_used" in segmentation.keys():
             plt.bar(
                 range(len(sorted_reals_all)),
@@ -592,7 +597,7 @@ def getFPR(segmentation, pdf=False):
                 width=1,
                 label="On-target EC+NC",
                 align="edge",
-                color=(0 / 256, 119 / 256, 187 / 256),
+                color=all_on_color,
             )
             plt.bar(
                 range(len(sorted_reals_full)),
@@ -600,7 +605,7 @@ def getFPR(segmentation, pdf=False):
                 width=1,
                 label="On-target NC",
                 align="edge",
-                color=(0 / 256, 153 / 256, 136 / 256),
+                color=full_on_color,
             )
             plt.bar(
                 range(len(sorted_blanks_all)),
@@ -608,7 +613,7 @@ def getFPR(segmentation, pdf=False):
                 width=1,
                 label="Off-target EC+NC",
                 align="edge",
-                color=(204 / 256, 51 / 256, 17 / 256),
+                color=all_off_color,
             )
             plt.bar(
                 range(len(sorted_blanks_full)),
@@ -616,7 +621,7 @@ def getFPR(segmentation, pdf=False):
                 width=1,
                 label="Off-target NC",
                 align="edge",
-                color=(238 / 256, 119 / 256, 51 / 256),
+                color=full_off_color,
             )
             plt.plot(
                 [0, len(real_per_cell_all)],
@@ -641,7 +646,7 @@ def getFPR(segmentation, pdf=False):
                 width=1,
                 label="On-target",
                 align="edge",
-                color=(0 / 256, 119 / 256, 187 / 256),
+                color=all_on_color,
             )
             plt.bar(
                 range(len(sorted_blanks_all)),
@@ -649,7 +654,7 @@ def getFPR(segmentation, pdf=False):
                 width=1,
                 label="Off-target",
                 align="edge",
-                color=(204 / 256, 51 / 256, 17 / 256),
+                color=all_off_color,
             )
             plt.plot(
                 [0, len(real_per_cell_all)],
@@ -676,15 +681,32 @@ def getFPR(segmentation, pdf=False):
 def plotBarcodeAbundance(decoded, pdf):
     fig, ax = plt.subplots()
 
+    # Count targets and sort them in descending order
     targets = decoded["target"].data.tolist()
     all_counts = pd.Series(collections.Counter(targets)).sort_values(ascending=False)
-    all_on_color = (0, 119 / 256, 187 / 256)
-    all_off_color = (204 / 256, 51 / 256, 17 / 256)
+
+    # Set scale, axis limits, axis labels, and plot title
+    ax.set_yscale("log")
+    plt.xlim([0, len(all_counts)])
+    plt.ylim([0.9, max(all_counts) * 1.1])
+    plt.xlabel("Barcodes")
+    plt.ylabel("Total counts per barcode")
+    plt.title("Relative abundance of barcodes")
+
+    # Get range of display values (for plotting text later)
+    disp_min = ax.transData.transform((0, 0.9))[1]
+    disp_max = ax.transData.transform((0, max(all_counts) * 1.1))[1]
+    disp_range = disp_max - disp_min
+
+    # Assign colors to sorted targets based on whether they are blanks or real
+    all_on_color = (0 / 256, 153 / 256, 136 / 256)
+    all_off_color = (238 / 256, 119 / 256, 51 / 256)
     all_colors = [
         all_on_color if "blank" not in target.lower() else all_off_color
         for target in all_counts.index
     ]
 
+    # Calculate upper 95% CI for blank codes and what proportion of real codes are above this value
     all_blank_counts = pd.Series(collections.Counter([s for s in targets if "blank" in s.lower()]))
     all_real_counts = pd.Series(
         collections.Counter([s for s in targets if not "blank" in s.lower()])
@@ -693,30 +715,30 @@ def plotBarcodeAbundance(decoded, pdf):
     all_std_bl = max(1, np.std(all_blank_counts))
     all_conf = norm.interval(0.95, loc=all_avg_bl, scale=all_std_bl)[1]
     good_codes_all = sum(all_real_counts > all_conf) / len(all_real_counts)
-    cutoff_all = len(all_counts) - (good_codes_all * len(all_counts))
 
-    x_offset = 0.02 * len(all_counts)
+    # Plot bars, upper 95% CI line, and text
     plt.bar(range(len(all_counts)), height=all_counts, color=all_colors, width=1, align="edge")
-    plt.axvline(cutoff_all, color="black", label="Upper 95% CI EC+NC")
+    plt.axhline(all_conf, color="black", label="Upper 95% CI EC+NC")
     plt.plot(
-        [cutoff_all, cutoff_all + x_offset],
-        [max(all_counts) * 0.1, max(all_counts) * 0.1],
+        [len(all_counts) * 0.4, len(all_counts) * 0.4],
+        [all_conf, get_y_offset(all_conf, disp_range / 4.35)],
         color="black",
     )
     plt.text(
-        cutoff_all + (0.03 * len(all_counts)),
-        max(all_counts) * 0.1,
+        len(all_counts) * 0.4,
+        get_y_offset(all_conf, disp_range / 3.95),
         f"{good_codes_all*100:.2f}% barcodes above {all_conf:.2f} threshold",
-        verticalalignment="center",
+        horizontalalignment="center",
         fontsize=8,
     )
 
+    # Do all the same for only non-corrected barcodes if error-corrected barcodes are present
     if "rounds_used" in decoded.coords:
         rounds_used = set(decoded["rounds_used"].data)
         targets = decoded[decoded["rounds_used"] == max(rounds_used)]["target"].data.tolist()
         full_counts = pd.Series(collections.Counter(targets)).sort_values(ascending=False)
-        full_on_color = (0 / 256, 153 / 256, 136 / 256)
-        full_off_color = (238 / 256, 119 / 256, 51 / 256)
+        full_on_color = (0 / 256, 119 / 256, 187 / 256)
+        full_off_color = (204 / 256, 51 / 256, 17 / 256)
         full_colors = [
             full_on_color if "blank" not in target.lower() else full_off_color
             for target in all_counts.index
@@ -732,45 +754,31 @@ def plotBarcodeAbundance(decoded, pdf):
         std_bl = max(1, np.std(full_blank_counts))
         full_conf = norm.interval(0.95, loc=avg_bl, scale=std_bl)[1]
         good_codes_full = sum(full_real_counts > full_conf) / len(full_real_counts)
-        cutoff_full = len(full_counts) - (good_codes_full * len(full_counts))
 
         plt.bar(
             range(len(full_counts)), height=full_counts, color=full_colors, width=1, align="edge"
         )
-        plt.axvline(cutoff_full, color="black", linestyle="dashed", label="NC Cutoff")
+        plt.axhline(full_conf, color="black", label="Upper 95% CI NC", linestyle="dashed")
         plt.plot(
-            [cutoff_full, cutoff_all + x_offset],
-            [max(all_counts) * 0.05, max(all_counts) * 0.05],
+            [len(full_counts) * 0.7, len(full_counts) * 0.7],
+            [full_conf, get_y_offset(all_conf, disp_range / 10.9)],
             color="black",
+            linestyle="dashed",
         )
         plt.text(
-            cutoff_all + (0.03 * len(all_counts)),
-            max(all_counts) * 0.05,
+            len(full_counts) * 0.7,
+            get_y_offset(all_conf, disp_range / 8.7),
             f"{good_codes_full*100:.2f}% barcodes above {full_conf:.2f} threshold",
-            verticalalignment="center",
+            horizontalalignment="center",
             fontsize=8,
         )
 
-    ax.set_yscale("log")
-    plt.xlim([0, len(all_counts)])
-    plt.ylim([0.9, max(all_counts) * 1.1])
-    plt.xlabel("Barcodes")
-    plt.ylabel("Total counts per barcode")
-    plt.title("Relative abundance of barcodes")
-
+    # Create and plot legend
     if "rounds_used" in decoded.coords:
-        proxy_positive_all = mpatches.Patch(
-            color=(0, 119 / 256, 187 / 256), label="On-target EC+NC"
-        )
-        proxy_positive_full = mpatches.Patch(
-            color=(0 / 256, 153 / 256, 136 / 256), label="On-target NC"
-        )
-        proxy_blank_all = mpatches.Patch(
-            color=(204 / 256, 51 / 256, 17 / 256), label="Off-target EC+NC"
-        )
-        proxy_blank_full = mpatches.Patch(
-            color=(238 / 256, 119 / 256, 51 / 256), label="Off-target NC"
-        )
+        proxy_positive_all = mpatches.Patch(color=all_on_color, label="On-target EC+NC")
+        proxy_positive_full = mpatches.Patch(color=full_on_color, label="On-target NC")
+        proxy_blank_all = mpatches.Patch(color=all_off_color, label="Off-target EC+NC")
+        proxy_blank_full = mpatches.Patch(color=full_off_color, label="Off-target NC")
         solid_line = Line2D([0], [0], color="black", linestyle="solid", label="Upper 95% CI EC+NC")
         dashed_line = Line2D([0], [0], color="black", linestyle="dashed", label="Upper 95% CI NC")
         handles = [
@@ -782,10 +790,9 @@ def plotBarcodeAbundance(decoded, pdf):
             dashed_line,
         ]
     else:
-        proxy_positive = mpatches.Patch(color=(0, 119 / 256, 187 / 256), label="On-target")
-        proxy_blank = mpatches.Patch(color=(204 / 256, 51 / 256, 17 / 256), label="Off-target")
+        proxy_positive = mpatches.Patch(color=all_on_color, label="On-target")
+        proxy_blank = mpatches.Patch(color=all_off_color, label="Off-target")
         handles = [proxy_positive, proxy_blank]
-
     plt.legend(handles=handles, loc=(1.02, 0.5))
 
     pdf.savefig(fig)
