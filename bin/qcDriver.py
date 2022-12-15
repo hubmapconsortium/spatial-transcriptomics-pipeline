@@ -678,6 +678,11 @@ def getFPR(segmentation, pdf=False):
     return results
 
 
+def get_y_offset(cutoff, shift):
+    offset = ax.transData.transform((0, cutoff))[1] + shift
+    return ax.transData.inverted().transform((0, offset))[1]
+
+
 def plotBarcodeAbundance(decoded, pdf):
     fig, ax = plt.subplots()
 
