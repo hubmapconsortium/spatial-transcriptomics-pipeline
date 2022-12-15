@@ -26,6 +26,7 @@ import starfish.data
 import yaml
 from astropy.stats import RipleysKEstimator
 from matplotlib.backends.backend_pdf import PdfPages
+from matplotlib.lines import Line2D
 from scipy.stats import norm, skew
 from starfish import BinaryMaskCollection, Codebook, DecodedIntensityTable, ImageStack
 from starfish.core.types import (
@@ -424,34 +425,28 @@ def getTranscriptDensity(transcripts, codebook):
 
 
 def getTranscriptsPerCell(segmented, pdf=False):
+
     counts = []
     # column to look at will be different depending if we've run baysor
     if "cell" in segmented.keys():
-        cells = segmented["cell"]
+        key = "cell"
     else:
-        cells = segmented["cell_id"]
+        key = "cell_id"
 
-    # remove unassigned cells
-    cells = [int(x) for x in cells if not np.isnan(x)]
+    counts = pd.Series(collections.Counter(segmented[segmented[key].notnull()][key])).sort_values(
+        ascending=False
+    )
 
-    if len(cells) == 0:
-        return ([0], 0, 0)
-
-    for i in range(int(max(cells)) + 1):
-        counts.append(len([x for x in cells if x == i]))
-
-    counts.sort()
-    counts = np.flip(counts)
     q1, mid, q3 = np.percentile(counts, [25, 50, 75])
     iqr_scale = 1.5
 
     if pdf:
-        fig, ax = plt.subplots()
+        fig, ax = plt.subplots(figsize=(10, 10))
 
         for axis in [ax.xaxis, ax.yaxis]:
             axis.set_major_locator(ticker.MaxNLocator(integer=True))
 
-        plt.bar(list(range(len(counts))), counts)
+        plt.bar(list(range(len(counts))), counts, width=1)
         plt.axhline(
             y=mid - iqr_scale * (q3 - q1), dashes=(1, 1), color="gray", label="Outlier Threshold"
         )
@@ -531,68 +526,148 @@ def plotTranscriptDist(counts, name, pdf):
 
 def getFPR(segmentation, pdf=False):
     # remove unassigned transcripts, if the columns to do so are present.
-
-    # remove unassigned transcripts, if the columns to do so are present.
     key = "cell"
     if "cell_id" in segmentation.keys():
         key = "cell_id"
-
     segmentation = segmentation[segmentation[key].notnull()]
 
-    if len(segmentation) == 0:
-        return None
+    # Get real and blank target counts per cell for all barcodes
+    blank_counts_all = segmentation[segmentation["target"].str.contains("blank", case=False)]
+    real_counts_all = segmentation[~segmentation["target"].str.contains("blank", case=False)]
+    cell_count = len(set(segmentation[key])) + 1
+    real_per_cell_all = pd.Series(collections.Counter(real_counts_all[key]))
+    blank_per_cell_all = pd.Series(collections.Counter(blank_counts_all[key]))
 
-    blank_counts_full = segmentation[segmentation["target"].str.contains("blank", case=False)]
-    real_counts_full = segmentation[~segmentation["target"].str.contains("blank", case=False)]
+    # Add in cells that have reals codes but not blank codes and vice versa
+    all_cells = set(segmentation[key])
+    empty_cells = pd.Series({cell: 0 for cell in all_cells if cell not in real_per_cell_all.index})
+    real_per_cell_all = real_per_cell_all.append(empty_cells)
+    empty_cells = pd.Series(
+        {cell: 0 for cell in all_cells if cell not in blank_per_cell_all.index}
+    )
+    blank_per_cell_all = blank_per_cell_all.append(empty_cells)
 
-    cell_count = int(real_counts_full[key].max()) + 1
-    real_per_cell_full = np.histogram(real_counts_full[key], bins=cell_count)[0]
-    blank_per_cell_full = np.histogram(blank_counts_full[key], bins=cell_count)[0]
+    # Sort counts by all real target counts
+    sorted_reals_all = real_per_cell_all.sort_values(ascending=False)
+    sorted_blanks_all = blank_per_cell_all[sorted_reals_all.index]
 
-    sort_ind = np.argsort(real_per_cell_full)
-    sorted_reals_full = [
-        real_per_cell_full[sort_ind[len(sort_ind) - i - 1]] for i in range(len(sort_ind))
-    ]
-    sorted_blanks_full = [
-        blank_per_cell_full[sort_ind[len(sort_ind) - i - 1]] for i in range(len(sort_ind))
-    ]
+    # If error-correction is used, do the same for only non-error-corrected barcodes
+    if "rounds_used" in segmentation.keys():
+        rounds_used = set(segmentation["rounds_used"])
+
+        # Get counts per cell
+        full_counts = segmentation[segmentation["rounds_used"] == max(rounds_used)]
+        blank_counts_full = full_counts[full_counts["target"].str.contains("blank", case=False)]
+        real_counts_full = full_counts[~full_counts["target"].str.contains("blank", case=False)]
+        real_per_cell_full = pd.Series(collections.Counter(real_counts_full[key]))
+        blank_per_cell_full = pd.Series(collections.Counter(blank_counts_full[key]))
+
+        # Add in empty cells
+        empty_cells = pd.Series(
+            {cell: 0 for cell in all_cells if cell not in real_per_cell_full.index}
+        )
+        real_per_cell_full = real_per_cell_full.append(empty_cells)
+        empty_cells = pd.Series(
+            {cell: 0 for cell in all_cells if cell not in blank_per_cell_full.index}
+        )
+        blank_per_cell_full = blank_per_cell_full.append(empty_cells)
+
+        # Sort
+        sorted_reals_full = real_per_cell_full[sorted_reals_all.index]
+        sorted_blanks_full = blank_per_cell_full[sorted_reals_all.index]
 
     results = {
-        "FP": sum(blank_per_cell_full),
-        "TP": sum(real_per_cell_full),
-        "FPR": sum(blank_per_cell_full) / (sum(blank_per_cell_full) + sum(real_per_cell_full)),
+        "FP": sum(blank_per_cell_all),
+        "TP": sum(real_per_cell_all),
+        "FPR": sum(blank_per_cell_all) / (sum(blank_per_cell_all) + sum(real_per_cell_all)),
     }
 
     if pdf:
         fig, ax = plt.subplots()
 
-        plt.bar(
-            range(len(real_per_cell_full)),
-            sorted_reals_full,
-            width=1,
-            label="On-target",
-            align="edge",
-            color=(0, 119 / 256, 187 / 256),
-        )
-        plt.bar(
-            range(len(blank_per_cell_full)),
-            sorted_blanks_full,
-            width=1,
-            label="Off-target",
-            align="edge",
-            color=(204 / 256, 51 / 256, 17 / 256),
-        )
-        plt.plot(
-            [0, len(real_per_cell_full)],
-            [np.median(real_per_cell_full), np.median(real_per_cell_full)],
-            color="black",
-            label="Median count",
-            linewidth=3,
-        )
+        all_on_color = (0 / 256, 153 / 256, 136 / 256)
+        all_off_color = (238 / 256, 119 / 256, 51 / 256)
+        full_on_color = (0 / 256, 119 / 256, 187 / 256)
+        full_off_color = (204 / 256, 51 / 256, 17 / 256)
+
+        if "rounds_used" in segmentation.keys():
+            plt.bar(
+                range(len(sorted_reals_all)),
+                sorted_reals_all,
+                width=1,
+                label="On-target EC+NC",
+                align="edge",
+                color=all_on_color,
+            )
+            plt.bar(
+                range(len(sorted_reals_full)),
+                sorted_reals_full,
+                width=1,
+                label="On-target NC",
+                align="edge",
+                color=full_on_color,
+            )
+            plt.bar(
+                range(len(sorted_blanks_all)),
+                sorted_blanks_all,
+                width=1,
+                label="Off-target EC+NC",
+                align="edge",
+                color=all_off_color,
+            )
+            plt.bar(
+                range(len(sorted_blanks_full)),
+                sorted_blanks_full,
+                width=1,
+                label="Off-target NC",
+                align="edge",
+                color=full_off_color,
+            )
+            plt.plot(
+                [0, len(real_per_cell_all)],
+                [np.median(real_per_cell_all), np.median(real_per_cell_all)],
+                color="black",
+                label="EC+NC Median count",
+                linewidth=3,
+            )
+            plt.plot(
+                [0, len(real_per_cell_full)],
+                [np.median(real_per_cell_full), np.median(real_per_cell_full)],
+                color="black",
+                linestyle="dashed",
+                label="NC Median count",
+                linewidth=3,
+            )
+
+        else:
+            plt.bar(
+                range(len(sorted_reals_all)),
+                sorted_reals_all,
+                width=1,
+                label="On-target",
+                align="edge",
+                color=all_on_color,
+            )
+            plt.bar(
+                range(len(sorted_blanks_all)),
+                sorted_blanks_all,
+                width=1,
+                label="Off-target",
+                align="edge",
+                color=all_off_color,
+            )
+            plt.plot(
+                [0, len(real_per_cell_all)],
+                [np.median(real_per_cell_all), np.median(real_per_cell_all)],
+                color="black",
+                label="Median count",
+                linewidth=3,
+            )
+
         plt.xlabel("Cells")
         plt.ylabel("Total barcodes per cell")
-        plt.xlim([0, len(real_per_cell_full)])
-        plt.ylim([0, max(max(real_per_cell_full), max(blank_per_cell_full)) * 1.1])
+        plt.xlim([0, len(real_per_cell_all)])
+        plt.ylim([0, max(max(real_per_cell_all), max(blank_per_cell_all)) * 1.1])
         plt.title("True positives vs False positives")
 
         plt.legend()
@@ -603,55 +678,132 @@ def getFPR(segmentation, pdf=False):
     return results
 
 
+def get_y_offset(cutoff, shift):
+    offset = ax.transData.transform((0, cutoff))[1] + shift
+    return ax.transData.inverted().transform((0, offset))[1]
+
+
 def plotBarcodeAbundance(decoded, pdf):
-    targets = decoded["target"].data.tolist()
-    blank_counts_full = [s for s in targets if "blank" in s.lower()]
-    real_counts_full = [s for s in targets if "blank" not in s.lower()]
-
-    blank_names = set(blank_counts_full)
-    blank_counts = []
-    while len(blank_names) > 0:
-        blank_counts.append(blank_counts_full.count(blank_names.pop()))
-
-    real_names = set(real_counts_full)
-    real_counts = []
-    while len(real_names) > 0:
-        real_counts.append(real_counts_full.count(real_names.pop()))
-
-    combined = blank_counts + real_counts
-    asrted = list(reversed(np.argsort(combined)))
-    bars = [combined[i] for i in asrted]
-    colors = [
-        (204 / 256, 51 / 256, 17 / 256) if i < len(blank_counts) else (0, 119 / 256, 187 / 256)
-        for i in asrted
-    ]
-
-    avg_bl = np.average(blank_counts)
-    std_bl = max(1, np.std(blank_counts))
-    conf = norm.interval(0.95, loc=avg_bl, scale=std_bl)[1]
-    good_codes = sum([1 if i > conf else 0 for i in real_counts]) / len(real_counts)
-
     fig, ax = plt.subplots()
 
-    plt.bar(range(len(bars)), height=bars, color=colors, width=1, align="edge")
-    plt.axhline(conf, color="black")
-    plt.text(
-        len(combined) / 3, conf + 1, f"{good_codes*100:.2f}% barcodes above {conf:.2f} threshold"
-    )
+    # Count targets and sort them in descending order
+    targets = decoded["target"].data.tolist()
+    all_counts = pd.Series(collections.Counter(targets)).sort_values(ascending=False)
+
+    # Set scale, axis limits, axis labels, and plot title
     ax.set_yscale("log")
-    plt.xlim([0, len(combined)])
-    plt.ylim([0.9, max(combined) * 1.1])
+    plt.xlim([0, len(all_counts)])
+    plt.ylim([0.9, max(all_counts) * 1.1])
     plt.xlabel("Barcodes")
     plt.ylabel("Total counts per barcode")
     plt.title("Relative abundance of barcodes")
-    proxy_positive = mpatches.Patch(color=(0, 119 / 256, 187 / 256), label="positive")
-    proxy_blank = mpatches.Patch(color=(204 / 256, 51 / 256, 17 / 256), label="blank")
-    plt.legend(handles=[proxy_positive, proxy_blank])
+
+    # Get range of display values (for plotting text later)
+    disp_min = ax.transData.transform((0, 0.9))[1]
+    disp_max = ax.transData.transform((0, max(all_counts) * 1.1))[1]
+    disp_range = disp_max - disp_min
+
+    # Assign colors to sorted targets based on whether they are blanks or real
+    all_on_color = (0 / 256, 153 / 256, 136 / 256)
+    all_off_color = (238 / 256, 119 / 256, 51 / 256)
+    all_colors = [
+        all_on_color if "blank" not in target.lower() else all_off_color
+        for target in all_counts.index
+    ]
+
+    # Calculate upper 95% CI for blank codes and what proportion of real codes are above this value
+    all_blank_counts = pd.Series(collections.Counter([s for s in targets if "blank" in s.lower()]))
+    all_real_counts = pd.Series(
+        collections.Counter([s for s in targets if not "blank" in s.lower()])
+    )
+    all_avg_bl = np.average(all_blank_counts)
+    all_std_bl = max(1, np.std(all_blank_counts))
+    all_conf = norm.interval(0.95, loc=all_avg_bl, scale=all_std_bl)[1]
+    good_codes_all = sum(all_real_counts > all_conf) / len(all_real_counts)
+
+    # Plot bars, upper 95% CI line, and text
+    plt.bar(range(len(all_counts)), height=all_counts, color=all_colors, width=1, align="edge")
+    plt.axhline(all_conf, color="black", label="Upper 95% CI EC+NC")
+    plt.plot(
+        [len(all_counts) * 0.4, len(all_counts) * 0.4],
+        [all_conf, get_y_offset(all_conf, disp_range / 4.35)],
+        color="black",
+    )
+    plt.text(
+        len(all_counts) * 0.4,
+        get_y_offset(all_conf, disp_range / 3.95),
+        f"{good_codes_all*100:.2f}% barcodes above {all_conf:.2f} threshold",
+        horizontalalignment="center",
+        fontsize=8,
+    )
+
+    # Do all the same for only non-corrected barcodes if error-corrected barcodes are present
+    if "rounds_used" in decoded.coords:
+        rounds_used = set(decoded["rounds_used"].data)
+        targets = decoded[decoded["rounds_used"] == max(rounds_used)]["target"].data.tolist()
+        full_counts = pd.Series(collections.Counter(targets)).sort_values(ascending=False)
+        full_on_color = (0 / 256, 119 / 256, 187 / 256)
+        full_off_color = (204 / 256, 51 / 256, 17 / 256)
+        full_colors = [
+            full_on_color if "blank" not in target.lower() else full_off_color
+            for target in all_counts.index
+        ]
+
+        full_blank_counts = pd.Series(
+            collections.Counter([s for s in targets if "blank" in s.lower()])
+        )
+        full_real_counts = pd.Series(
+            collections.Counter([s for s in targets if not "blank" in s.lower()])
+        )
+        avg_bl = np.average(full_blank_counts)
+        std_bl = max(1, np.std(full_blank_counts))
+        full_conf = norm.interval(0.95, loc=avg_bl, scale=std_bl)[1]
+        good_codes_full = sum(full_real_counts > full_conf) / len(full_real_counts)
+
+        plt.bar(
+            range(len(full_counts)), height=full_counts, color=full_colors, width=1, align="edge"
+        )
+        plt.axhline(full_conf, color="black", label="Upper 95% CI NC", linestyle="dashed")
+        plt.plot(
+            [len(full_counts) * 0.7, len(full_counts) * 0.7],
+            [full_conf, get_y_offset(all_conf, disp_range / 10.9)],
+            color="black",
+            linestyle="dashed",
+        )
+        plt.text(
+            len(full_counts) * 0.7,
+            get_y_offset(all_conf, disp_range / 8.7),
+            f"{good_codes_full*100:.2f}% barcodes above {full_conf:.2f} threshold",
+            horizontalalignment="center",
+            fontsize=8,
+        )
+
+    # Create and plot legend
+    if "rounds_used" in decoded.coords:
+        proxy_positive_all = mpatches.Patch(color=all_on_color, label="On-target EC+NC")
+        proxy_positive_full = mpatches.Patch(color=full_on_color, label="On-target NC")
+        proxy_blank_all = mpatches.Patch(color=all_off_color, label="Off-target EC+NC")
+        proxy_blank_full = mpatches.Patch(color=full_off_color, label="Off-target NC")
+        solid_line = Line2D([0], [0], color="black", linestyle="solid", label="Upper 95% CI EC+NC")
+        dashed_line = Line2D([0], [0], color="black", linestyle="dashed", label="Upper 95% CI NC")
+        handles = [
+            proxy_positive_all,
+            proxy_positive_full,
+            proxy_blank_all,
+            proxy_blank_full,
+            solid_line,
+            dashed_line,
+        ]
+    else:
+        proxy_positive = mpatches.Patch(color=all_on_color, label="On-target")
+        proxy_blank = mpatches.Patch(color=all_off_color, label="Off-target")
+        handles = [proxy_positive, proxy_blank]
+    plt.legend(handles=handles, loc=(1.02, 0.5))
 
     pdf.savefig(fig)
     plt.close()
 
-    return {"cutoff": conf, "barcode_average": avg_bl, "barcode_std_used": std_bl}
+    return {"cutoff": all_conf, "barcode_average": all_avg_bl, "barcode_std_used": all_std_bl}
 
 
 def plotSpotRatio(spots, transcripts, name, pdf):
