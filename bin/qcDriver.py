@@ -26,6 +26,7 @@ import starfish.data
 import yaml
 from astropy.stats import RipleysKEstimator
 from matplotlib.backends.backend_pdf import PdfPages
+from matplotlib.lines import Line2D
 from scipy.stats import norm, skew
 from starfish import BinaryMaskCollection, Codebook, DecodedIntensityTable, ImageStack
 from starfish.core.types import (
