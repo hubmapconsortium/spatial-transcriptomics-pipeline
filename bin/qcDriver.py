@@ -552,11 +552,10 @@ def getFPR(segmentation, pdf=False):
     sorted_blanks_all = blank_per_cell_all[sorted_reals_all.index]
 
     # If error-correction is used, do the same for only non-error-corrected barcodes
-    if "rounds_used" in segmentation.keys():
-        rounds_used = set(segmentation["rounds_used"])
+    if "corrected_rounds" in segmentation.keys():
 
         # Get counts per cell
-        full_counts = segmentation[segmentation["rounds_used"] == max(rounds_used)]
+        full_counts = segmentation[segmentation["corrected_rounds"] == 0]
         blank_counts_full = full_counts[full_counts["target"].str.contains("blank", case=False)]
         real_counts_full = full_counts[~full_counts["target"].str.contains("blank", case=False)]
         real_per_cell_full = pd.Series(collections.Counter(real_counts_full[key]))
@@ -590,7 +589,7 @@ def getFPR(segmentation, pdf=False):
         full_on_color = (0 / 256, 119 / 256, 187 / 256)
         full_off_color = (204 / 256, 51 / 256, 17 / 256)
 
-        if "rounds_used" in segmentation.keys():
+        if "corrected_rounds" in segmentation.keys():
             plt.bar(
                 range(len(sorted_reals_all)),
                 sorted_reals_all,
@@ -678,7 +677,7 @@ def getFPR(segmentation, pdf=False):
     return results
 
 
-def get_y_offset(cutoff, shift):
+def get_y_offset(cutoff, shift, ax):
     offset = ax.transData.transform((0, cutoff))[1] + shift
     return ax.transData.inverted().transform((0, offset))[1]
 
@@ -726,21 +725,20 @@ def plotBarcodeAbundance(decoded, pdf):
     plt.axhline(all_conf, color="black", label="Upper 95% CI EC+NC")
     plt.plot(
         [len(all_counts) * 0.4, len(all_counts) * 0.4],
-        [all_conf, get_y_offset(all_conf, disp_range / 4.35)],
+        [all_conf, get_y_offset(all_conf, disp_range / 4.35, ax)],
         color="black",
     )
     plt.text(
         len(all_counts) * 0.4,
-        get_y_offset(all_conf, disp_range / 3.95),
+        get_y_offset(all_conf, disp_range / 3.95, ax),
         f"{good_codes_all*100:.2f}% barcodes above {all_conf:.2f} threshold",
         horizontalalignment="center",
         fontsize=8,
     )
 
     # Do all the same for only non-corrected barcodes if error-corrected barcodes are present
-    if "rounds_used" in decoded.coords:
-        rounds_used = set(decoded["rounds_used"].data)
-        targets = decoded[decoded["rounds_used"] == max(rounds_used)]["target"].data.tolist()
+    if "corrected_rounds" in decoded.coords:
+        targets = decoded[decoded["corrected_rounds"] == 0]["target"].data.tolist()
         full_counts = pd.Series(collections.Counter(targets)).sort_values(ascending=False)
         full_on_color = (0 / 256, 119 / 256, 187 / 256)
         full_off_color = (204 / 256, 51 / 256, 17 / 256)
@@ -766,20 +764,20 @@ def plotBarcodeAbundance(decoded, pdf):
         plt.axhline(full_conf, color="black", label="Upper 95% CI NC", linestyle="dashed")
         plt.plot(
             [len(full_counts) * 0.7, len(full_counts) * 0.7],
-            [full_conf, get_y_offset(all_conf, disp_range / 10.9)],
+            [full_conf, get_y_offset(all_conf, disp_range / 10.9, ax)],
             color="black",
             linestyle="dashed",
         )
         plt.text(
             len(full_counts) * 0.7,
-            get_y_offset(all_conf, disp_range / 8.7),
+            get_y_offset(all_conf, disp_range / 8.7, ax),
             f"{good_codes_full*100:.2f}% barcodes above {full_conf:.2f} threshold",
             horizontalalignment="center",
             fontsize=8,
         )
 
     # Create and plot legend
-    if "rounds_used" in decoded.coords:
+    if "corrected_rounds" in decoded.coords:
         proxy_positive_all = mpatches.Patch(color=all_on_color, label="On-target EC+NC")
         proxy_positive_full = mpatches.Patch(color=full_on_color, label="On-target NC")
         proxy_blank_all = mpatches.Patch(color=all_off_color, label="Off-target EC+NC")
