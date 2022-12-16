@@ -1,11 +1,12 @@
 #!/usr/bin/env python
 
+import operator as op
 import sys
 import time
 from argparse import ArgumentParser
 from copy import deepcopy
 from datetime import datetime
-from functools import partialmethod
+from functools import partialmethod, reduce
 from os import makedirs, path
 from pathlib import Path
 from typing import Callable, Mapping, Optional, Set, Tuple, Union
@@ -15,6 +16,8 @@ import pandas as pd
 import starfish
 import starfish.data
 import xarray as xr
+from scipy.optimize import fsolve
+from scipy.spatial import distance
 from starfish import (
     Codebook,
     DecodedIntensityTable,
