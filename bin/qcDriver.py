@@ -317,7 +317,8 @@ def getSpotRoundDist(spots, pdf=False):
             roundTallies[r] += 1
 
     tally = [roundTallies[i] for i in range(max(roundTallies.keys()) + 1)]
-    tally = [t / sum(tally) for t in tally]
+    total = sum(tally)
+    tally = [t / total for t in tally]
     std = np.std(tally)
     skw = skew(tally)
 
@@ -343,7 +344,7 @@ def getSpotRoundDist(spots, pdf=False):
         pdf.savefig(fig)
         plt.close()
 
-    return {"tally": tally, "stdev": std, "skew": skw}
+    return {"tally": tally, "stdev": std, "skew": skw, "total": total}
 
 
 def getSpotChannelDist(spots, pdf=False):
@@ -356,7 +357,8 @@ def getSpotChannelDist(spots, pdf=False):
             channelTallies[ch] += 1
 
     tally = [channelTallies[i] for i in range(max(channelTallies.keys()) + 1)]
-    tally = [t / sum(tally) for t in tally]
+    total = sum(tally)
+    tally = [t / total for t in tally]
     std = np.std(tally)
     skw = skew(tally)
 
@@ -381,7 +383,7 @@ def getSpotChannelDist(spots, pdf=False):
 
         pdf.savefig(fig)
         plt.close()
-    return {"tally": tally, "stdev": std, "skew": skw}
+    return {"tally": tally, "stdev": std, "skew": skw, "total": total}
 
 
 def maskedSpatialDensity(masked, unmasked, imgsize, steps, pdf=False):
@@ -489,14 +491,32 @@ def getTranscriptDist(transcripts):
                 chlTally[rvals.argmax()] += 1
             else:
                 omitTally[r] += 1
-    rndTally = [r / sum(rndTally) for r in rndTally]
-    chlTally = [r / sum(chlTally) for r in chlTally]
-    if sum(omitTally) != 0:
-        omitTally = [r / sum(omitTally) for r in omitTally]
+    rndTotal = sum(rndTally)
+    rndTally = [r / rndTotal for r in rndTally]
+    chlTotal = sum(chlTally)
+    chlTally = [r / chlTotal for r in chlTally]
+    omitTotal = sum(omitTally)
+    if omitTotal != 0:
+        omitTally = [r / total for r in omitTally]
     return {
-        "rounds": {"tally": rndTally, "stdev": np.std(rndTally), "skew": skew(rndTally)},
-        "channels": {"tally": chlTally, "stdev": np.std(chlTally), "skew": skew(chlTally)},
-        "omit_rounds": {"tally": omitTally, "stdev": np.std(omitTally), "skew": skew(omitTally)},
+        "rounds": {
+            "tally": rndTally,
+            "stdev": np.std(rndTally),
+            "skew": skew(rndTally),
+            "total": rndTotal,
+        },
+        "channels": {
+            "tally": chlTally,
+            "stdev": np.std(chlTally),
+            "skew": skew(chlTally),
+            "total": chlTotal,
+        },
+        "omit_rounds": {
+            "tally": omitTally,
+            "stdev": np.std(omitTally),
+            "skew": skew(omitTally),
+            "omitTotal": omitTotal,
+        },
     }
 
 
@@ -551,6 +571,16 @@ def getFPR(segmentation, pdf=False):
     sorted_reals_all = real_per_cell_all.sort_values(ascending=False)
     sorted_blanks_all = blank_per_cell_all[sorted_reals_all.index]
 
+    results = {
+        "FP": sum(blank_per_cell_all),
+        "TP": sum(real_per_cell_all),
+        "FPR": sum(blank_per_cell_all) / (sum(blank_per_cell_all) + sum(real_per_cell_all)),
+        "tally": {
+            "reals_all": sorted_reals_all,
+            "blanks_all": sorted_blanks_all,
+        },
+    }
+
     # If error-correction is used, do the same for only non-error-corrected barcodes
     if "rounds_used" in segmentation.keys():
         rounds_used = set(segmentation["rounds_used"])
@@ -576,11 +606,8 @@ def getFPR(segmentation, pdf=False):
         sorted_reals_full = real_per_cell_full[sorted_reals_all.index]
         sorted_blanks_full = blank_per_cell_full[sorted_reals_all.index]
 
-    results = {
-        "FP": sum(blank_per_cell_all),
-        "TP": sum(real_per_cell_all),
-        "FPR": sum(blank_per_cell_all) / (sum(blank_per_cell_all) + sum(real_per_cell_all)),
-    }
+        results["tally"]["reals_full"] = sorted_reals_full
+        results["tally"]["blanks_full"] = sorted_blanks_full
 
     if pdf:
         fig, ax = plt.subplots()
@@ -737,6 +764,11 @@ def plotBarcodeAbundance(decoded, pdf):
         fontsize=8,
     )
 
+    results = {
+        "all_real": all_real_counts,
+        "all_blank": all_blank_rounds,
+    }
+
     # Do all the same for only non-corrected barcodes if error-corrected barcodes are present
     if "rounds_used" in decoded.coords:
         rounds_used = set(decoded["rounds_used"].data)
@@ -778,6 +810,9 @@ def plotBarcodeAbundance(decoded, pdf):
             fontsize=8,
         )
 
+        results["full_real"] = full_real_counts
+        results["full_blank"] = full_blank_counts
+
     # Create and plot legend
     if "rounds_used" in decoded.coords:
         proxy_positive_all = mpatches.Patch(color=all_on_color, label="On-target EC+NC")
@@ -803,7 +838,12 @@ def plotBarcodeAbundance(decoded, pdf):
     pdf.savefig(fig)
     plt.close()
 
-    return {"cutoff": all_conf, "barcode_average": all_avg_bl, "barcode_std_used": all_std_bl}
+    return {
+        "cutoff": all_conf,
+        "barcode_average": all_avg_bl,
+        "barcode_std_used": all_std_bl,
+        "tallies": results,
+    }
 
 
 def plotSpotRatio(spots, transcripts, name, pdf):
@@ -927,6 +967,7 @@ def runFOV(
     if segmentation is not None:
         trRes["per_cell"] = getTranscriptsPerCell(segmentation, pdf)
         trRes["FPR"] = getFPR(segmentation, pdf)
+    trRes["total"] = np.shape(transcripts.data)[0]
     trRes["density"] = getTranscriptDensity(transcripts, codebook)
     if spots:
         trRes["fraction_spots_used"] = getFractionSpotsUsed(relevSpots, transcripts)
