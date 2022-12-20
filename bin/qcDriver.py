@@ -466,7 +466,7 @@ def getTranscriptsPerCell(segmented, pdf=False):
         pdf.savefig(fig)
         plt.close()
     return {
-        "counts": counts,
+        "counts": list(counts),
         "quartiles": (q1, mid, q3),
         "stdev": np.std(counts),
         "skew": skew(counts),
@@ -497,7 +497,7 @@ def getTranscriptDist(transcripts):
     chlTally = [r / chlTotal for r in chlTally]
     omitTotal = sum(omitTally)
     if omitTotal != 0:
-        omitTally = [r / total for r in omitTally]
+        omitTally = [r / omitTotal for r in omitTally]
     return {
         "rounds": {
             "tally": rndTally,
@@ -576,8 +576,8 @@ def getFPR(segmentation, pdf=False):
         "TP": sum(real_per_cell_all),
         "FPR": sum(blank_per_cell_all) / (sum(blank_per_cell_all) + sum(real_per_cell_all)),
         "tally": {
-            "reals_all": sorted_reals_all,
-            "blanks_all": sorted_blanks_all,
+            "reals_all": list(sorted_reals_all),
+            "blanks_all": list(sorted_blanks_all),
         },
     }
 
@@ -605,8 +605,8 @@ def getFPR(segmentation, pdf=False):
         sorted_reals_full = real_per_cell_full[sorted_reals_all.index]
         sorted_blanks_full = blank_per_cell_full[sorted_reals_all.index]
 
-        results["tally"]["reals_full"] = sorted_reals_full
-        results["tally"]["blanks_full"] = sorted_blanks_full
+        results["tally"]["reals_full"] = list(sorted_reals_full)
+        results["tally"]["blanks_full"] = list(sorted_blanks_full)
 
     if pdf:
         fig, ax = plt.subplots()
@@ -764,8 +764,8 @@ def plotBarcodeAbundance(decoded, pdf):
     )
 
     results = {
-        "all_real": all_real_counts,
-        "all_blank": all_blank_rounds,
+        "all_real": list(all_real_counts),
+        "all_blank": list(all_blank_counts),
     }
 
     # Do all the same for only non-corrected barcodes if error-corrected barcodes are present
@@ -808,8 +808,8 @@ def plotBarcodeAbundance(decoded, pdf):
             fontsize=8,
         )
 
-        results["full_real"] = full_real_counts
-        results["full_blank"] = full_blank_counts
+        results["full_real"] = list(full_real_counts)
+        results["full_blank"] = list(full_blank_counts)
 
     # Create and plot legend
     if "corrected_rounds" in decoded.coords:
