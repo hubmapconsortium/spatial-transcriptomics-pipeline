@@ -441,7 +441,7 @@ def getTranscriptsPerCell(segmented=None, results=None, pdf=False):
             collections.Counter(segmented[segmented[key].notnull()][key])
         ).sort_values(ascending=False)
     else:
-        results.sort()
+        results.sort().reverse()
         counts = results
 
     q1, mid, q3 = np.percentile(counts, [25, 50, 75])
@@ -750,8 +750,8 @@ def plotBarcodeAbundance(pdf, decoded=None, results=None):
         targets = decoded["target"].data.tolist()
         all_counts = pd.Series(collections.Counter(targets)).sort_values(ascending=False)
     else:
-        fulldict = results["all_real"]
-        fulldict.update(results["all_blank"])
+        fulldict = results["reals_all"]
+        fulldict.update(results["blanks_all"])
         all_counts = pd.Series(fulldict).sort_values(ascending=False)
 
     # Set scale, axis limits, axis labels, and plot title
@@ -782,10 +782,10 @@ def plotBarcodeAbundance(pdf, decoded=None, results=None):
         all_real_counts_raw = collections.Counter([s for s in targets if not "blank" in s.lower()])
         all_real_counts = pd.Series(all_real_counts_raw)
     else:
-        all_blank_counts_raw = results["all_blank"]
-        all_blank_counts = list(results["all_blank"].values())
-        all_real_counts_raw = results["all_real"]
-        all_real_counts = list(results["all_real"].values())
+        all_blank_counts_raw = results["blanks_all"]
+        all_blank_counts = list(results["blanks_all"].values())
+        all_real_counts_raw = results["reals_all"]
+        all_real_counts = list(results["reals_all"].values())
 
     all_avg_bl = np.average(all_blank_counts)
     all_std_bl = max(1, np.std(all_blank_counts))
@@ -809,20 +809,20 @@ def plotBarcodeAbundance(pdf, decoded=None, results=None):
     )
 
     final_results = {
-        "all_real": dict(all_real_counts_raw),
-        "all_blank": dict(all_blank_counts_raw),
+        "reals_all": dict(all_real_counts_raw),
+        "blanks_all": dict(all_blank_counts_raw),
     }
 
     # Do all the same for only non-corrected barcodes if error-corrected barcodes are present
     if (decoded is not None and "corrected_rounds" in decoded.coords) or (
-        results is not None and "full_real" in results.keys()
+        results is not None and "reals_full" in results.keys()
     ):
         if decoded is not None:
             targets = decoded[decoded["corrected_rounds"] == 0]["target"].data.tolist()
             full_counts = pd.Series(collections.Counter(targets)).sort_values(ascending=False)
         else:
-            fulldict = results["full_real"]
-            fulldict.update(results["full_blank"])
+            fulldict = results["reals_full"]
+            fulldict.update(results["blanks_full"])
             full_counts = pd.Series(fulldict.values()).sort_values(ascending=False)
 
         full_on_color = (0 / 256, 119 / 256, 187 / 256)
@@ -842,10 +842,10 @@ def plotBarcodeAbundance(pdf, decoded=None, results=None):
             )
             full_real_counts = pd.Series(full_real_counts_raw)
         else:
-            full_blank_counts_raw = results["full_blank"]
-            full_blank_counts = list(results["full_blank"].values())
-            full_real_counts_raw = results["full_real"]
-            full_real_counts = list(results["full_real"].values())
+            full_blank_counts_raw = results["blanks_full"]
+            full_blank_counts = list(results["blanks_full"].values())
+            full_real_counts_raw = results["reals_full"]
+            full_real_counts = list(results["reals_full"].values())
 
         avg_bl = np.average(full_blank_counts)
         std_bl = max(1, np.std(full_blank_counts))
@@ -870,12 +870,12 @@ def plotBarcodeAbundance(pdf, decoded=None, results=None):
             fontsize=8,
         )
 
-        final_results["full_real"] = dict(full_real_counts_raw)
-        final_results["full_blank"] = dict(full_blank_counts_raw)
+        final_results["reals_full"] = dict(full_real_counts_raw)
+        final_results["blanks_full"] = dict(full_blank_counts_raw)
 
     # Create and plot legend
     if (decoded is not None and "corrected_rounds" in decoded.coords) or (
-        results is not None and "full_real" in results.keys()
+        results is not None and "reals_full" in results.keys()
     ):
         proxy_positive_all = mpatches.Patch(color=all_on_color, label="On-target EC+NC")
         proxy_positive_full = mpatches.Patch(color=full_on_color, label="On-target NC")
@@ -904,7 +904,7 @@ def plotBarcodeAbundance(pdf, decoded=None, results=None):
         "cutoff": all_conf,
         "barcode_average": all_avg_bl,
         "barcode_std_used": all_std_bl,
-        "tallies": final_results,
+        "tally": final_results,
     }
 
 
@@ -1050,20 +1050,20 @@ def runFOV(
             cur_trs = transcripts[~transcripts["target"].str.contains("blank", case=False)]
         trDist = getTranscriptDist(cur_trs)
         for k, v in trDist.items():
-            trRes[f"{k}{t}"] = v
+            trRes[f"{k}{t}_dist"] = v
         if pdf:
-            plotTranscriptDist(trRes[f"rounds{t}"]["tally"], f"round{t}", pdf)
-            plotTranscriptDist(trRes[f"channels{t}"]["tally"], f"channel{t}", pdf)
+            plotTranscriptDist(trRes[f"rounds{t}_dist"]["tally"], f"round{t}", pdf)
+            plotTranscriptDist(trRes[f"channels{t}_dist"]["tally"], f"channel{t}", pdf)
         if spots and pdf:
             plotSpotRatio(
                 results["spots"]["channel_dist"]["tally"],
-                trRes[f"channels{t}"]["tally"],
+                trRes[f"channels{t}_dist"]["tally"],
                 f"channel{t}",
                 pdf,
             )
             plotSpotRatio(
                 results["spots"]["round_dist"]["tally"],
-                trRes[f"rounds{t}"]["tally"],
+                trRes[f"rounds{t}_dist"]["tally"],
                 f"round{t}",
                 pdf,
             )
@@ -1135,14 +1135,66 @@ def run(
         # a bit hacky, but we are less likely to run into memory issues if we take the `results`
         # output from the prior analyses and stich that together, compared to combining all
         # prior results objects.
-        rounds = len(results[fovs[0]]["transcripts"]["rounds"]["tally"])
-        channels = len(results[fovs[0]]["transcripts"]["channels"]["tally"])
+        lens = {
+            "round": len(results[fovs[0]]["transcripts"]["rounds"]["tally"]),
+            "channel": len(results[fovs[0]]["transcripts"]["channels"]["tally"]),
+        }
         if savePdf:
             pdf = PdfPages(output_dir + "combined_graph_output.pdf")
         else:
             pdf = None
 
         print("Computing QC for combined FOVs")
+
+        dims = [["transcripts", "round"], ["transcripts", "channel"]]
+
+        if "rounds_noblank" in results[fovs[0]]["transcripts"].keys():
+            dims.extend([["transcripts", "round_noblank"], ["transcripts", "channel_noblank"]])
+
+        if spots:
+            # these must be after the transcript dims
+            # because we only check if we're on spots to decide to plot spot ratio
+            dims.extend([["spots", "round"], ["spots", "channel"]])
+
+        newRes = {}
+        for target, axis in dims:
+            # target: transcripts vs spots
+            # axis: rounds vs channels
+            print(f"\tComputing combined {target}:{axis} distributions")
+            total = sum([results[f][target][f"{axis}_dist"]["total"] for f in fovs])
+            tally = [
+                sum(
+                    [
+                        results[f][target][f"{axis}_dist"]["tally"][i]
+                        * results[f][target][f"{axis}_dist"]["total"]
+                        for f in fovs
+                    ]
+                )
+                / total
+                for i in range(lens[axis])
+            ]
+            localRes = {"tally": tally, "stdev": np.std(tally), "skew": skew(tally)}
+            if target not in newRes.keys():
+                newRes[target] = {}
+            newRes[target][f"{axis}_dist"] = localRes
+            if pdf:
+                plotTranscriptDist(tally, axis, target, pdf, target == "transcripts")
+                if target == "spots":
+                    # if target is spots, then we can directly plot them with transcripts
+                    plotSpotRatio(
+                        tally,
+                        newRes["transcripts"][f"{axis}_dist"]["tally"],
+                        f"{axis}",
+                        pdf,
+                    )
+                    if f"{axis}_noblank_dist" in newRes["transcripts"].keys():
+                        # include noblank comparison
+                        plotSpotRatio(
+                            tally,
+                            newRes["transcripts"][f"{axis}_noblank_dist"]["tally"],
+                            f"{axis}_noblanks",
+                            pdf,
+                        )
 
         if spots:
             # recompute spot based metrics by combining across fovs
@@ -1160,43 +1212,6 @@ def run(
                 spotRes["spot_counts"]["segmented_count"] / spotRes["spot_counts"]["total_count"]
             )
             spotRes["density"] = spotRes["spot_counts"]["total_count"] / len(codebook)
-            round_t = sum([results[f]["spots"]["round_dist"]["total"] for f in fovs])
-            round_tally = [
-                sum(
-                    [
-                        results[f]["spots"]["round_dist"]["tally"][r]
-                        * results[f]["spots"]["round_dist"]["total"]
-                        for f in fovs
-                    ]
-                )
-                / round_t
-                for r in range(rounds)
-            ]
-            spotRes["round_dist"] = {
-                "tally": round_tally,
-                "stdev": np.std(round_tally),
-                "skew": skew(round_tally),
-            }
-            channel_t = sum([results[f]["spots"]["channel_dist"]["total"] for f in fovs])
-            channel_tally = [
-                sum(
-                    [
-                        results[f]["spots"]["channel_dist"]["tally"][c]
-                        * results[f]["spots"]["channel_dist"]["total"]
-                        for f in fovs
-                    ]
-                )
-                / channel_t
-                for c in range(channels)
-            ]
-            spotRes["channel_dist"] = {
-                "tally": channel_tally,
-                "stdev": np.std(channel_tally),
-                "skew": skew(channel_tally),
-            }
-            if pdf:
-                plotTranscriptDist(spotRes["channel_dist"]["tally"], "channel", pdf, False)
-                plotTranscriptDist(spotRes["round_dist"]["tally"], "round", pdf, False)
 
         print("\tComputing transcript metrics")
 
@@ -1223,87 +1238,6 @@ def run(
                 )
                 / trRes["total"]
             )
-        # recompute transcript metrics by combining across fovs
-        # we could probably parametrize this
-        round_t = sum([results[f]["transcripts"]["rounds"]["total"] for f in fovs])
-        round_tally = [
-            sum(
-                [
-                    results[f]["transcripts"]["rounds"]["tally"][r]
-                    * results[f]["transcripts"]["rounds"]["total"]
-                    for f in fovs
-                ]
-            )
-            / round_t
-            for r in range(rounds)
-        ]
-        trRes["rounds"] = {
-            "tally": round_tally,
-            "stdev": np.std(round_tally),
-            "skew": skew(round_tally),
-        }
-
-        channel_t = sum([results[f]["transcripts"]["channels"]["total"] for f in fovs])
-        channel_tally = [
-            sum(
-                [
-                    results[f]["transcripts"]["channels"]["tally"][c]
-                    * results[f]["transcripts"]["channels"]["total"]
-                    for f in fovs
-                ]
-            )
-            / channel_t
-            for c in range(channels)
-        ]
-        trRes["channels"] = {
-            "tally": channel_tally,
-            "stdev": np.std(channel_tally),
-            "skew": skew(channel_tally),
-        }
-        if pdf:
-            plotTranscriptDist(trRes["channels"]["tally"], "channel", pdf)
-            plotTranscriptDist(trRes["rounds"]["tally"], "round", pdf)
-
-        if "rounds_noblank" in results[fovs[0]]["transcripts"].keys():
-            round_t = sum([results[f]["transcripts"]["rounds_noblank"]["total"] for f in fovs])
-            round_tally = [
-                sum(
-                    [
-                        results[f]["transcripts"]["rounds_noblank"]["tally"][r]
-                        * results[f]["transcripts"]["rounds_noblank"]["total"]
-                        for f in fovs
-                    ]
-                )
-                / round_t
-                for r in range(rounds)
-            ]
-            trRes["rounds_noblank"] = {
-                "tally": round_tally,
-                "stdev": np.std(round_tally),
-                "skew": skew(round_tally),
-            }
-
-            channel_t = sum([results[f]["transcripts"]["channels_noblank"]["total"] for f in fovs])
-            channel_tally = [
-                sum(
-                    [
-                        results[f]["transcripts"]["channels_noblank"]["tally"][c]
-                        * results[f]["transcripts"]["channels_noblank"]["total"]
-                        for f in fovs
-                    ]
-                )
-                / channel_t
-                for c in range(channels)
-            ]
-            trRes["channels_noblank"] = {
-                "tally": channel_tally,
-                "stdev": np.std(channel_tally),
-                "skew": skew(round_tally),
-            }
-
-            if pdf:
-                plotTranscriptDist(trRes["channels_noblank"]["tally"], "channels_noblank", pdf)
-                plotTranscriptDist(trRes["rounds_noblank"]["tally"], "rounds_noblank", pdf)
 
         if segmentation:
             print("\tRe-computing segmentation based metrics")
@@ -1316,12 +1250,12 @@ def run(
 
         print("\tRe-computing barcode metrics")
         barcodeTallies = {}
-        for k in results[fovs[0]]["transcripts"]["barcode_counts"]["tallies"].keys():
+        for k in results[fovs[0]]["transcripts"]["barcode_counts"]["tally"].keys():
             # take full list of barcodes across fovs, because barcodes with a count of 0 in a given fov won't be listed
             superBars = set(
                 flatten(
                     [
-                        list(results[f]["transcripts"]["barcode_counts"]["tallies"][k].keys())
+                        list(results[f]["transcripts"]["barcode_counts"]["tally"][k].keys())
                         for f in fovs
                     ]
                 )
@@ -1330,15 +1264,18 @@ def run(
             barcodeTallies[k] = {
                 bar: sum(
                     [
-                        results[f]["transcripts"]["barcode_counts"]["tallies"][k][bar]
+                        results[f]["transcripts"]["barcode_counts"]["tally"][k][bar]
                         for f in fovs
-                        if bar in results[f]["transcripts"]["barcode_counts"]["tallies"][k].keys()
+                        if bar in results[f]["transcripts"]["barcode_counts"]["tally"][k].keys()
                     ]
                 )
                 for bar in superBars
             }
         trRes["barcode_counts"] = plotBarcodeAbundance(results=barcodeTallies, pdf=pdf)
 
+        # don't forget to re-add the parametrized dist metrics
+        spotRes.update(newRes["spots"])
+        trRes.update(newRes["transcripts"])
         results["combined"] = {"spots": spotRes, "transcripts": trRes}
 
         if savePdf:
