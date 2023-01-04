@@ -1266,7 +1266,10 @@ def run(
                     [
                         results[f]["transcripts"]["barcode_counts"]["tally"][k][bar]
                         for f in fovs
-                        if bar in results[f]["transcripts"]["barcode_counts"]["tally"][k].keys()
+                        if (
+                            bar in results[f]["transcripts"]["barcode_counts"]["tally"][k].keys()
+                            and ("blank" in k or "blank" not in bar)
+                        )
                     ]
                 )
                 for bar in superBars
