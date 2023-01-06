@@ -441,7 +441,8 @@ def getTranscriptsPerCell(segmented=None, results=None, pdf=False):
             collections.Counter(segmented[segmented[key].notnull()][key])
         ).sort_values(ascending=False)
     else:
-        results.sort().reverse()
+        results.sort()
+        results.reverse()
         counts = results
 
     q1, mid, q3 = np.percentile(counts, [25, 50, 75])
@@ -504,23 +505,23 @@ def getTranscriptDist(transcripts):
     if omitTotal != 0:
         omitTally = [r / omitTotal for r in omitTally]
     return {
-        "rounds": {
+        "round": {
             "tally": rndTally,
             "stdev": np.std(rndTally),
             "skew": skew(rndTally),
             "total": rndTotal,
         },
-        "channels": {
+        "channel": {
             "tally": chlTally,
             "stdev": np.std(chlTally),
             "skew": skew(chlTally),
             "total": chlTotal,
         },
-        "omit_rounds": {
+        "omit_round": {
             "tally": omitTally,
             "stdev": np.std(omitTally),
             "skew": skew(omitTally),
-            "omitTotal": omitTotal,
+            "total": omitTotal,
         },
     }
 
@@ -1052,18 +1053,18 @@ def runFOV(
         for k, v in trDist.items():
             trRes[f"{k}{t}_dist"] = v
         if pdf:
-            plotTranscriptDist(trRes[f"rounds{t}_dist"]["tally"], f"round{t}", pdf)
-            plotTranscriptDist(trRes[f"channels{t}_dist"]["tally"], f"channel{t}", pdf)
+            plotTranscriptDist(trRes[f"round{t}_dist"]["tally"], f"round{t}", pdf)
+            plotTranscriptDist(trRes[f"channel{t}_dist"]["tally"], f"channel{t}", pdf)
         if spots and pdf:
             plotSpotRatio(
                 results["spots"]["channel_dist"]["tally"],
-                trRes[f"channels{t}_dist"]["tally"],
+                trRes[f"channel{t}_dist"]["tally"],
                 f"channel{t}",
                 pdf,
             )
             plotSpotRatio(
                 results["spots"]["round_dist"]["tally"],
-                trRes[f"rounds{t}_dist"]["tally"],
+                trRes[f"round{t}_dist"]["tally"],
                 f"round{t}",
                 pdf,
             )
@@ -1136,8 +1137,8 @@ def run(
         # output from the prior analyses and stich that together, compared to combining all
         # prior results objects.
         lens = {
-            "round": len(results[fovs[0]]["transcripts"]["rounds"]["tally"]),
-            "channel": len(results[fovs[0]]["transcripts"]["channels"]["tally"]),
+            "round": len(results[fovs[0]]["transcripts"]["round_dist"]["tally"]),
+            "channel": len(results[fovs[0]]["transcripts"]["channel_dist"]["tally"]),
         }
         if savePdf:
             pdf = PdfPages(output_dir + "combined_graph_output.pdf")
@@ -1148,8 +1149,13 @@ def run(
 
         dims = [["transcripts", "round"], ["transcripts", "channel"]]
 
-        if "rounds_noblank" in results[fovs[0]]["transcripts"].keys():
+        if "round_noblank_dist" in results[fovs[0]]["transcripts"].keys():
             dims.extend([["transcripts", "round_noblank"], ["transcripts", "channel_noblank"]])
+
+        if "omit_round_dist" in results[fovs[0]]["transcripts"].keys():
+            dims.extend([["transcripts", "omit_round"]])
+            if "round_noblank_dist" in results[fovs[0]]["transcripts"].keys():
+                dims.extend([["transcripts", "omit_round_noblank"]])
 
         if spots:
             # these must be after the transcript dims
@@ -1160,6 +1166,9 @@ def run(
         for target, axis in dims:
             # target: transcripts vs spots
             # axis: rounds vs channels
+            thisLen = lens[
+                "round" if "round" in axis else "channel"
+            ]  # don't want this to break with _noblank or omit_
             print(f"\tComputing combined {target}:{axis} distributions")
             total = sum([results[f][target][f"{axis}_dist"]["total"] for f in fovs])
             tally = [
@@ -1171,14 +1180,14 @@ def run(
                     ]
                 )
                 / total
-                for i in range(lens[axis])
+                for i in range(thisLen)
             ]
             localRes = {"tally": tally, "stdev": np.std(tally), "skew": skew(tally)}
             if target not in newRes.keys():
                 newRes[target] = {}
             newRes[target][f"{axis}_dist"] = localRes
             if pdf:
-                plotTranscriptDist(tally, axis, target, pdf, target == "transcripts")
+                plotTranscriptDist(tally, axis, pdf, target == "transcripts")
                 if target == "spots":
                     # if target is spots, then we can directly plot them with transcripts
                     plotSpotRatio(
