@@ -1,12 +1,9 @@
 #!/usr/bin/env python
 
 import collections
-import functools
 import gc
-import math
 import pickle
 import sys
-import time
 from argparse import ArgumentParser
 from datetime import datetime
 from functools import partialmethod
@@ -75,7 +72,6 @@ def filterSpots(spots, mask, oneIndex=False, invert=False):
     maskMat[maskMat > 1] = 1
     if invert:
         maskMat = 1 - maskMat
-    maskSize = np.shape(maskMat)
     for item in spots.items():
         selectedSpots = item[1].spot_attrs.data
         selectedSpots = selectedSpots.reset_index(drop=True)
@@ -166,7 +162,7 @@ def plotRipleyResults(pdf, results, key, doMonte=False, text=None):
     plt.close()
 
 
-## Internal Metrics
+# == Internal Metrics ==
 # Spot Metrics
 
 
@@ -444,6 +440,9 @@ def getTranscriptsPerCell(segmented=None, results=None, pdf=False):
         results.sort()
         counts = results
 
+    if len(counts) == 0:
+        return {"counts": [0], "quartiles": (0, 0, 0), "stdev": 0, "skew": 0}
+
     q1, mid, q3 = np.percentile(counts, [25, 50, 75])
     iqr_scale = 1.5
 
@@ -567,7 +566,6 @@ def getFPR(segmentation=None, results=None, pdf=False):
         # Get real and blank target counts per cell for all barcodes
         blank_counts_all = segmentation[segmentation["target"].str.contains("blank", case=False)]
         real_counts_all = segmentation[~segmentation["target"].str.contains("blank", case=False)]
-        cell_count = len(set(segmentation[key])) + 1
         real_per_cell_all = pd.Series(collections.Counter(real_counts_all[key]))
         blank_per_cell_all = pd.Series(collections.Counter(blank_counts_all[key]))
 
@@ -779,7 +777,7 @@ def plotBarcodeAbundance(pdf, decoded=None, results=None):
     if decoded is not None:
         all_blank_counts_raw = collections.Counter([s for s in targets if "blank" in s.lower()])
         all_blank_counts = pd.Series(all_blank_counts_raw)
-        all_real_counts_raw = collections.Counter([s for s in targets if not "blank" in s.lower()])
+        all_real_counts_raw = collections.Counter([s for s in targets if "blank" not in s.lower()])
         all_real_counts = pd.Series(all_real_counts_raw)
     else:
         all_blank_counts_raw = results["all_blank"]
@@ -838,7 +836,7 @@ def plotBarcodeAbundance(pdf, decoded=None, results=None):
             )
             full_blank_counts = pd.Series(full_blank_counts_raw)
             full_real_counts_raw = collections.Counter(
-                [s for s in targets if not "blank" in s.lower()]
+                [s for s in targets if "blank" not in s.lower()]
             )
             full_real_counts = pd.Series(full_real_counts_raw)
         else:
@@ -946,8 +944,8 @@ def simplifyDict(ob):
         return ob
 
 
-def flatten(l):
-    return [item for sublist in l for item in sublist]
+def flatten(lis):
+    return [item for sublist in lis for item in sublist]
 
 
 def runFOV(
@@ -1399,17 +1397,16 @@ if __name__ == "__main__":
     codebook = False
     roi = False
 
-    transcripts = False
+    transcripts = {}
     if args.transcript_pkl:
         transcripts = pickle.load(open(args.transcript_pkl, "rb"))
     else:
         # load transcripts from exp dir
-        transcripts = {}
         for f in glob("{}/cdf/*_decoded.cdf".format(args.exp_output)):
             name = f[len(str(args.exp_output)) + 5 : -12]
             transcripts[name] = DecodedIntensityTable.open_netcdf(f)
 
-    segmentation = False
+    segmentation = None
     if (
         args.segmentation_loc
     ):  # if this is true, going to assume baysorStaged dir-wise FOV structure
@@ -1421,7 +1418,7 @@ if __name__ == "__main__":
             # pre-filtering for nan targets, since this will crash QC code.
             segmentation[name] = segmentation[name][~segmentation[name]["target"].isna()]
 
-    spots = False
+    spots = None
     if args.spots_pkl:
         spots = pickle.load(open(args.spots_pkl, "rb"))
     elif args.has_spots:
