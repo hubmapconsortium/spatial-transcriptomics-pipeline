@@ -894,7 +894,7 @@ def plotBarcodeAbundance(pdf, decoded=None, results=None):
         handles = [proxy_positive, proxy_blank]
     lgd = ax.legend(handles=handles, loc=(1.02, 0.5))
 
-    pdf.savefig(fig, bbox_extra_artists=(lgd,), bbox_inches='tight')
+    pdf.savefig(fig, bbox_extra_artists=(lgd,), bbox_inches="tight")
     plt.close()
 
     return {
