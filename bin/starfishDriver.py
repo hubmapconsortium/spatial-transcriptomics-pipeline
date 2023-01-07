@@ -400,7 +400,7 @@ def nck(n, k):
     """
     n choose k function
     """
-    k = min(r, n - k)
+    k = min(k, n - k)
     numer = reduce(op.mul, range(n, n - k, -1), 1)
     denom = reduce(op.mul, range(1, k + 1), 1)
     return numer // denom
@@ -420,7 +420,7 @@ def add_corrected_rounds(codebook, decoded, ham_dist):
         target = str(code["target"].data)
         codeword = code.data
         codeword = codeword.flatten()
-        C = [ncr(x, ham_dist) for x in range(len(codeword))]
+        C = [nck(x, ham_dist) for x in range(len(codeword))]
         codewords = np.tile(codeword, (len(C), 1))
         for i in range(len(C)):
             codewords[i, C[i]] = int(~np.array(codewords[i, C[i]], dtype=bool))
@@ -554,7 +554,7 @@ def run(
             # Check that codebook is not one-hot
             for row in experiment.codebook[0].data:
                 row_sum = sum(row == 0)
-                if row_sum != channelsN or row_sum != 0:
+                if row_sum != len(experiment.codebook['c']) or row_sum != 0:
                     ham_dist = 1
                     decoded = add_corrected_rounds(codebook, decoded, ham_dist)
 
