@@ -892,9 +892,9 @@ def plotBarcodeAbundance(pdf, decoded=None, results=None):
         proxy_positive = mpatches.Patch(color=all_on_color, label="On-target")
         proxy_blank = mpatches.Patch(color=all_off_color, label="Off-target")
         handles = [proxy_positive, proxy_blank]
-    plt.legend(handles=handles, loc=(1.02, 0.5))
+    lgd = ax.legend(handles=handles, loc=(1.02, 0.5))
 
-    pdf.savefig(fig)
+    pdf.savefig(fig, bbox_extra_artists=(lgd,), bbox_inches='tight')
     plt.close()
 
     return {
