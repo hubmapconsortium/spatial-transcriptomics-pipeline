@@ -1,6 +1,5 @@
 #!/usr/bin/env python
 
-import functools
 import hashlib
 import json
 import os
@@ -11,23 +10,19 @@ from concurrent.futures.process import ProcessPoolExecutor
 from copy import deepcopy
 from datetime import datetime
 from functools import partial, partialmethod
-from os import makedirs, path
+from os import path
 from pathlib import Path
 from time import time
 
 import cv2
 import numpy as np
-import pandas as pd
-import skimage
 import starfish
 import tifffile as tiff
-import xarray as xr
 from scipy import ndimage
-from skimage import exposure, morphology, registration, restoration
-from skimage.morphology import ball, dilation, disk, opening
+from skimage import exposure, morphology, restoration
+from skimage.morphology import disk
 from skimage.registration import phase_cross_correlation
-from starfish import BinaryMaskCollection, Experiment, ImageStack
-from starfish.experiment.builder import write_experiment_json
+from starfish import Experiment, ImageStack
 from starfish.types import Levels
 from tqdm import tqdm
 

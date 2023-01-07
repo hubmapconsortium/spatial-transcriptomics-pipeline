@@ -1,20 +1,21 @@
 #!/usr/bin/env python
 
+import operator as op
+import os
 import sys
 import time
 from argparse import ArgumentParser
 from copy import deepcopy
 from datetime import datetime
-from functools import partialmethod
+from functools import partialmethod, reduce
 from os import makedirs, path
 from pathlib import Path
-from typing import Callable, Mapping, Optional, Set, Tuple, Union
+from typing import Callable, Tuple, Union
 
 import numpy as np
-import pandas as pd
 import starfish
 import starfish.data
-import xarray as xr
+from scipy.spatial import distance
 from starfish import (
     Codebook,
     DecodedIntensityTable,
@@ -22,16 +23,8 @@ from starfish import (
     ImageStack,
     IntensityTable,
 )
-from starfish.core.types import Number, SpotAttributes, SpotFindingResults
-from starfish.spots import AssignTargets
-from starfish.types import (
-    Axes,
-    Coordinates,
-    CoordinateValue,
-    Features,
-    Levels,
-    TraceBuildingStrategies,
-)
+from starfish.core.types import Number, SpotFindingResults
+from starfish.types import Axes, Features, Levels, TraceBuildingStrategies
 from tqdm import tqdm
 
 
@@ -181,8 +174,19 @@ def blobDriver(
 
 
 def init_scale(img: ImageStack):
-    # Initialize scaling factors for each image based on the relative positions of the 90th percentile
-    # of their intensity histograms.
+    """
+    Initialize scaling factors for each image based on the relative positions
+    of the 90th percentile of their intensity histograms.
+
+    Parameters
+    ----------
+    img : ImageStack
+        The target image for the initial scaling
+
+    Returns
+    -------
+    Matrix of scaling factors (TODO: more specific + typecasting?)
+    """
 
     # Build pixel histograms for each image
     pixel_histos = {}
@@ -393,6 +397,57 @@ def saveTable(table: DecodedIntensityTable, savename: str):
     print(f"Saved decoded csv file {savename}.")
 
 
+def nck(n, k):
+    """
+    n choose k function
+    """
+    k = min(k, n - k)
+    numer = reduce(op.mul, range(n, n - k, -1), 1)
+    denom = reduce(op.mul, range(1, k + 1), 1)
+    return numer // denom
+
+
+def add_corrected_rounds(codebook, decoded, ham_dist):
+    """
+    For MERFISH experiments, adds "corrected_rounds" field to DecodedIntensityTable which denotes the number of rounds
+    that were corrected for in the experiment
+    """
+
+    # Make two dictionaries, both have target names as keys, neighbor_codes contains all neighboring codes to that
+    # targets code within the hamming distance while perfect_words contains only the correct codeword for that target
+    neighbor_codes = {}
+    perfect_words = {}
+    for code in codebook:
+        target = str(code["target"].data)
+        codeword = code.data
+        codeword = codeword.flatten()
+        C = [nck(x, ham_dist) for x in range(len(codeword))]
+        codewords = np.tile(codeword, (len(C), 1))
+        for i in range(len(C)):
+            codewords[i, C[i]] = int(~np.array(codewords[i, C[i]], dtype=bool))
+        neighbor_codes[target] = np.array([word / np.linalg.norm(word) for word in codewords])
+        perfect_words[target] = codeword / np.linalg.norm(codeword)
+
+    # For every transcript, check whether it's pixel vector is closer in distance to the true code or one of the
+    # neighbor codes. If it is closer to a neighbor code, there was an error correction.
+    corrected_rounds = []
+    for i, transcript in enumerate(decoded):
+        on_distance = np.linalg.norm(
+            transcript.data.flatten() - perfect_words[str(transcript["target"].data)]
+        )
+        off_distances = distance.cdist(
+            transcript.data.flatten().reshape((1, -1)),
+            neighbor_codes[str(transcript["target"].data)],
+        )
+        if on_distance < np.min(off_distances):
+            corrected_rounds.append(0)
+        else:
+            corrected_rounds.append(1)
+
+    # Add corrected_rounds field to table and return
+    return decoded.assign_coords(corrected_rounds=("features", corrected_rounds))
+
+
 def run(
     output_dir: str,
     experiment: Experiment,
@@ -495,6 +550,15 @@ def run(
             decoded = pixelDriver(img, experiment.codebook, **pixelRunnerKwargs)[0]
             print(f"Found {len(decoded)} transcripts with pixelDriver")
 
+            # If applicable add "corrected_rounds" field
+
+            # Check that codebook is not one-hot
+            for row in experiment.codebook[0].data:
+                row_sum = sum(row == 0)
+                if row_sum != len(experiment.codebook["c"]) or row_sum != 0:
+                    ham_dist = 1
+                    decoded = add_corrected_rounds(experiment.codebook, decoded, ham_dist)
+
         # SimpleLookupDecoder will not have PASSES_THRESHOLDS
         if Features.PASSES_THRESHOLDS in decoded.coords and not not_filtered_results:
             decoded = decoded.loc[decoded[Features.PASSES_THRESHOLDS]]
@@ -543,7 +607,7 @@ if __name__ == "__main__":
     p.add_argument("--detector-method", type=str, nargs="?")
     p.add_argument("--use-ref-img", dest="use_ref_img", action="store_true")
     p.set_defaults(use_ref_img=False)
-    ### aside, are we going to want to include the ability to run a sweep?
+    # == aside, are we going to want to include the ability to run a sweep?
 
     # decodeRunner kwargs
     p.add_argument("--decode-spots-method", type=str)
@@ -551,7 +615,7 @@ if __name__ == "__main__":
         "--trace-building-strategy", type=str, nargs="?"
     )  # only optional for SimpleLookupDecoder
 
-    ## MetricDistance
+    # == MetricDistance
     p.add_argument("--max-distance", type=float, nargs="?")
     p.add_argument("--min-intensity", type=float, nargs="?")
     p.add_argument("--metric", type=str, nargs="?")  # NOTE also used in pixelRunner
@@ -562,7 +626,7 @@ if __name__ == "__main__":
     )  # also used in PerRoundMaxChannel, CheckAll
     p.add_argument("--return-original-intensities", type=bool, nargs="?")
 
-    ## CheckAll
+    # == CheckAll
     p.add_argument("--error-rounds", type=int, nargs="?")
     p.add_argument("--mode", type=str, nargs="?")
     p.add_argument("--physical-coords", dest="physical_coords", action="store_true")

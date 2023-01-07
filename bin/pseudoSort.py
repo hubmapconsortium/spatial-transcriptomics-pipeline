@@ -10,9 +10,7 @@ from typing import Dict, List
 import numpy as np
 import pandas as pd
 import skimage.io
-import starfish
 import yaml
-from PIL import Image
 from starfish import Codebook
 
 

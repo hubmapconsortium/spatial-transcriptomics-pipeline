@@ -8,30 +8,22 @@ from functools import partialmethod
 from glob import glob
 from os import makedirs, path
 from pathlib import Path
-from time import time
-from typing import List, Mapping, Set
+from typing import List
 
 import cv2
 import numpy as np
-import pandas as pd
 import PIL
 import skimage
 import starfish
 import starfish.data
-import xarray as xr
 from scipy import ndimage
 from skimage.filters import threshold_local
 from skimage.morphology import disk
-from starfish import (
-    BinaryMaskCollection,
-    DecodedIntensityTable,
-    ImageStack,
-    IntensityTable,
-)
+from starfish import BinaryMaskCollection, DecodedIntensityTable, ImageStack
 from starfish.image import Filter as ImgFilter
-from starfish.morphology import Binarize, Filter, Merge, Segment
+from starfish.morphology import Binarize, Filter, Segment
 from starfish.spots import AssignTargets
-from starfish.types import Axes, Features, Levels
+from starfish.types import Axes, Levels
 from tqdm import tqdm
 
 
@@ -167,7 +159,6 @@ def segment_nuclei(
     scaled_nuclei = clip.run(nuclei, in_place=False)
 
     # Threshold locally
-    block_size = thresh_block_size
     param = 100
     local_thresh = threshold_local(
         scaled_nuclei.xarray.data[0, 0, 0], thresh_block_size, offset=0, param=param
@@ -328,10 +319,6 @@ def segment_cytoplasm(
         decoded_targets["zc"] = decoded_targets["z"]
     data = deepcopy(decoded_targets.to_decoded_dataframe().data)
 
-    # Calculate the number of transcripts found within some search radius for each pixel in the image
-    all_points = [(x, y) for x in range(good_nuclei.shape[1]) for y in range(good_nuclei.shape[0])]
-    data_points = pd.DataFrame({"x": [x[0] for x in all_points], "y": [x[1] for x in all_points]})
-
     # Create image whose pixel intensities are proportional to the number of transcripts found in it's search
     # radius defined neighborhood
     density = np.zeros(good_nuclei.shape)
@@ -344,9 +331,6 @@ def segment_cytoplasm(
 
     # Smooth density map with gaussian filter
     smoothed_density = ndimage.gaussian_filter(dilation, sigma=10)
-
-    # Smooth intensities w/ median filter
-    median = ndimage.median_filter(smoothed_density, size=30)
 
     pmin = 0
     pmax = 80
@@ -387,8 +371,6 @@ def segment_cytoplasm(
 
     # Remove small
     props = skimage.measure.regionprops(final_labels)
-    areas = [p.area for p in props]
-    outlier = np.percentile(areas, 25) - 2 * (np.percentile(areas, 75) - np.percentile(areas, 25))
     area_small = [p.area < 20000 for p in props]
     for x in range(1, len(area_small) + 1):
         if area_small[x - 1]:
@@ -397,8 +379,6 @@ def segment_cytoplasm(
 
     # Remove bg
     props = skimage.measure.regionprops(final_labels)
-    areas = [p.area for p in props]
-    outlier = np.percentile(areas, 75) + 5 * (np.percentile(areas, 75) - np.percentile(areas, 25))
     area_big = [p.area > 200000 for p in props]
     for x in range(1, len(area_big) + 1):
         if area_big[x - 1]:
