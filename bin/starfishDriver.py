@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
-import os
 import operator as op
+import os
 import sys
 import time
 from argparse import ArgumentParser
@@ -24,12 +24,7 @@ from starfish import (
     IntensityTable,
 )
 from starfish.core.types import Number, SpotFindingResults
-from starfish.types import (
-    Axes,
-    Features,
-    Levels,
-    TraceBuildingStrategies,
-)
+from starfish.types import Axes, Features, Levels, TraceBuildingStrategies
 from tqdm import tqdm
 
 
@@ -179,17 +174,28 @@ def blobDriver(
 
 
 def init_scale(img: ImageStack):
-    # Initialize scaling factors for each image based on the relative positions of the 90th percentile
-    # of their intensity histograms.
+    """
+    Initialize scaling factors for each image based on the relative positions
+    of the 90th percentile of their intensity histograms.
+
+    Parameters
+    ----------
+    img : ImageStack
+        The target image for the initial scaling
+
+    Returns
+    -------
+    Matrix of scaling factors (TODO: more specific + typecasting?)
+    """
 
     # Build pixel histograms for each image
     pixel_histos = {}
     for r in range(img.num_rounds):
         for ch in range(img.num_chs):
             data = deepcopy(img.xarray.data[r, ch])
-            data = np.rint(data * (2**16))
-            data[data == 2**16] = (2**16) - 1
-            hist = np.histogram(data, bins=range((2**16)))
+            data = np.rint(data * (2 ** 16))
+            data[data == 2 ** 16] = (2 ** 16) - 1
+            hist = np.histogram(data, bins=range((2 ** 16)))
             pixel_histos[(r, ch)] = hist[0]
 
     # Estimate scaling factors using cumulative distribution of each images intensities
@@ -549,7 +555,7 @@ def run(
             # Check that codebook is not one-hot
             for row in experiment.codebook[0].data:
                 row_sum = sum(row == 0)
-                if row_sum != len(experiment.codebook['c']) or row_sum != 0:
+                if row_sum != len(experiment.codebook["c"]) or row_sum != 0:
                     ham_dist = 1
                     decoded = add_corrected_rounds(experiment.codebook, decoded, ham_dist)
 

@@ -19,11 +19,7 @@ import starfish.data
 from scipy import ndimage
 from skimage.filters import threshold_local
 from skimage.morphology import disk
-from starfish import (
-    BinaryMaskCollection,
-    DecodedIntensityTable,
-    ImageStack,
-)
+from starfish import BinaryMaskCollection, DecodedIntensityTable, ImageStack
 from starfish.image import Filter as ImgFilter
 from starfish.morphology import Binarize, Filter, Segment
 from starfish.spots import AssignTargets
