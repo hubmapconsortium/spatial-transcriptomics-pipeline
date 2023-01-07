@@ -193,9 +193,9 @@ def init_scale(img: ImageStack):
     for r in range(img.num_rounds):
         for ch in range(img.num_chs):
             data = deepcopy(img.xarray.data[r, ch])
-            data = np.rint(data * (2 ** 16))
-            data[data == 2 ** 16] = (2 ** 16) - 1
-            hist = np.histogram(data, bins=range((2 ** 16)))
+            data = np.rint(data * (2**16))
+            data[data == 2**16] = (2**16) - 1
+            hist = np.histogram(data, bins=range((2**16)))
             pixel_histos[(r, ch)] = hist[0]
 
     # Estimate scaling factors using cumulative distribution of each images intensities
