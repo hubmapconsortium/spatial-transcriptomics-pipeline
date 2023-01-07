@@ -1,4 +1,4 @@
-FROM quay.io/ucsc_cgl/toil:5.7.1-b5cae9634820d76cb6c13b2a6312895122017d54-py3.9
+FROM quay.io/ucsc_cgl/toil:5.9.0a1-e1da83f8b3b45bad69facfacf86b5938aa07b92f-py3.9
 
 ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && apt-get install -y subversion && rm -rf /var/lib/apt/lists/*
