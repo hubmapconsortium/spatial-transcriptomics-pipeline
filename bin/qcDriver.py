@@ -25,15 +25,13 @@ from astropy.stats import RipleysKEstimator
 from matplotlib.backends.backend_pdf import PdfPages
 from matplotlib.lines import Line2D
 from scipy.stats import norm, skew
-from starfish import BinaryMaskCollection, Codebook, DecodedIntensityTable, ImageStack
+from starfish import BinaryMaskCollection, Codebook, DecodedIntensityTable
 from starfish.core.types import (
-    DecodedSpots,
-    Number,
     PerImageSliceSpotResults,
     SpotAttributes,
     SpotFindingResults,
 )
-from starfish.types import Axes, Coordinates, CoordinateValue, Features
+from starfish.types import Axes, Coordinates
 from tqdm import tqdm
 
 # utility methods

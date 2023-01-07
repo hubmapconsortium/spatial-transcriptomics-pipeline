@@ -7,26 +7,25 @@ import sys
 from argparse import ArgumentParser
 from datetime import datetime
 from pathlib import Path
-from shutil import copyfile
 from time import time
 from typing import List, Mapping, Union
 
-import click
 import numpy as np
 import pandas as pd
 import skimage.io
-import starfish
 import xarray as xr
 from slicedimage import ImageFormat
 from starfish import Codebook
 from starfish.experiment.builder import FetchedTile, TileFetcher, write_experiment_json
-from starfish.types import Axes, Coordinates, CoordinateValue, Features
+from starfish.types import Axes, Coordinates, CoordinateValue
 
 # below is modified from parsing example from starfish docs
 
 # We use this to cache images across tiles.  In the case of the osmFISH data set, volumes are saved
 # together in a single file.  To avoid reopening and decoding the TIFF file, we use a single-element
 # cache that maps between file_path and the npy file.
+
+
 @functools.lru_cache(maxsize=1)
 def cached_read_fn(file_path) -> np.ndarray:
     # return skimage.io.imread(file_path, format="tiff")

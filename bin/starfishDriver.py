@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 
+import os
 import operator as op
 import sys
 import time
@@ -9,14 +10,11 @@ from datetime import datetime
 from functools import partialmethod, reduce
 from os import makedirs, path
 from pathlib import Path
-from typing import Callable, Mapping, Optional, Set, Tuple, Union
+from typing import Callable, Tuple, Union
 
 import numpy as np
-import pandas as pd
 import starfish
 import starfish.data
-import xarray as xr
-from scipy.optimize import fsolve
 from scipy.spatial import distance
 from starfish import (
     Codebook,
@@ -25,12 +23,9 @@ from starfish import (
     ImageStack,
     IntensityTable,
 )
-from starfish.core.types import Number, SpotAttributes, SpotFindingResults
-from starfish.spots import AssignTargets
+from starfish.core.types import Number, SpotFindingResults
 from starfish.types import (
     Axes,
-    Coordinates,
-    CoordinateValue,
     Features,
     Levels,
     TraceBuildingStrategies,
@@ -556,7 +551,7 @@ def run(
                 row_sum = sum(row == 0)
                 if row_sum != channelsN or row_sum != 0:
                     ham_dist = 1
-                    decoded = add_corrected_rounds(codebook, decoded, ham_dist)
+                    decoded = add_corrected_rounds(experiment.codebook, decoded, ham_dist)
 
         # SimpleLookupDecoder will not have PASSES_THRESHOLDS
         if Features.PASSES_THRESHOLDS in decoded.coords and not not_filtered_results:
@@ -606,7 +601,7 @@ if __name__ == "__main__":
     p.add_argument("--detector-method", type=str, nargs="?")
     p.add_argument("--use-ref-img", dest="use_ref_img", action="store_true")
     p.set_defaults(use_ref_img=False)
-    ### aside, are we going to want to include the ability to run a sweep?
+    # == aside, are we going to want to include the ability to run a sweep?
 
     # decodeRunner kwargs
     p.add_argument("--decode-spots-method", type=str)
@@ -614,7 +609,7 @@ if __name__ == "__main__":
         "--trace-building-strategy", type=str, nargs="?"
     )  # only optional for SimpleLookupDecoder
 
-    ## MetricDistance
+    # == MetricDistance
     p.add_argument("--max-distance", type=float, nargs="?")
     p.add_argument("--min-intensity", type=float, nargs="?")
     p.add_argument("--metric", type=str, nargs="?")  # NOTE also used in pixelRunner
@@ -625,7 +620,7 @@ if __name__ == "__main__":
     )  # also used in PerRoundMaxChannel, CheckAll
     p.add_argument("--return-original-intensities", type=bool, nargs="?")
 
-    ## CheckAll
+    # == CheckAll
     p.add_argument("--error-rounds", type=int, nargs="?")
     p.add_argument("--mode", type=str, nargs="?")
     p.add_argument("--physical-coords", dest="physical_coords", action="store_true")
