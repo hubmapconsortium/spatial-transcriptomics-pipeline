@@ -8,7 +8,7 @@ requirements:
   DockerRequirement:
     #dockerPull: vpetukhov/baysor:v0.5.0
     #dockerPull: waltsbaysor:latest
-    dockerPull: hubmap/baysor:latest
+    dockerPull: hubmap/baysor:2.131
 
 inputs:
   csv:
