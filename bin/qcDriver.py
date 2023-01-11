@@ -1219,21 +1219,21 @@ def run(
                 doRipley=doRipley,
                 savePdf=savePdf,
             )
-        # running combined analysis on FOVs
-        # a bit hacky, but we are less likely to run into memory issues if we take the `results`
-        # output from the prior analyses and stich that together, compared to combining all
-        # prior results objects.
-        lens = {
-            "round": len(results[fovs[0]]["transcripts"]["round_dist"]["tally"]),
-            "channel": len(results[fovs[0]]["transcripts"]["channel_dist"]["tally"]),
-        }
-        if savePdf:
-            pdf = PdfPages(output_dir + "combined_graph_output.pdf")
-        else:
-            pdf = None
-
         # don't bother running these if we only have one fov.
         if len(fovs) > 1:
+            # running combined analysis on FOVs
+            # a bit hacky, but we are less likely to run into memory issues if we take the `results`
+            # output from the prior analyses and stich that together, compared to combining all
+            # prior results objects.
+            lens = {
+                "round": len(results[fovs[0]]["transcripts"]["round_dist"]["tally"]),
+                "channel": len(results[fovs[0]]["transcripts"]["channel_dist"]["tally"]),
+            }
+            if savePdf:
+                pdf = PdfPages(output_dir + "combined_graph_output.pdf")
+            else:
+                pdf = None
+
             print("Computing QC for combined FOVs")
 
             dims = [["transcripts", "round"], ["transcripts", "channel"]]
