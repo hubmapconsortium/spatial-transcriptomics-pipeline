@@ -551,6 +551,7 @@ def plotTranscriptDist(counts, name, pdf, transcripts=True):
     plt.close()
 
 
+# New version that plot bars in order of height
 def getFPR(segmentation=None, results=None, pdf=False):
     if segmentation is None and results is None:
         raise Exception("Either segmentation or results must be provided.")
@@ -641,89 +642,179 @@ def getFPR(segmentation=None, results=None, pdf=False):
         full_on_color = (0 / 256, 119 / 256, 187 / 256)
         full_off_color = (204 / 256, 51 / 256, 17 / 256)
 
+        # This next part orders the values and colors so that taller bars are plotted first and shorter bars later
+        # to ensure that as many bars as possible are visible. Ties are broken according to the category order in
+        # the hierarchy variable.
+        per_cell_values = []
+        per_cell_colors = []
+        if (segmentation is not None and "corrected_rounds" in segmentation.keys()) or (
+            results is not None and "reals_full" in results.keys()
+        ):
+            hierarchy = ["all_on", "full_on", "all_off", "full_off"][::-1]
+            for ind in sorted_reals_all.index:
+                values = pd.Series(
+                    [
+                        sorted_reals_all[ind],
+                        sorted_reals_full[ind],
+                        sorted_blanks_all[ind],
+                        sorted_blanks_full[ind],
+                    ],
+                    index=["all_on", "full_on", "all_off", "full_off"],
+                )
+                sorted_values = values.sort_values(ascending=False)
+                colors = pd.Series(
+                    [all_on_color, full_on_color, all_off_color, full_off_color],
+                    index=["all_on", "full_on", "all_off", "full_off"],
+                )[sorted_values.index]
+                counter = collections.Counter(sorted_values)
+                if sum(np.array(list(counter.values())) > 1) > 0:
+                    for value in counter:
+                        if counter[value] > 1:
+                            order = sorted_values[
+                                [
+                                    x
+                                    for x in hierarchy
+                                    if x in sorted_values[sorted_values == value].index
+                                ]
+                            ]
+                            value1_ind = np.where(sorted_values.index == order.index[0])[0][0]
+                            value2_ind = np.where(sorted_values.index == order.index[1])[0][0]
+                            if value1_ind > value2_ind:
+                                new_index = list(sorted_values.index)
+                                new_index[value1_ind] = sorted_values.index[value2_ind]
+                                new_index[value2_ind] = sorted_values.index[value1_ind]
+                                sorted_values = sorted_values[new_index]
+                                colors = colors[new_index]
+                per_cell_colors.append(list(colors))
+                per_cell_values.append(list(sorted_values))
+
+            bars1 = [values[0] for values in per_cell_values]
+            bars1_colors = [colors[0] for colors in per_cell_colors]
+            bars2 = [values[1] for values in per_cell_values]
+            bars2_colors = [colors[1] for colors in per_cell_colors]
+            bars3 = [values[2] for values in per_cell_values]
+            bars3_colors = [colors[2] for colors in per_cell_colors]
+            bars4 = [values[3] for values in per_cell_values]
+            bars4_colors = [colors[3] for colors in per_cell_colors]
+
+        else:
+            hierarchy = ["all_on", "all_off"][::-1]
+            for ind in sorted_reals_all.index:
+                values = pd.Series(
+                    [sorted_reals_all[ind], sorted_blanks_all[ind]], index=["all_on", "all_off"]
+                )
+                sorted_values = values.sort_values(ascending=False)
+                colors = pd.Series([all_on_color, all_off_color], index=["all_on", "all_off"])[
+                    sorted_values.index
+                ]
+                counter = collections.Counter(sorted_values)
+                if sum(np.array(list(counter.values())) > 1) > 0:
+                    for value in counter:
+                        if counter[value] > 1:
+                            order = sorted_values[
+                                [
+                                    x
+                                    for x in hierarchy
+                                    if x in sorted_values[sorted_values == value].index
+                                ]
+                            ]
+                            value1_ind = np.where(sorted_values.index == order.index[0])[0][0]
+                            value2_ind = np.where(sorted_values.index == order.index[1])[0][0]
+                            if value1_ind > value2_ind:
+                                new_index = list(sorted_values.index)
+                                new_index[value1_ind] = sorted_values.index[value2_ind]
+                                new_index[value2_ind] = sorted_values.index[value1_ind]
+                                sorted_values = sorted_values[new_index]
+                                colors = colors[new_index]
+                per_cell_colors.append(list(colors))
+                per_cell_values.append(list(sorted_values))
+
+            bars1 = [values[0] for values in per_cell_values]
+            bars1_colors = [colors[0] for colors in per_cell_colors]
+
+            bars2 = [values[1] for values in per_cell_values]
+            bars2_colors = [colors[1] for colors in per_cell_colors]
+
+        plt.bar(
+            range(len(bars1)),
+            bars1,
+            width=1,
+            align="edge",
+            color=bars1_colors,
+        )
+        plt.bar(
+            range(len(bars2)),
+            bars2,
+            width=1,
+            align="edge",
+            color=bars2_colors,
+        )
         if (segmentation is not None and "corrected_rounds" in segmentation.keys()) or (
             results is not None and "reals_full" in results.keys()
         ):
             plt.bar(
-                range(len(sorted_reals_all)),
-                sorted_reals_all,
+                range(len(bars3)),
+                bars3,
                 width=1,
-                label="On-target EC+NC",
                 align="edge",
-                color=all_on_color,
+                color=bars3_colors,
             )
             plt.bar(
-                range(len(sorted_reals_full)),
-                sorted_reals_full,
+                range(len(bars4)),
+                bars4,
                 width=1,
-                label="On-target NC",
                 align="edge",
-                color=full_on_color,
+                color=bars4_colors,
             )
-            plt.bar(
-                range(len(sorted_blanks_all)),
-                sorted_blanks_all,
-                width=1,
-                label="Off-target EC+NC",
-                align="edge",
-                color=all_off_color,
-            )
-            plt.bar(
-                range(len(sorted_blanks_full)),
-                sorted_blanks_full,
-                width=1,
-                label="Off-target NC",
-                align="edge",
-                color=full_off_color,
-            )
-            plt.plot(
-                [0, len(real_per_cell_all)],
-                [np.median(real_per_cell_all), np.median(real_per_cell_all)],
-                color="black",
-                label="EC+NC Median count",
-                linewidth=3,
-            )
+        plt.plot(
+            [0, len(real_per_cell_all)],
+            [np.median(real_per_cell_all), np.median(real_per_cell_all)],
+            color="black",
+            linewidth=3,
+        )
+        if (segmentation is not None and "corrected_rounds" in segmentation.keys()) or (
+            results is not None and "reals_full" in results.keys()
+        ):
             plt.plot(
                 [0, len(real_per_cell_full)],
                 [np.median(real_per_cell_full), np.median(real_per_cell_full)],
                 color="black",
                 linestyle="dashed",
-                label="NC Median count",
                 linewidth=3,
             )
 
+        # Create and plot legend
+        if (segmentation is not None and "corrected_rounds" in segmentation.keys()) or (
+            results is not None and "reals_full" in results.keys()
+        ):
+            proxy_all_on = mpatches.Patch(color=all_on_color, label="On-target EC+NC")
+            proxy_full_on = mpatches.Patch(color=full_on_color, label="On-target NC")
+            proxy_all_off = mpatches.Patch(color=all_off_color, label="Off-target EC+NC")
+            proxy_full_off = mpatches.Patch(color=full_off_color, label="Off-target NC")
+            solid_line = Line2D([0], [0], color="black", linestyle="solid", label="EC+NC Median")
+            dashed_line = Line2D([0], [0], color="black", linestyle="dashed", label="NC Median")
+            handles = [
+                proxy_all_on,
+                proxy_full_on,
+                proxy_all_off,
+                proxy_full_off,
+                solid_line,
+                dashed_line,
+            ]
         else:
-            plt.bar(
-                range(len(sorted_reals_all)),
-                sorted_reals_all,
-                width=1,
-                label="On-target",
-                align="edge",
-                color=all_on_color,
+            proxy_on = mpatches.Patch(color=all_on_color, label="On-target")
+            proxy_off = mpatches.Patch(color=all_off_color, label="Off-target")
+            solid_line = Line2D(
+                [0], [0], color="black", linestyle="solid", label="On-target Median"
             )
-            plt.bar(
-                range(len(sorted_blanks_all)),
-                sorted_blanks_all,
-                width=1,
-                label="Off-target",
-                align="edge",
-                color=all_off_color,
-            )
-            plt.plot(
-                [0, len(real_per_cell_all)],
-                [np.median(real_per_cell_all), np.median(real_per_cell_all)],
-                color="black",
-                label="Median count",
-                linewidth=3,
-            )
+            handles = [proxy_on, proxy_off, solid_line]
+        plt.legend(handles=handles)
 
         plt.xlabel("Cells")
         plt.ylabel("Total barcodes per cell")
         plt.xlim([0, len(real_per_cell_all)])
-        plt.ylim([0, max(max(real_per_cell_all), max(blank_per_cell_all)) * 1.1])
+        plt.ylim([0, max(max(real_per_cell_all), max(blank_per_cell_all)) * 1.05])
         plt.title("True positives vs False positives")
-
-        plt.legend()
 
         pdf.savefig(fig)
         plt.close()
@@ -854,13 +945,13 @@ def plotBarcodeAbundance(pdf, decoded=None, results=None):
         )
         plt.axhline(full_conf, color="black", label="Upper 95% CI NC", linestyle="dashed")
         plt.plot(
-            [len(full_counts) * 0.7, len(full_counts) * 0.7],
+            [len(all_counts) * 0.7, len(all_counts) * 0.7],
             [full_conf, get_y_offset(all_conf, disp_range / 10.9, ax)],
             color="black",
             linestyle="dashed",
         )
         plt.text(
-            len(full_counts) * 0.7,
+            len(all_counts) * 0.7,
             get_y_offset(all_conf, disp_range / 8.7, ax),
             f"{good_codes_full*100:.2f}% barcodes above {full_conf:.2f} threshold",
             horizontalalignment="center",
