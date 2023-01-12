@@ -756,13 +756,13 @@ if __name__ == "__main__":
     not_filtered_results = args.not_filtered_results
 
     level_method = args.level_method
-    if level_method == "SCALE_BY_CHUNK":
+    if level_method and level_method == "SCALE_BY_CHUNK":
         level_method = Levels.SCALE_BY_CHUNK
-    elif level_method == "SCALE_BY_IMAGE":
+    elif level_method and level_method == "SCALE_BY_IMAGE":
         level_method = Levels.SCALE_BY_IMAGE
-    elif level_method == "SCALE_SATURATED_BY_CHUNK":
+    elif level_method and level_method == "SCALE_SATURATED_BY_CHUNK":
         level_method = Levels.SCALE_SATURATED_BY_CHUNK
-    elif level_method == "SCALE_SATURATED_BY_IMAGE":
+    elif level_method and level_method == "SCALE_SATURATED_BY_IMAGE":
         level_method = Levels.SCALE_SATURATED_BY_IMAGE
     else:
         level_method = Levels.SCALE_BY_IMAGE
