@@ -164,13 +164,17 @@ def blobDriver(
     #        v.spot_attrs = SpotAttributes(high)
     #    print(f"removed spots below threshold, now {blob.count_total_spots()} total spots")
     # blobs[fov] = blob
-    if output_dir:
-        blob.save(output_name)
-        print("spots saved.")
-    start = time.time()
-    decoded = decodeRunner(blob, codebook, **decodeRunnerKwargs)
-    print("decodeRunner", time.time() - start)
-    return blob, decoded
+    if blob.count_total_spots() > 0:
+        if output_dir:
+            blob.save(output_name)
+            print("spots saved.")
+        start = time.time()
+        decoded = decodeRunner(blob, codebook, **decodeRunnerKwargs)
+        print("decodeRunner", time.time() - start)
+        return blob, decoded
+    else:
+        print("Skipping decoding step.")
+        return blob, DecodedIntensityTable()
 
 
 def init_scale(img: ImageStack):
@@ -564,10 +568,13 @@ def run(
             decoded = decoded.loc[decoded[Features.PASSES_THRESHOLDS]]
             decoded = decoded[decoded.target != "nan"]
 
-        saveTable(decoded, output_dir + "csv/" + fov + "_decoded.csv")
-        # decoded[fov].to_decoded_dataframe().save_csv(output_dir+fov+"_decoded.csv")
-        decoded.to_netcdf(output_dir + "cdf/" + fov + "_decoded.cdf")
-        print(f"Saved cdf file {output_dir}cdf/{fov}_decoded.cdf")
+        if len(decoded) > 0:
+            saveTable(decoded, output_dir + "csv/" + fov + "_decoded.csv")
+            # decoded[fov].to_decoded_dataframe().save_csv(output_dir+fov+"_decoded.csv")
+            decoded.to_netcdf(output_dir + "cdf/" + fov + "_decoded.cdf")
+            print(f"Saved cdf file {output_dir}cdf/{fov}_decoded.cdf")
+        else:
+            print(f"No transcripts found for {fov}! Not saving a DecodedIntensityTable file.")
 
         # can run into memory problems, doing this preemptively.
         del img

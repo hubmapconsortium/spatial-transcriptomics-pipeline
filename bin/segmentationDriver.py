@@ -524,7 +524,6 @@ def run(
     input_loc: Path,
     exp_loc: Path,
     output_loc: str,
-    fov_count: int,
     aux_name: str,
     roiKwargs: dict,
     labeledKwargs: dict,
@@ -542,8 +541,6 @@ def run(
         Directory that contains "experiment.json" file for the experiment.
     output_loc: str
         Path to directory where output will be saved.
-    fov_count: int
-        The number of FOVs in the experiment.
     aux_name: str
         The name of the auxillary view to look at for image segmentation.
     roiKwargs: dict
@@ -605,7 +602,7 @@ def run(
     # TODO: rearrange this to be more memory efficient by only loading in one image at a time.
     if "nuclei_view" in densityKwargs:
         nuclei_imgs = {}
-        for key in exp.keys():
+        for key in keys:
             nuclei_imgs[key] = exp[key].get_image(densityKwargs["nuclei_view"])
         del densityKwargs["nuclei_view"]
         for i in range(len(keys)):
@@ -621,7 +618,7 @@ def run(
 
     else:
         img_stack = []
-        for key in exp.keys():
+        for key in keys:
             print(f"looking at {key}, {aux_name}")
             cur_img = exp[key].get_image(aux_name)
             img_stack.append(cur_img)
@@ -652,7 +649,7 @@ def run(
 
     # apply mask to tables, save results
     al = AssignTargets.Label()
-    for i in range(fov_count):
+    for i in range(len(masks)):
         labeled = al.run(masks[i], results[i])
         # labeled = labeled[labeled.cell_id != "nan"]
         if "xc" not in labeled.features.coords:
@@ -676,6 +673,9 @@ def run(
         labeled.to_expression_matrix().save_anndata(output_dir + keys[i] + "/exp_segmented.h5ad")
         print("saved fov key: {}, index {}".format(keys[i], i))
 
+    if len(masks) == 0:
+        print("No FOVs found! Did the decoding step complete correctly?")
+
     sys.stdout = sys.__stdout__
 
 
@@ -690,7 +690,6 @@ if __name__ == "__main__":
     p = ArgumentParser()
 
     p.add_argument("--decoded-loc", type=Path)
-    p.add_argument("--fov-count", type=int)
     p.add_argument("--exp-loc", type=Path)
     p.add_argument("--aux-name", type=str, nargs="?")
 
@@ -721,7 +720,6 @@ if __name__ == "__main__":
 
     args = p.parse_args()
 
-    fov_count = args.fov_count
     input_dir = args.decoded_loc
     exp_dir = args.exp_loc
     aux_name = args.aux_name
@@ -755,7 +753,6 @@ if __name__ == "__main__":
         input_dir,
         exp_dir,
         output_dir,
-        fov_count,
         aux_name,
         roiKwargs,
         labeledKwargs,

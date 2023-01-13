@@ -894,7 +894,6 @@ steps:
       exp_loc: spaceTxConversion/spaceTx_converted
       parameter_json: parameter_json
       aux_name: aux_name
-      fov_count: fov_count
       binary_mask:
         source: [binary_mask, mask_roi_files, mask_roi_formats, mask_labeled_files, mask_labeled_formats]
         valueFrom: |

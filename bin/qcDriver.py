@@ -499,9 +499,7 @@ def getTranscriptDist(transcripts):
     chlTotal = sum(chlTally)
     chlTally = [r / chlTotal for r in chlTally]
     omitTotal = sum(omitTally)
-    if omitTotal != 0:
-        omitTally = [r / omitTotal for r in omitTally]
-    return {
+    results = {
         "round": {
             "tally": rndTally,
             "stdev": np.std(rndTally),
@@ -514,13 +512,16 @@ def getTranscriptDist(transcripts):
             "skew": skew(chlTally),
             "total": chlTotal,
         },
-        "omit_round": {
+    }
+    if omitTotal != 0:
+        omitTally = [r / omitTotal for r in omitTally]
+        results["omit_round"] = {
             "tally": omitTally,
             "stdev": np.std(omitTally),
             "skew": skew(omitTally),
             "total": omitTotal,
-        },
-    }
+        }
+    return results
 
 
 def plotTranscriptDist(counts, name, pdf, transcripts=True):
@@ -1484,7 +1485,7 @@ if __name__ == "__main__":
             exp = starfish.core.experiment.experiment.Experiment.from_json(
                 str(args.codebook_exp) + "/experiment.json"
             )
-            img = exp["fov_000"].get_image("primary")
+            img = exp[list(exp.keys())[0]].get_image("primary")
             roi = BinaryMaskCollection.from_fiji_roi_set(
                 path_to_roi_set_zip=args.roi, original_image=img
             )
@@ -1511,15 +1512,17 @@ if __name__ == "__main__":
     if args.exp_output:
         # reading in from experiment can have multiple FOVs
         fovs = [k for k in transcripts.keys()]
-    run(
-        transcripts=transcripts,
-        codebook=codebook,
-        size=size,
-        fovs=fovs,
-        spots=spots,
-        spot_threshold=spot_threshold,
-        segmask=roi,
-        segmentation=segmentation,
-        doRipley=args.run_ripley,
-        savePdf=args.save_pdf,
-    )
+    if not args.exp_output or len(transcripts.keys()) > 0:
+        # only run QC if we actually have input.
+        run(
+            transcripts=transcripts,
+            codebook=codebook,
+            size=size,
+            fovs=fovs,
+            spots=spots,
+            spot_threshold=spot_threshold,
+            segmask=roi,
+            segmentation=segmentation,
+            doRipley=args.run_ripley,
+            savePdf=args.save_pdf,
+        )
