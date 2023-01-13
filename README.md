@@ -217,7 +217,7 @@ The following are used in `starfishRunner.cwl`, which is effectively a wrapper f
     Order of L_p norm to apply to intensities and codes when using metric_decode to pair each intensity to its closest target.  Defaults to 2.
 
 ### Segmentation
-Used by `segmentation.cwl`. Results from this step will automatically be run through Baysor unless `skip_baysor` is set to `True`.  Depending on pre-existing segmentation data, one of three methods can be used.
+Used by `segmentation.cwl`. Results from this step will be run through Baysor if `run_baysor` is set to `True`.  Depending on pre-existing segmentation data, one of three methods can be used.
 - `aux_name` *string?*
   The name of the aux view to look at for segmentation. May not required depending on `binary_mask` settings.
 - `binary_mask`
