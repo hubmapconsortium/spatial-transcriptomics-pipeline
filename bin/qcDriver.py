@@ -1382,9 +1382,12 @@ def run(
             trRes["barcode_counts"] = plotBarcodeAbundance(results=barcodeTallies, pdf=pdf)
 
             # don't forget to re-add the parametrized dist metrics
-            spotRes.update(newRes["spots"])
             trRes.update(newRes["transcripts"])
-            results["combined"] = {"spots": spotRes, "transcripts": trRes}
+            if spots:
+                spotRes.update(newRes["spots"])
+                results["combined"] = {"spots": spotRes, "transcripts": trRes}
+            else:
+                results["combined"] = {"transcripts": trRes}
 
             if savePdf:
                 pdf.close()
