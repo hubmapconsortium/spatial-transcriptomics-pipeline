@@ -81,8 +81,8 @@ def filterSpots(spots, mask, oneIndex=False, invert=False):
                 and maskMat[int(row["y"]) - oneIndex][int(row["x"]) - oneIndex] == 1
             ) or (
                 len(maskMat.shape) == 3
-                and maskMat[int(row["y"]) - oneIndex][int(row["x"]) - oneIndex][
-                    int(row["z"] - oneIndex)
+                and maskMat[int(row["z"]) - oneIndex][int(row["y"]) - oneIndex][
+                    int(row["x"] - oneIndex)
                 ]
                 == 1
             ):
@@ -1497,6 +1497,11 @@ if __name__ == "__main__":
             for f in transcripts.keys():
                 maskloc = "{}/{}/mask.tiff".format(args.segmentation_loc, f)
                 roi[f] = skimage.io.imread(maskloc)
+                # If 3D check dimensions and make sure always (z, y, x). skimage sometimes
+                # moves the z dimension last.
+                if len(roi[f].shape) == 3:
+                    if roi[f].shape[0] > roi[f].shape[2]:
+                        roi[f] = np.transpose(roi[f], axes=[2, 0, 1])
 
     elif args.codebook_pkl:
         codebook = pickle.load(open(args.codebook_pkl, "rb"))
