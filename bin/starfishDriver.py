@@ -527,12 +527,10 @@ def run(
 
         ref_img = None
         if use_ref:
-            ref_img = img.reduce({Axes.CH, Axes.ROUND, Axes.ZPLANE}, func="max")
+            ref_img = img.reduce({Axes.CH, Axes.ROUND}, func="max")
         if anchor_name:
             ref_img = (
-                experiment[fov]
-                .get_image(anchor_name)
-                .reduce({Axes.CH, Axes.ROUND, Axes.ZPLANE}, func="max")
+                experiment[fov].get_image(anchor_name).reduce({Axes.CH, Axes.ROUND}, func="max")
             )
 
         if rescale:
