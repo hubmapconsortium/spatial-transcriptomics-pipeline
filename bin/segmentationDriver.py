@@ -701,7 +701,7 @@ def run(
             temp = labeled.to_dict()
             temp["coords"]["zc"] = temp["coords"]["z"]
             labeled = DecodedIntensityTable.from_dict(temp)
-        labeled.to_decoded_dataframe().save_csv(output_dir + keys[i] + "/segmentation.csv")
+        labeled.to_features_dataframe().save_csv(output_dir + keys[i] + "/segmentation.csv")
         labeled.to_netcdf(output_dir + keys[i] + "/df_segmented.cdf")
         labeled.to_expression_matrix().to_pandas().to_csv(
             output_dir + keys[i] + "/exp_segmented.csv"
