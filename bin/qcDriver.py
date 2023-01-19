@@ -845,7 +845,7 @@ def plotBarcodeAbundance(pdf, decoded=None, results=None):
     # Set scale, axis limits, axis labels, and plot title
     ax.set_yscale("log")
     plt.xlim([0, len(all_counts)])
-    plt.ylim([0.9, max(all_counts) * 1.1])
+    plt.ylim([0.9, max(all_counts) * 5])
     plt.xlabel("Barcodes")
     plt.ylabel("Total counts per barcode")
     plt.title("Relative abundance of barcodes")
