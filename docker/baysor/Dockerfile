@@ -1,5 +1,6 @@
 # based on https://github.com/kharchenkolab/Baysor/blob/master/Dockerfile
-# version of image in dockerhub breaks in cwltool due to included CMD line.
+# retrieved 2023.01.18
+# version of this image in dockerhub breaks in cwltool due to included CMD line.
 
 FROM julia:latest
 

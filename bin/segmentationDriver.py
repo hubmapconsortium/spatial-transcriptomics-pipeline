@@ -648,7 +648,7 @@ def run(
                 nuclei=nuclei_imgs[keys[i]], decoded_targets=results[i], **densityKwargs
             )
             maskname = f"{output_dir}/{keys[i]}/mask.tiff"
-            skimage.io.imsave(maskname, raw_mask)
+            skimage.io.imsave(maskname, np.squeeze(raw_mask))
             masks.append(
                 BinaryMaskCollection.from_external_labeled_image(maskname, nuclei_imgs[keys[i]])
             )
@@ -678,11 +678,8 @@ def run(
 
         # save masks to tiffs for later processing
         for i in range(len(masks)):
-            binmask = masks[i].to_label_image().xarray.values
-            while len(binmask.shape) > 2:
-                binmask = np.sum(binmask, axis=0)
-            binmask = binmask > 0
-            PIL.Image.fromarray(binmask).save("{}/{}/mask.tiff".format(output_dir, keys[i]))
+            intmask = masks[i].to_label_image().xarray.values
+            skimage.io.imsave(f"{output_dir}/{keys[i]}/mask.tiff", np.squeeze(intmask))
 
     # apply mask to tables, save results
     al = AssignTargets.Label()
@@ -701,7 +698,7 @@ def run(
             temp = labeled.to_dict()
             temp["coords"]["zc"] = temp["coords"]["z"]
             labeled = DecodedIntensityTable.from_dict(temp)
-        labeled.to_features_dataframe().save_csv(output_dir + keys[i] + "/segmentation.csv")
+        labeled.to_features_dataframe().to_csv(output_dir + keys[i] + "/segmentation.csv")
         labeled.to_netcdf(output_dir + keys[i] + "/df_segmented.cdf")
         labeled.to_expression_matrix().to_pandas().to_csv(
             output_dir + keys[i] + "/exp_segmented.csv"
