@@ -416,7 +416,7 @@ def cli(
                 clip.run(anchor, in_place=True)
 
         else:
-            print("\tskipping clip and scale, will be performed during rescaling.")
+            print("\tskipping clip and scale.")
 
         print(f"\tView {fov} complete")
         # save modified image
