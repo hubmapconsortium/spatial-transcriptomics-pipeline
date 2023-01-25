@@ -401,7 +401,7 @@ def cli(
             print("\taligning to " + aux_name)
             img = register_primary(img, register, ch_per_reg)
 
-        if not rescale:
+        if not rescale and not (clip_min == 0 and clip_max == 0):
             print("\tclip and scaling...")
             # Scale image, clipping all but the highest intensities to zero
             clip = starfish.image.Filter.ClipPercentileToZero(
