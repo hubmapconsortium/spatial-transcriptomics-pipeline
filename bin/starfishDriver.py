@@ -744,11 +744,11 @@ def run(
     if blob_based and not path.isdir(output_dir + "spots/"):
         makedirs(output_dir + "spots")
 
-    # reporter = open(
-    #    path.join(output_dir, datetime.now().strftime("%Y%m%d_%H%M_starfish_runner.log")), "w"
-    # )
-    # sys.stdout = reporter
-    # sys.stderr = reporter
+    reporter = open(
+        path.join(output_dir, datetime.now().strftime("%Y%m%d_%H%M_starfish_runner.log")), "w"
+    )
+    sys.stdout = reporter
+    sys.stderr = reporter
 
     print(locals())
 
