@@ -461,9 +461,9 @@ inputs:
           doc:  Pixel size labels are dilated by in final step. Helpful for closing small holes that are common from thresholding but can also cause cell boundaries to exceed their true boundaries if set too high. Label dilation respects label borders and does not mix labels.
 
 # QC
-  skip_baysor:
+  run_baysor:
     type: boolean?
-    doc: If true, the baysor step will be skipped.
+    doc: If true, the baysor step will be run.
     default: false
 
   find_ripley:
@@ -530,7 +530,7 @@ steps:
     in:
       datafile: parameter_json
       schema: read_schema/data
-    out: [skip_baysor, skip_processing, register_aux_view, fov_positioning_x_locs, fov_positioning_x_shape, fov_positioning_x_voxel, fov_positioning_y_locs, fov_positioning_y_shape, fov_positioning_y_voxel, fov_positioning_z_locs, fov_positioning_z_shape, fov_positioning_z_voxel, add_blanks]
+    out: [run_baysor, skip_processing, register_aux_view, fov_positioning_x_locs, fov_positioning_x_shape, fov_positioning_x_voxel, fov_positioning_y_locs, fov_positioning_y_shape, fov_positioning_y_voxel, fov_positioning_z_locs, fov_positioning_z_shape, fov_positioning_z_voxel, add_blanks]
     when: $(inputs.datafile != null)
 
   sorter:
@@ -894,7 +894,6 @@ steps:
       exp_loc: spaceTxConversion/spaceTx_converted
       parameter_json: parameter_json
       aux_name: aux_name
-      fov_count: fov_count
       binary_mask:
         source: [binary_mask, mask_roi_files, mask_roi_formats, mask_labeled_files, mask_labeled_formats]
         valueFrom: |
@@ -921,8 +920,8 @@ steps:
   baysorStaged:
     run: steps/baysorStaged.cwl
     in:
-      skip_baysor:
-        source: [stage/skip_baysor, skip_baysor]
+      run_baysor:
+        source: [stage/run_baysor, run_baysor]
         valueFrom: |
           ${
             if(self[0]||self[1]){
@@ -932,7 +931,7 @@ steps:
             };
           }
       segmented: segmentation/segmented
-    when: $(inputs.skip_baysor == false)
+    when: $(inputs.run_baysor == true)
     out:
       [baysor]
 

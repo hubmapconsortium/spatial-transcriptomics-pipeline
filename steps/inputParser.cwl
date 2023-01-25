@@ -106,7 +106,7 @@ outputs:
   binary_mask_thresh_block_size: int
   binary_mask_watershed_footprint_size: int
   binary_mask_label_exp_size: int
-  skip_baysor: boolean
+  run_baysor: boolean
   find_ripley: boolean
   save_pdf: boolean
 

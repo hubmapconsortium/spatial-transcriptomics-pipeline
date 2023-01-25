@@ -8,11 +8,9 @@ from functools import partialmethod
 from glob import glob
 from os import makedirs, path
 from pathlib import Path
-from typing import List
 
 import cv2
 import numpy as np
-import PIL
 import skimage
 import starfish
 import starfish.data
@@ -27,16 +25,18 @@ from starfish.types import Axes, Levels
 from tqdm import tqdm
 
 
-def masksFromRoi(
-    img_stack: List[ImageStack], roi_set: Path, file_formats: str
-) -> List[BinaryMaskCollection]:
+def maskFromRoi(
+    img: ImageStack, fov: str, roi_set: Path, file_formats: str
+) -> BinaryMaskCollection:
     """
-    Return a list of masks from provided RoiSet.zip files.
+    Return a mask from provided RoiSet.zip files.
 
     Parameters
     ----------
-    img_stack: list[ImageStack]
-        The images that the masks are to be applied to, provided per FOV.
+    img: ImageStack
+        The image that the mask is to be applied to.
+    fov: str
+        The name of the fov that we need to segment.
     roi_set: Path
         Directory containing RoiSet files.
     file_formats: str
@@ -47,23 +47,23 @@ def masksFromRoi(
     list[BinaryMaskCollection]:
         Binary masks for each FOV.
     """
-    masks = []
-    for i in range(len(img_stack)):
-        mask_name = ("{}/" + file_formats).format(roi_set, i)
-        masks.append(BinaryMaskCollection.from_fiji_roi_set(mask_name, img_stack[i]))
-    return masks
+    i = int(fov[-3:])
+    mask_name = ("{}/" + file_formats).format(roi_set, i)
+    return BinaryMaskCollection.from_fiji_roi_set(mask_name, img)
 
 
-def masksFromLabeledImages(
-    img_stack: List[ImageStack], labeled_image: Path, file_formats_labeled: str
-) -> List[BinaryMaskCollection]:
+def maskFromLabeledImages(
+    img: ImageStack, fov: str, labeled_image: Path, file_formats_labeled: str
+) -> BinaryMaskCollection:
     """
-    Returns a list of masks from the provided labeled images.
+    Returns a mask from the provided labeled images.
 
     Parameters
     ----------
-    img_stack: list[ImageStack]
-        The images that the masks will be applied to, provided per FOV.
+    img: ImageStack
+        The image that the masks will be applied to.
+    fov: str
+        The name of the fov that we need to segment.
     labeled_image: Path
         Directory of labeled images with image segmentation data, such as from ilastik classification.
     file_formats_labeled: str
@@ -71,24 +71,22 @@ def masksFromLabeledImages(
 
     Returns
     -------
-    list[BinaryMaskCollection]:
-        Binary masks for each FOV.
+    BinaryMaskCollection:
+        Binary mask.
     """
-    masks = []
-    for i in range(len(img_stack)):
-        label_name = ("{}/" + file_formats_labeled).format(labeled_image, i)
-        masks.append(BinaryMaskCollection.from_external_labeled_image(label_name, img_stack[i]))
-    return masks
+    i = int(fov[-3:])
+    label_name = ("{}/" + file_formats_labeled).format(labeled_image, i)
+    return BinaryMaskCollection.from_external_labeled_image(label_name, img)
 
 
-def masksFromWatershed(
-    img_stack: List[ImageStack],
+def maskFromWatershed(
+    img: ImageStack,
     img_threshold: float,
     min_dist: int,
     min_size: int,
     max_size: int,
     masking_radius: int,
-) -> List[BinaryMaskCollection]:
+) -> BinaryMaskCollection:
     """
     Runs a primitive thresholding and watershed pipeline to generate segmentation masks.
 
@@ -107,8 +105,8 @@ def masksFromWatershed(
 
     Returns
     -------
-    list[BinaryMaskCollection]:
-        Binary masks for each FOV.
+    BinaryMaskCollection:
+        Binary masks for this FOV.
     """
     wt_filt = ImgFilter.WhiteTophat(masking_radius, is_volume=False)
     thresh_filt = Binarize.ThresholdBinarize(img_threshold)
@@ -116,16 +114,13 @@ def masksFromWatershed(
     area_filt = Filter.AreaFilter(min_area=min_size, max_area=max_size)
     area_mask = Filter.Reduce("logical_or", lambda shape: np.zeros(shape=shape, dtype=bool))
     segmenter = Segment.WatershedSegment()
-    masks = []
-    for img in img_stack:
-        img_flat = img.reduce({Axes.ROUND, Axes.CH}, func="max")
-        working_img = wt_filt.run(img_flat, in_place=False)
-        working_img = thresh_filt.run(working_img)
-        labeled = min_dist_label.run(working_img)
-        working_img = area_filt.run(labeled)
-        working_img = area_mask.run(working_img)
-        masks.append(segmenter.run(img_flat, labeled, working_img))
-    return masks
+    img_flat = img.reduce({Axes.ROUND, Axes.CH}, func="max")
+    working_img = wt_filt.run(img_flat, in_place=False)
+    working_img = thresh_filt.run(working_img)
+    labeled = min_dist_label.run(working_img)
+    working_img = area_filt.run(labeled)
+    working_img = area_mask.run(working_img)
+    return segmenter.run(img_flat, labeled, working_img)
 
 
 def _clip_percentile_to_zero(image, p_min, p_max, min_coeff=1, max_coeff=1):
@@ -471,6 +466,7 @@ def segmentByDensity(
     thresh_block_size=51,
     watershed_footprint_size=100,
     label_exp_size=20,
+    nuclei_view="",
 ):
 
     """
@@ -492,6 +488,7 @@ def segmentByDensity(
         label_exp_size: Pixel size labels are dilated by in final step. Helpful for closing small holes that are
                         common from thresholding but can also cause cell boundaries to exceed their true boundaries
                         if set too high. Label dilation respects label borders and does not mix labels.
+        nuclei_view: dummy variable to prevent issues with how we load in kwargs.
     """
 
     # TODO: Currently only works for 2D images, will modify to work with 3D images that are treated as stacks of
@@ -561,7 +558,6 @@ def run(
     input_loc: Path,
     exp_loc: Path,
     output_loc: str,
-    fov_count: int,
     aux_name: str,
     roiKwargs: dict,
     labeledKwargs: dict,
@@ -579,8 +575,6 @@ def run(
         Directory that contains "experiment.json" file for the experiment.
     output_loc: str
         Path to directory where output will be saved.
-    fov_count: int
-        The number of FOVs in the experiment.
     aux_name: str
         The name of the auxillary view to look at for image segmentation.
     roiKwargs: dict
@@ -619,14 +613,11 @@ def run(
     #    print("made " + output_dir + "h5ad")
 
     # read in netcdfs based on how we saved prev step
-    results = []
-    keys = []
-    masks = []
+    results = {}
     for f in glob("{}/cdf/*_decoded.cdf".format(input_loc)):
-        results.append(DecodedIntensityTable.open_netcdf(f))
         name = f[len(str(input_loc)) + 5 : -12]
         print("found fov key: " + name)
-        keys.append(name)
+        results[name] = DecodedIntensityTable.open_netcdf(f)
         print("loaded " + f)
         if not path.isdir(output_dir + name):
             makedirs(output_dir + name)
@@ -639,79 +630,53 @@ def run(
     print("loaded " + str(exp_loc / "experiment.json"))
 
     # IF WE'RE DOING DENSITY BASED, THAT's DIFFERENT'
-    # TODO: rearrange this to be more memory efficient by only loading in one image at a time.
-    if "nuclei_view" in densityKwargs:
-        nuclei_imgs = {}
-        for key in exp.keys():
-            nuclei_imgs[key] = exp[key].get_image(densityKwargs["nuclei_view"])
-        del densityKwargs["nuclei_view"]
-        for i in range(len(keys)):
-            print(f"Segmenting {keys[i]}")
+    for key in results.keys():
+        if "nuclei_view" in densityKwargs:
+            nuclei_img = exp[key].get_image(densityKwargs["nuclei_view"])
+            print(f"Segmenting {key}")
             raw_mask = segmentByDensity(
-                nuclei=nuclei_imgs[keys[i]], decoded_targets=results[i], **densityKwargs
+                nuclei=nuclei_img, decoded_targets=results[key], **densityKwargs
             )
-            maskname = f"{output_dir}/{keys[i]}/mask.tiff"
-            skimage.io.imsave(maskname, raw_mask)
-            masks.append(
-                BinaryMaskCollection.from_external_labeled_image(maskname, nuclei_imgs[keys[i]])
-            )
-
-    else:
-        img_stack = []
-        for key in exp.keys():
+            maskname = f"{output_dir}/{key}/mask.tiff"
+            skimage.io.imsave(maskname, np.squeeze(raw_mask))
+            mask = BinaryMaskCollection.from_external_labeled_image(maskname, nuclei_img)
+        else:
             print(f"looking at {key}, {aux_name}")
             cur_img = exp[key].get_image(aux_name)
-            img_stack.append(cur_img)
-        # determine how we generate mask, then make it
-        if len(roiKwargs.keys()) > 0:
-            # then apply roi
-            print("applying Roi mask")
-            masks = masksFromRoi(img_stack, **roiKwargs)
-        elif len(labeledKwargs.keys()) > 0:
-            # then apply images
-            print("applying labeled image mask")
-            masks = masksFromLabeledImages(img_stack, **labeledKwargs)
-        elif len(watershedKwargs.keys()) > 0:
-            # then go thru watershed pipeline
-            print("running basic threshold and watershed pipeline")
-            masks = masksFromWatershed(img_stack, **watershedKwargs)
-        else:
-            # throw error
-            raise Exception("Parameters do not specify means of defining mask.")
+            # determine how we generate mask, then make it
+            if len(roiKwargs.keys()) > 0:
+                # then apply roi
+                print("applying Roi mask")
+                mask = maskFromRoi(cur_img, key, **roiKwargs)
+            elif len(labeledKwargs.keys()) > 0:
+                # then apply images
+                print("applying labeled image mask")
+                mask = maskFromLabeledImages(cur_img, key, **labeledKwargs)
+            elif len(watershedKwargs.keys()) > 0:
+                # then go thru watershed pipeline
+                print("running basic threshold and watershed pipeline")
+                mask = maskFromWatershed(cur_img, **watershedKwargs)
+            else:
+                # throw error
+                raise Exception("Parameters do not specify means of defining mask.")
 
-        # save masks to tiffs for later processing
-        for i in range(len(masks)):
-            binmask = masks[i].to_label_image().xarray.values
-            while len(binmask.shape) > 2:
-                binmask = np.sum(binmask, axis=0)
-            binmask = binmask > 0
-            PIL.Image.fromarray(binmask).save("{}/{}/mask.tiff".format(output_dir, keys[i]))
+            # save masks to tiffs for later processing
+            intmask = mask.to_label_image().xarray.values
+            skimage.io.imsave(f"{output_dir}/{key}/mask.tiff", np.squeeze(intmask))
 
-    # apply mask to tables, save results
-    al = AssignTargets.Label()
-    for i in range(fov_count):
-        labeled = al.run(masks[i], results[i])
+        # apply mask to tables, save results
+        al = AssignTargets.Label()
+        labeled = al.run(mask, results[key])
         # labeled = labeled[labeled.cell_id != "nan"]
-        if "xc" not in labeled.features.coords:
-            temp = labeled.to_dict()
-            temp["coords"]["xc"] = temp["coords"]["x"]
-            labeled = DecodedIntensityTable.from_dict(temp)
-        if "yc" not in labeled.features.coords:
-            temp = labeled.to_dict()
-            temp["coords"]["yc"] = temp["coords"]["y"]
-            labeled = DecodedIntensityTable.from_dict(temp)
-        if "zc" not in labeled.features.coords:
-            temp = labeled.to_dict()
-            temp["coords"]["zc"] = temp["coords"]["z"]
-            labeled = DecodedIntensityTable.from_dict(temp)
-        labeled.to_decoded_dataframe().save_csv(output_dir + keys[i] + "/segmentation.csv")
-        labeled.to_netcdf(output_dir + keys[i] + "/df_segmented.cdf")
-        labeled.to_expression_matrix().to_pandas().to_csv(
-            output_dir + keys[i] + "/exp_segmented.csv"
-        )
-        labeled.to_expression_matrix().save(output_dir + keys[i] + "/exp_segmented.cdf")
-        labeled.to_expression_matrix().save_anndata(output_dir + keys[i] + "/exp_segmented.h5ad")
-        print("saved fov key: {}, index {}".format(keys[i], i))
+        labeled.to_features_dataframe().to_csv(output_dir + key + "/segmentation.csv")
+        labeled.to_netcdf(output_dir + key + "/df_segmented.cdf")
+        labeled.to_expression_matrix().to_pandas().to_csv(output_dir + key + "/exp_segmented.csv")
+        labeled.to_expression_matrix().save(output_dir + key + "/exp_segmented.cdf")
+        labeled.to_expression_matrix().save_anndata(output_dir + key + "/exp_segmented.h5ad")
+        print("saved fov key: {}".format(key))
+
+    if len(results) == 0:
+        print("No FOVs found! Did the decoding step complete correctly?")
 
     sys.stdout = sys.__stdout__
 
@@ -727,7 +692,6 @@ if __name__ == "__main__":
     p = ArgumentParser()
 
     p.add_argument("--decoded-loc", type=Path)
-    p.add_argument("--fov-count", type=int)
     p.add_argument("--exp-loc", type=Path)
     p.add_argument("--aux-name", type=str, nargs="?")
 
@@ -758,7 +722,6 @@ if __name__ == "__main__":
 
     args = p.parse_args()
 
-    fov_count = args.fov_count
     input_dir = args.decoded_loc
     exp_dir = args.exp_loc
     aux_name = args.aux_name
@@ -792,7 +755,6 @@ if __name__ == "__main__":
         input_dir,
         exp_dir,
         output_dir,
-        fov_count,
         aux_name,
         roiKwargs,
         labeledKwargs,

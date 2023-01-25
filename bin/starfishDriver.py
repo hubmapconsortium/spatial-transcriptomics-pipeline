@@ -772,6 +772,7 @@ def run(
             experiment, exploc, anchor_name, is_volume, level_method, compositeKwargs
         )
 
+<<<<<<< master
         # Find spots and decode the composite image
         blobs, decoded = blobDriver(
             composite_img,
@@ -781,6 +782,15 @@ def run(
             decodeRunnerKwargs,
             output_name=f"{output_dir}spots/composite_",
         )
+=======
+        ref_img = None
+        if use_ref:
+            ref_img = img.reduce({Axes.CH, Axes.ROUND}, func="max")
+        if anchor_name:
+            ref_img = (
+                experiment[fov].get_image(anchor_name).reduce({Axes.CH, Axes.ROUND}, func="max")
+            )
+>>>>>>> master
 
         # Save composite results
         if len(decoded) > 0:
@@ -789,6 +799,7 @@ def run(
             decoded.to_netcdf(output_dir + "cdf/composite_decoded.cdf")
             print(f"Saved cdf file {output_dir}cdf/composite_decoded.cdf")
         else:
+<<<<<<< master
             print(f"No transcripts found for composite! Not saving a DecodedIntensityTable file.")
 
         # Saves per FOV spots and decoded results
@@ -863,6 +874,38 @@ def run(
             del ref_img
             del decoded
             print("Total driver time", time.time() - start0)
+=======
+            decoded = pixelDriver(img, experiment.codebook, **pixelRunnerKwargs)[0]
+            print(f"Found {len(decoded)} transcripts with pixelDriver")
+
+            # If applicable add "corrected_rounds" field
+
+            # Check that codebook is not one-hot
+            for row in experiment.codebook[0].data:
+                row_sum = sum(row == 0)
+                if row_sum != len(experiment.codebook["c"]) or row_sum != 0:
+                    ham_dist = 1
+                    decoded = add_corrected_rounds(experiment.codebook, decoded, ham_dist)
+
+        # SimpleLookupDecoder will not have PASSES_THRESHOLDS
+        if Features.PASSES_THRESHOLDS in decoded.coords and not not_filtered_results:
+            decoded = decoded.loc[decoded[Features.PASSES_THRESHOLDS]]
+            decoded = decoded[decoded.target != "nan"]
+
+        if len(decoded) > 0:
+            saveTable(decoded, output_dir + "csv/" + fov + "_decoded.csv")
+            # decoded[fov].to_decoded_dataframe().save_csv(output_dir+fov+"_decoded.csv")
+            decoded.to_netcdf(output_dir + "cdf/" + fov + "_decoded.cdf")
+            print(f"Saved cdf file {output_dir}cdf/{fov}_decoded.cdf")
+        else:
+            print(f"No transcripts found for {fov}! Not saving a DecodedIntensityTable file.")
+
+        # can run into memory problems, doing this preemptively.
+        del img
+        del ref_img
+        del decoded
+        print("Total driver time", time.time() - start0)
+>>>>>>> master
     sys.stdout = sys.__stdout__
     return 0
 
