@@ -164,13 +164,17 @@ def blobDriver(
     #        v.spot_attrs = SpotAttributes(high)
     #    print(f"removed spots below threshold, now {blob.count_total_spots()} total spots")
     # blobs[fov] = blob
-    if output_dir:
-        blob.save(output_name)
-        print("spots saved.")
-    start = time.time()
-    decoded = decodeRunner(blob, codebook, **decodeRunnerKwargs)
-    print("decodeRunner", time.time() - start)
-    return blob, decoded
+    if blob.count_total_spots() > 0:
+        if output_dir:
+            blob.save(output_name)
+            print("spots saved.")
+        start = time.time()
+        decoded = decodeRunner(blob, codebook, **decodeRunnerKwargs)
+        print("decodeRunner", time.time() - start)
+        return blob, decoded
+    else:
+        print("Skipping decoding step.")
+        return blob, DecodedIntensityTable()
 
 
 def init_scale(img: ImageStack):
@@ -523,12 +527,10 @@ def run(
 
         ref_img = None
         if use_ref:
-            ref_img = img.reduce({Axes.CH, Axes.ROUND, Axes.ZPLANE}, func="max")
+            ref_img = img.reduce({Axes.CH, Axes.ROUND}, func="max")
         if anchor_name:
             ref_img = (
-                experiment[fov]
-                .get_image(anchor_name)
-                .reduce({Axes.CH, Axes.ROUND, Axes.ZPLANE}, func="max")
+                experiment[fov].get_image(anchor_name).reduce({Axes.CH, Axes.ROUND}, func="max")
             )
 
         if rescale:
@@ -564,10 +566,13 @@ def run(
             decoded = decoded.loc[decoded[Features.PASSES_THRESHOLDS]]
             decoded = decoded[decoded.target != "nan"]
 
-        saveTable(decoded, output_dir + "csv/" + fov + "_decoded.csv")
-        # decoded[fov].to_decoded_dataframe().save_csv(output_dir+fov+"_decoded.csv")
-        decoded.to_netcdf(output_dir + "cdf/" + fov + "_decoded.cdf")
-        print(f"Saved cdf file {output_dir}cdf/{fov}_decoded.cdf")
+        if len(decoded) > 0:
+            saveTable(decoded, output_dir + "csv/" + fov + "_decoded.csv")
+            # decoded[fov].to_decoded_dataframe().save_csv(output_dir+fov+"_decoded.csv")
+            decoded.to_netcdf(output_dir + "cdf/" + fov + "_decoded.cdf")
+            print(f"Saved cdf file {output_dir}cdf/{fov}_decoded.cdf")
+        else:
+            print(f"No transcripts found for {fov}! Not saving a DecodedIntensityTable file.")
 
         # can run into memory problems, doing this preemptively.
         del img
@@ -756,13 +761,13 @@ if __name__ == "__main__":
     not_filtered_results = args.not_filtered_results
 
     level_method = args.level_method
-    if level_method == "SCALE_BY_CHUNK":
+    if level_method and level_method == "SCALE_BY_CHUNK":
         level_method = Levels.SCALE_BY_CHUNK
-    elif level_method == "SCALE_BY_IMAGE":
+    elif level_method and level_method == "SCALE_BY_IMAGE":
         level_method = Levels.SCALE_BY_IMAGE
-    elif level_method == "SCALE_SATURATED_BY_CHUNK":
+    elif level_method and level_method == "SCALE_SATURATED_BY_CHUNK":
         level_method = Levels.SCALE_SATURATED_BY_CHUNK
-    elif level_method == "SCALE_SATURATED_BY_IMAGE":
+    elif level_method and level_method == "SCALE_SATURATED_BY_IMAGE":
         level_method = Levels.SCALE_SATURATED_BY_IMAGE
     else:
         level_method = Levels.SCALE_BY_IMAGE

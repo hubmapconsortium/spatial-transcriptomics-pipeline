@@ -26,10 +26,6 @@ inputs:
     type: string?
     doc: The name of the aux view to look at in the experiment file.
 
-  fov_count:
-    type: int?
-    doc: The number of FOVs that are included in this experiment
-
   mask_roi_files:
     type: Directory?
     doc: Flattened directory input, refer to record entry "binary_mask"
@@ -125,7 +121,7 @@ steps:
 
       requirements:
         DockerRequirement:
-          dockerPull: hubmap/starfish-custom:2.131
+          dockerPull: hubmap/starfish-custom:latest
 
       inputs:
         schema:
@@ -147,7 +143,7 @@ steps:
     in:
       datafile: parameter_json
       schema: read_schema/data
-    out: [aux_name, fov_count, binary_mask_img_threshold, binary_mask_min_dist, binary_mask_min_allowed_size, binary_mask_max_allowed_size, binary_mask_masking_radius, binary_mask_nuclei_view, binary_mask_cyto_seg, binary_mask_correct_seg, binary_mask_border_buffer, binary_mask_area_thresh, binary_mask_thresh_block_size, binary_mask_watershed_footprint_size, binary_mask_label_exp_size]
+    out: [aux_name, binary_mask_img_threshold, binary_mask_min_dist, binary_mask_min_allowed_size, binary_mask_max_allowed_size, binary_mask_masking_radius, binary_mask_nuclei_view, binary_mask_cyto_seg, binary_mask_correct_seg, binary_mask_border_buffer, binary_mask_area_thresh, binary_mask_thresh_block_size, binary_mask_watershed_footprint_size, binary_mask_label_exp_size]
     when: $(inputs.datafile != null)
   execute_segmentation:
     run:
@@ -156,7 +152,7 @@ steps:
 
       requirements:
         DockerRequirement:
-          dockerPull: hubmap/starfish-custom:2.131
+          dockerPull: hubmap/starfish-custom:latest
 
       inputs:
         decoded_loc:
@@ -173,11 +169,6 @@ steps:
           type: string?
           inputBinding:
             prefix: --aux-name
-
-        fov_count:
-          type: int
-          inputBinding:
-            prefix: --fov-count
 
         binary_mask:
           type:
@@ -283,9 +274,6 @@ steps:
               return null;
             }
           }
-      fov_count:
-        source: [stage_segmentation/fov_count, fov_count]
-        pickValue: first_non_null
       binary_mask:
         source: [binary_mask, stage_segmentation/binary_mask_img_threshold, stage_segmentation/binary_mask_min_dist, stage_segmentation/binary_mask_min_allowed_size, stage_segmentation/binary_mask_max_allowed_size, stage_segmentation/binary_mask_masking_radius, stage_segmentation/binary_mask_nuclei_view, stage_segmentation/binary_mask_cyto_seg, stage_segmentation/binary_mask_correct_seg, stage_segmentation/binary_mask_border_buffer, stage_segmentation/binary_mask_area_thresh, stage_segmentation/binary_mask_thresh_block_size, stage_segmentation/binary_mask_watershed_footprint_size, stage_segmentation/binary_mask_label_exp_size, mask_roi_files, mask_roi_formats, mask_labeled_files, mask_labeled_formats]
         valueFrom: |

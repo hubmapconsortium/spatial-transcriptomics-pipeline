@@ -8,11 +8,9 @@ from functools import partialmethod
 from glob import glob
 from os import makedirs, path
 from pathlib import Path
-from typing import List
 
 import cv2
 import numpy as np
-import PIL
 import skimage
 import starfish
 import starfish.data
@@ -27,16 +25,18 @@ from starfish.types import Axes, Levels
 from tqdm import tqdm
 
 
-def masksFromRoi(
-    img_stack: List[ImageStack], roi_set: Path, file_formats: str
-) -> List[BinaryMaskCollection]:
+def maskFromRoi(
+    img: ImageStack, fov: str, roi_set: Path, file_formats: str
+) -> BinaryMaskCollection:
     """
-    Return a list of masks from provided RoiSet.zip files.
+    Return a mask from provided RoiSet.zip files.
 
     Parameters
     ----------
-    img_stack: list[ImageStack]
-        The images that the masks are to be applied to, provided per FOV.
+    img: ImageStack
+        The image that the mask is to be applied to.
+    fov: str
+        The name of the fov that we need to segment.
     roi_set: Path
         Directory containing RoiSet files.
     file_formats: str
@@ -47,23 +47,23 @@ def masksFromRoi(
     list[BinaryMaskCollection]:
         Binary masks for each FOV.
     """
-    masks = []
-    for i in range(len(img_stack)):
-        mask_name = ("{}/" + file_formats).format(roi_set, i)
-        masks.append(BinaryMaskCollection.from_fiji_roi_set(mask_name, img_stack[i]))
-    return masks
+    i = int(fov[-3:])
+    mask_name = ("{}/" + file_formats).format(roi_set, i)
+    return BinaryMaskCollection.from_fiji_roi_set(mask_name, img)
 
 
-def masksFromLabeledImages(
-    img_stack: List[ImageStack], labeled_image: Path, file_formats_labeled: str
-) -> List[BinaryMaskCollection]:
+def maskFromLabeledImages(
+    img: ImageStack, fov: str, labeled_image: Path, file_formats_labeled: str
+) -> BinaryMaskCollection:
     """
-    Returns a list of masks from the provided labeled images.
+    Returns a mask from the provided labeled images.
 
     Parameters
     ----------
-    img_stack: list[ImageStack]
-        The images that the masks will be applied to, provided per FOV.
+    img: ImageStack
+        The image that the masks will be applied to.
+    fov: str
+        The name of the fov that we need to segment.
     labeled_image: Path
         Directory of labeled images with image segmentation data, such as from ilastik classification.
     file_formats_labeled: str
@@ -71,24 +71,22 @@ def masksFromLabeledImages(
 
     Returns
     -------
-    list[BinaryMaskCollection]:
-        Binary masks for each FOV.
+    BinaryMaskCollection:
+        Binary mask.
     """
-    masks = []
-    for i in range(len(img_stack)):
-        label_name = ("{}/" + file_formats_labeled).format(labeled_image, i)
-        masks.append(BinaryMaskCollection.from_external_labeled_image(label_name, img_stack[i]))
-    return masks
+    i = int(fov[-3:])
+    label_name = ("{}/" + file_formats_labeled).format(labeled_image, i)
+    return BinaryMaskCollection.from_external_labeled_image(label_name, img)
 
 
-def masksFromWatershed(
-    img_stack: List[ImageStack],
+def maskFromWatershed(
+    img: ImageStack,
     img_threshold: float,
     min_dist: int,
     min_size: int,
     max_size: int,
     masking_radius: int,
-) -> List[BinaryMaskCollection]:
+) -> BinaryMaskCollection:
     """
     Runs a primitive thresholding and watershed pipeline to generate segmentation masks.
 
@@ -107,8 +105,8 @@ def masksFromWatershed(
 
     Returns
     -------
-    list[BinaryMaskCollection]:
-        Binary masks for each FOV.
+    BinaryMaskCollection:
+        Binary masks for this FOV.
     """
     wt_filt = ImgFilter.WhiteTophat(masking_radius, is_volume=False)
     thresh_filt = Binarize.ThresholdBinarize(img_threshold)
@@ -116,16 +114,13 @@ def masksFromWatershed(
     area_filt = Filter.AreaFilter(min_area=min_size, max_area=max_size)
     area_mask = Filter.Reduce("logical_or", lambda shape: np.zeros(shape=shape, dtype=bool))
     segmenter = Segment.WatershedSegment()
-    masks = []
-    for img in img_stack:
-        img_flat = img.reduce({Axes.ROUND, Axes.CH}, func="max")
-        working_img = wt_filt.run(img_flat, in_place=False)
-        working_img = thresh_filt.run(working_img)
-        labeled = min_dist_label.run(working_img)
-        working_img = area_filt.run(labeled)
-        working_img = area_mask.run(working_img)
-        masks.append(segmenter.run(img_flat, labeled, working_img))
-    return masks
+    img_flat = img.reduce({Axes.ROUND, Axes.CH}, func="max")
+    working_img = wt_filt.run(img_flat, in_place=False)
+    working_img = thresh_filt.run(working_img)
+    labeled = min_dist_label.run(working_img)
+    working_img = area_filt.run(labeled)
+    working_img = area_mask.run(working_img)
+    return segmenter.run(img_flat, labeled, working_img)
 
 
 def _clip_percentile_to_zero(image, p_min, p_max, min_coeff=1, max_coeff=1):
@@ -139,282 +134,326 @@ def segment_nuclei(
     nuclei, border_buffer=None, area_thresh=1.05, thresh_block_size=51, wtshd_ftprnt_size=100
 ):
 
-    # Even out background of nuclei image using large morphological opening
-    size = 200
-    sigma = 20
-    background = cv2.morphologyEx(nuclei.xarray.data[0, 0, 0], cv2.MORPH_OPEN, disk(size))
-    smoothed = ndimage.gaussian_filter(background, sigma=sigma)
-    nuclei.xarray.data[0, 0, 0] = nuclei.xarray.data[0, 0, 0] - smoothed
-    nuclei.xarray.data[0, 0, 0][nuclei.xarray.data[0, 0, 0] < 0] = 0
+    good_nuclei_all_z = np.zeros(nuclei.xarray.data[0, 0].shape, dtype="int32")
+    all_nuclei_all_z = np.zeros(nuclei.xarray.data[0, 0].shape, dtype="int32")
+    og_nuclei = deepcopy(nuclei)
+    for z in range(nuclei.num_zplanes):
 
-    # Median filter
-    nuclei.xarray.data[0, 0, 0] = ndimage.median_filter(nuclei.xarray.data[0, 0, 0], size=10)
+        nuclei = deepcopy(og_nuclei)
 
-    # Scale image intensities and convert low intensities to zero
-    pmin = 50
-    pmax = 100
-    clip = starfish.image.Filter.ClipPercentileToZero(
-        p_min=pmin, p_max=pmax, is_volume=False, level_method=Levels.SCALE_BY_CHUNK
-    )
-    scaled_nuclei = clip.run(nuclei, in_place=False)
+        # Even out background of nuclei image using large morphological opening
+        size = 200
+        sigma = 20
+        background = cv2.morphologyEx(nuclei.xarray.data[0, 0, z], cv2.MORPH_OPEN, disk(size))
+        smoothed = ndimage.gaussian_filter(background, sigma=sigma)
+        nuclei.xarray.data[0, 0, z] = nuclei.xarray.data[0, 0, z] - smoothed
+        nuclei.xarray.data[0, 0, z][nuclei.xarray.data[0, 0, z] < 0] = 0
 
-    # Threshold locally
-    param = 100
-    local_thresh = threshold_local(
-        scaled_nuclei.xarray.data[0, 0, 0], thresh_block_size, offset=0, param=param
-    )
-    binary = scaled_nuclei.xarray.data[0, 0, 0] > local_thresh
+        # Median filter
+        nuclei.xarray.data[0, 0, z] = ndimage.median_filter(nuclei.xarray.data[0, 0, z], size=10)
 
-    # Morphological opening and closing to even edges out of nuclei
-    size = 10
-    kernel = np.ones((size, size), np.uint8)
-    binary = cv2.morphologyEx(binary.astype("uint8"), cv2.MORPH_OPEN, kernel)
-    binary = cv2.morphologyEx(binary.astype("uint8"), cv2.MORPH_CLOSE, kernel)
-
-    # Remove small objects
-    cc_labels = skimage.measure.label(binary)
-    props = skimage.measure.regionprops(cc_labels)
-    areas = [p.area for p in props]
-    outlier = 100
-    area_small = [p.area < outlier for p in props]
-    for x in range(1, len(area_small) + 1):
-        if area_small[x - 1]:
-            cc_labels[cc_labels == x] = 0
-    cc_labels = skimage.segmentation.relabel_sequential(cc_labels)[0]
-
-    # Convert back to binary
-    binary = (cc_labels >= 1).astype("int16")
-
-    # Find all non-overlapping nuclei (aka "good" nuclei)
-
-    # Label each connect component as a single nucleus
-    good_nuclei = skimage.measure.label(binary)
-
-    # Remove border objects if specified
-    if border_buffer is not None:
-        good_nuclei = skimage.segmentation.clear_border(good_nuclei, buffer_size=border_buffer)
-        good_nuclei = skimage.segmentation.relabel_sequential(good_nuclei)[0]
-
-    # Identify objects with deformed borders (likely overlapping nuclei) by ratio of convex hull area with
-    # normal area
-    props = skimage.measure.regionprops(good_nuclei)
-    deformed_border = []
-    for x in range(1, len(props) + 1):
-
-        object_area = props[x - 1].area
-        con_hull_area = props[x - 1].convex_area
-
-        if con_hull_area / object_area > area_thresh:
-            deformed_border.append(False)
-        else:
-            deformed_border.append(True)
-
-    for x in range(1, len(deformed_border) + 1):
-        if not deformed_border[x - 1]:
-            good_nuclei[good_nuclei == x] = 0
-    good_nuclei = skimage.segmentation.relabel_sequential(good_nuclei)[0]
-
-    # Remove big
-    props = skimage.measure.regionprops(good_nuclei)
-    if len(props) > 0:
-        areas = [p.area for p in props]
-        outlier = np.percentile(areas, 75) + 1.5 * (
-            np.percentile(areas, 75) - np.percentile(areas, 25)
+        # Scale image intensities and convert low intensities to zero
+        pmin = 50
+        pmax = 100
+        clip = starfish.image.Filter.ClipPercentileToZero(
+            p_min=pmin, p_max=pmax, is_volume=False, level_method=Levels.SCALE_BY_CHUNK
         )
-        area_big = [p.area > outlier for p in props]
+        scaled_nuclei = clip.run(nuclei, in_place=False)
 
-        for x in range(1, len(area_big) + 1):
-            if area_big[x - 1]:
+        # Threshold locally
+        param = 100
+        local_thresh = threshold_local(
+            scaled_nuclei.xarray.data[0, 0, z], thresh_block_size, offset=0, param=param
+        )
+        binary = scaled_nuclei.xarray.data[0, 0, z] > local_thresh
+
+        # Morphological opening and closing to even edges out of nuclei
+        size = 10
+        kernel = np.ones((size, size), np.uint8)
+        binary = cv2.morphologyEx(binary.astype("uint8"), cv2.MORPH_OPEN, kernel)
+        binary = cv2.morphologyEx(binary.astype("uint8"), cv2.MORPH_CLOSE, kernel)
+
+        # Remove small objects
+        cc_labels = skimage.measure.label(binary)
+        props = skimage.measure.regionprops(cc_labels)
+        areas = [p.area for p in props]
+        outlier = 100
+        area_small = [p.area < outlier for p in props]
+        for x in range(1, len(area_small) + 1):
+            if area_small[x - 1]:
+                cc_labels[cc_labels == x] = 0
+        cc_labels = skimage.segmentation.relabel_sequential(cc_labels)[0]
+
+        # Convert back to binary
+        binary = (cc_labels >= 1).astype("int16")
+
+        # Find all non-overlapping nuclei (aka "good" nuclei)
+
+        # Label each connect component as a single nucleus
+        good_nuclei = skimage.measure.label(binary)
+
+        # Remove border objects if specified
+        if border_buffer is not None:
+            good_nuclei = skimage.segmentation.clear_border(good_nuclei, buffer_size=border_buffer)
+            good_nuclei = skimage.segmentation.relabel_sequential(good_nuclei)[0]
+
+        # Identify objects with deformed borders (likely overlapping nuclei) by ratio of convex hull area with
+        # normal area
+        props = skimage.measure.regionprops(good_nuclei)
+        deformed_border = []
+        for x in range(1, len(props) + 1):
+
+            object_area = props[x - 1].area
+            con_hull_area = props[x - 1].convex_area
+
+            if con_hull_area / object_area > area_thresh:
+                deformed_border.append(False)
+            else:
+                deformed_border.append(True)
+
+        for x in range(1, len(deformed_border) + 1):
+            if not deformed_border[x - 1]:
                 good_nuclei[good_nuclei == x] = 0
         good_nuclei = skimage.segmentation.relabel_sequential(good_nuclei)[0]
 
-    # Segment all nuclei
+        # Remove big
+        props = skimage.measure.regionprops(good_nuclei)
+        if len(props) > 0:
+            areas = [p.area for p in props]
+            outlier = np.percentile(areas, 75) + 1.5 * (
+                np.percentile(areas, 75) - np.percentile(areas, 25)
+            )
+            area_big = [p.area > outlier for p in props]
 
-    # Segment all nuclei using watershed
-    distance = ndimage.distance_transform_edt(binary)
-    max_coords = skimage.feature.peak_local_max(
-        distance, labels=binary, footprint=np.ones((wtshd_ftprnt_size, wtshd_ftprnt_size))
-    )
-    local_maxima = np.zeros_like(binary, dtype=bool)
-    local_maxima[tuple(max_coords.T)] = True
-    markers = ndimage.label(local_maxima)[0]
-    all_nuclei = skimage.segmentation.watershed(-distance, markers, mask=binary)
+            for x in range(1, len(area_big) + 1):
+                if area_big[x - 1]:
+                    good_nuclei[good_nuclei == x] = 0
+            good_nuclei = skimage.segmentation.relabel_sequential(good_nuclei)[0]
 
-    # Fix nuclei segmentation errors
-    all_nuclei = all_nuclei.astype("uint16")
+        # Segment all nuclei
 
-    # Calculate number of pixels to set as threshold for merging objects. Need to set as a constant pixel
-    # number and not ratio of areas to prevent large objects from blobbing up.
-    # Calculated as (area_thresh - 1) * (average good nuclei area)
-    props = skimage.measure.regionprops(all_nuclei.astype("int16"))
-    areas = [p.area for p in props]
-    px_area_thresh = np.mean(areas) * (area_thresh - 1)
+        # Segment all nuclei using watershed
+        distance = ndimage.distance_transform_edt(binary)
+        max_coords = skimage.feature.peak_local_max(
+            distance, labels=binary, footprint=np.ones((wtshd_ftprnt_size, wtshd_ftprnt_size))
+        )
+        local_maxima = np.zeros_like(binary, dtype=bool)
+        local_maxima[tuple(max_coords.T)] = True
+        markers = ndimage.label(local_maxima)[0]
+        all_nuclei = skimage.segmentation.watershed(-distance, markers, mask=binary)
 
-    ymax, xmax = nuclei.shape["y"], nuclei.shape["x"]
-    flag = False
-    while not flag:
-        # Find pairs of label that are adjacent (possible segmentation errors)
-        pairs = {}
-        for x in range(1, xmax - 1):
-            for y in range(1, ymax - 1):
-                value = all_nuclei[y, x]
-                if value != 0:
-                    neighbors = []
-                    neighbors.append(all_nuclei[y - 1, x])
-                    neighbors.append(all_nuclei[y + 1, x])
-                    neighbors.append(all_nuclei[y, x - 1])
-                    neighbors.append(all_nuclei[y, x + 1])
-                    neighbors = [n for n in neighbors if n != 0]
-                    for neighbor in neighbors:
-                        if neighbor != value:
-                            pairs[(int(value), int(neighbor))] = 0
-        neighbor_pairs = list(set([tuple(sorted(pair)) for pair in pairs]))
+        # Fix nuclei segmentation errors
+        all_nuclei = all_nuclei.astype("uint16")
 
+        # Calculate number of pixels to set as threshold for merging objects. Need to set as a constant pixel
+        # number and not ratio of areas to prevent large objects from blobbing up.
+        # Calculated as (area_thresh - 1) * (average good nuclei area)
         props = skimage.measure.regionprops(all_nuclei.astype("int16"))
-        # Check ratio between area of the convex hull of both object and the original combined area, if it is low,
-        # then the two objects are probably a single object and should be merged
-        merge_count = 0
-        removed_labels = []
-        for pair in neighbor_pairs:
+        areas = [p.area for p in props]
+        px_area_thresh = np.mean(areas) * (area_thresh - 1)
 
-            if pair[0] not in removed_labels and pair[1] not in removed_labels:
+        ymax, xmax = nuclei.shape["y"], nuclei.shape["x"]
+        flag = False
+        while not flag:
+            # Find pairs of label that are adjacent (possible segmentation errors)
+            pairs = {}
+            for x in range(1, xmax - 1):
+                for y in range(1, ymax - 1):
+                    value = all_nuclei[y, x]
+                    if value != 0:
+                        neighbors = []
+                        neighbors.append(all_nuclei[y - 1, x])
+                        neighbors.append(all_nuclei[y + 1, x])
+                        neighbors.append(all_nuclei[y, x - 1])
+                        neighbors.append(all_nuclei[y, x + 1])
+                        neighbors = [n for n in neighbors if n != 0]
+                        for neighbor in neighbors:
+                            if neighbor != value:
+                                pairs[(int(value), int(neighbor))] = 0
+            neighbor_pairs = list(set([tuple(sorted(pair)) for pair in pairs]))
 
-                pair_image1 = np.zeros((ymax, xmax))
-                bbox = props[pair[0] - 1].bbox
-                pair_image1[bbox[0] : bbox[2], bbox[1] : bbox[3]] = props[pair[0] - 1].convex_image
-                pair_image2 = np.zeros((ymax, xmax))
-                bbox = props[pair[1] - 1].bbox
-                pair_image2[bbox[0] : bbox[2], bbox[1] : bbox[3]] = props[pair[1] - 1].convex_image
-                pair_image = pair_image1.astype(bool) | pair_image2.astype(bool)
-                pair_props = skimage.measure.regionprops(pair_image.astype(int))
+            props = skimage.measure.regionprops(all_nuclei.astype("int16"))
+            # Check ratio between area of the convex hull of both object and the original combined area, if it is low,
+            # then the two objects are probably a single object and should be merged
+            merge_count = 0
+            removed_labels = []
+            for pair in neighbor_pairs:
 
-                if pair_props[0].convex_area - pair_props[0].area < px_area_thresh:
-                    all_nuclei[all_nuclei == pair[0]] = pair[1]
-                    merge_count += 1
-                    removed_labels.append(pair[0])
-        all_nuclei = skimage.segmentation.relabel_sequential(all_nuclei.astype("int16"))[0]
-        if merge_count == 0:
-            flag = True
+                if pair[0] not in removed_labels and pair[1] not in removed_labels:
 
-    # Remove small
-    props = skimage.measure.regionprops(all_nuclei)
-    for x in np.where([props[x].area < 100 for x in range(len(props))])[0]:
-        all_nuclei[all_nuclei == x + 1] = 0
-    all_nuclei = skimage.segmentation.relabel_sequential(all_nuclei)[0]
+                    pair_image1 = np.zeros((ymax, xmax))
+                    bbox = props[pair[0] - 1].bbox
+                    pair_image1[bbox[0] : bbox[2], bbox[1] : bbox[3]] = props[
+                        pair[0] - 1
+                    ].convex_image
+                    pair_image2 = np.zeros((ymax, xmax))
+                    bbox = props[pair[1] - 1].bbox
+                    pair_image2[bbox[0] : bbox[2], bbox[1] : bbox[3]] = props[
+                        pair[1] - 1
+                    ].convex_image
+                    pair_image = pair_image1.astype(bool) | pair_image2.astype(bool)
+                    pair_props = skimage.measure.regionprops(pair_image.astype(int))
 
-    return good_nuclei, all_nuclei
+                    if pair_props[0].convex_area - pair_props[0].area < px_area_thresh:
+                        all_nuclei[all_nuclei == pair[0]] = pair[1]
+                        merge_count += 1
+                        removed_labels.append(pair[0])
+            all_nuclei = skimage.segmentation.relabel_sequential(all_nuclei.astype("int16"))[0]
+            if merge_count == 0:
+                flag = True
+
+        # Remove small
+        props = skimage.measure.regionprops(all_nuclei)
+        for x in np.where([props[x].area < 100 for x in range(len(props))])[0]:
+            all_nuclei[all_nuclei == x + 1] = 0
+        all_nuclei = skimage.segmentation.relabel_sequential(all_nuclei)[0]
+
+        good_nuclei_all_z[z] = deepcopy(good_nuclei)
+        all_nuclei_all_z[z] = deepcopy(all_nuclei)
+
+    # Adjust values so there are no repeats across slices
+    for z in range(1, nuclei.num_zplanes):
+        good_prev_max = np.max(good_nuclei_all_z[z - 1])
+        good_nuclei_all_z[z] = good_nuclei_all_z[z] + good_prev_max
+        good_nuclei_all_z[z][good_nuclei_all_z[z] == good_prev_max] = 0
+
+        all_prev_max = np.max(all_nuclei_all_z[z - 1])
+        all_nuclei_all_z[z] = all_nuclei_all_z[z] + all_prev_max
+        all_nuclei_all_z[z][all_nuclei_all_z[z] == all_prev_max] = 0
+
+    return good_nuclei_all_z, all_nuclei_all_z
 
 
 def segment_cytoplasm(
-    good_nuclei, all_nuclei, decoded_targets, border_buffer=None, label_exp_size=20
+    good_nuclei, all_nuclei, decoded_targets, border_buffer=None, label_exp_size=None
 ):
 
     # Convert transcripts to dataframe
-    # TODO fix this to work for all cases
-    if "xc" not in decoded_targets:
-        decoded_targets["xc"] = decoded_targets["x"]
-    if "yc" not in decoded_targets:
-        decoded_targets["yc"] = decoded_targets["y"]
-    if "zc" not in decoded_targets:
-        decoded_targets["zc"] = decoded_targets["z"]
-    data = deepcopy(decoded_targets.to_decoded_dataframe().data)
+    data = deepcopy(decoded_targets.to_features_dataframe())
 
-    # Create image whose pixel intensities are proportional to the number of transcripts found in it's search
-    # radius defined neighborhood
-    density = np.zeros(good_nuclei.shape)
-    for x, y in zip(data["xc"], data["yc"]):
-        density[y, x] = 1
+    # Create empty arrays to put results in
+    good_cyto_all_z = np.zeros(good_nuclei.shape, dtype="int32")
+    all_cyto_all_z = np.zeros(all_nuclei.shape, dtype="int32")
 
-    # Dilate a bit
-    kernel = np.ones((3, 3), np.uint8)
-    dilation = cv2.dilate(density, kernel, iterations=3)
+    for z in range(all_nuclei.shape[0]):
 
-    # Smooth density map with gaussian filter
-    smoothed_density = ndimage.gaussian_filter(dilation, sigma=10)
+        # Subset data for current z slice
+        data = data[data["z"] == z]
 
-    pmin = 0
-    pmax = 80
-    scaled_density = _clip_percentile_to_zero(smoothed_density, pmin, pmax)
+        # Create image whose pixel intensities are proportional to the number of transcripts found in it's search
+        # radius defined neighborhood
+        density = np.zeros(good_nuclei[z].shape)
+        for x, y in zip(data["x"], data["y"]):
+            density[y, x] = 1
 
-    # Threshold locally
-    block_size = 101
-    param = 100
-    local_thresh = threshold_local(scaled_density, block_size, offset=0, param=param)
-    binary = scaled_density > local_thresh
+        # Dilate a bit
+        kernel = np.ones((3, 3), np.uint8)
+        dilation = cv2.dilate(density, kernel, iterations=3)
 
-    # Add in nuclei to ensure they are in the foreground
-    binary = binary + all_nuclei
-    binary[binary > 1] = 1
+        # Smooth density map with gaussian filter
+        smoothed_density = ndimage.gaussian_filter(dilation, sigma=10)
 
-    # Closing to fill small gaps
-    size = 10
-    kernel = np.ones((size, size), np.uint8)
-    closed = cv2.morphologyEx(binary.astype("uint8"), cv2.MORPH_CLOSE, kernel)
-    closed = closed.astype(bool)
+        pmin = 0
+        pmax = 80
+        scaled_density = _clip_percentile_to_zero(smoothed_density, pmin, pmax)
 
-    # Segment cytoplasms using nuclei centroids as markers and binary nuclei image as mask
-    distance = ndimage.distance_transform_edt(closed)
-    cyto_labels = skimage.segmentation.watershed(
-        -distance, all_nuclei, mask=closed, compactness=0.001
-    )
+        # Threshold locally
+        block_size = 101
+        param = 100
+        local_thresh = threshold_local(scaled_density, block_size, offset=0, param=param)
+        binary = scaled_density > local_thresh
 
-    # Remove cytoplasms associated with border or suspected overlapping nuclei
-    bad_nuclei = all_nuclei.astype(bool) ^ good_nuclei.astype(bool)
-    bad_labels = skimage.measure.label(bad_nuclei.astype(int))
-    props = skimage.measure.regionprops(bad_labels)
-    for x in np.where([props[x].area < 100 for x in range(len(props))])[0]:
-        bad_labels[bad_labels == x + 1] = 0
-    bad_nuclei = deepcopy(bad_labels).astype(bool)
-    bad_cyto = np.unique(cyto_labels[bad_nuclei])
-    final_labels = deepcopy(cyto_labels)
-    final_labels[np.isin(cyto_labels, bad_cyto)] = 0
+        # Add in nuclei to ensure they are in the foreground
+        binary = binary + all_nuclei[z]
+        binary[binary > 1] = 1
 
-    # Remove small
-    props = skimage.measure.regionprops(final_labels)
-    area_small = [p.area < 20000 for p in props]
-    for x in range(1, len(area_small) + 1):
-        if area_small[x - 1]:
-            final_labels[final_labels == x] = 0
-    final_labels = skimage.segmentation.relabel_sequential(final_labels)[0]
+        # Closing to fill small gaps
+        size = 10
+        kernel = np.ones((size, size), np.uint8)
+        closed = cv2.morphologyEx(binary.astype("uint8"), cv2.MORPH_CLOSE, kernel)
+        closed = closed.astype(bool)
 
-    # Remove bg
-    props = skimage.measure.regionprops(final_labels)
-    area_big = [p.area > 200000 for p in props]
-    for x in range(1, len(area_big) + 1):
-        if area_big[x - 1]:
-            final_labels[final_labels == x] = 0
-    final_labels = skimage.segmentation.relabel_sequential(final_labels)[0]
-
-    # Remove cytoplasm that have multiple nuclei in them
-    for label in range(1, final_labels.max() + 1):
-        nuclei_in_cyto = np.unique(all_nuclei[final_labels == label])
-        if len(nuclei_in_cyto) > 2:
-            final_labels[final_labels == label] = 0
-    final_labels = skimage.segmentation.relabel_sequential(final_labels)[0]
-
-    if border_buffer is not None:
-        # Remove cytoplasms associated with border nuclei (for full cytoplasm set if border_buffer is set)
-        all_nuclei_no_bord = skimage.segmentation.clear_border(
-            all_nuclei, buffer_size=border_buffer
+        # Segment cytoplasms using nuclei centroids as markers and binary nuclei image as mask
+        distance = ndimage.distance_transform_edt(closed)
+        cyto_labels = skimage.segmentation.watershed(
+            -distance, all_nuclei[z], mask=closed, compactness=0.001
         )
-        all_nuclei_no_bord = skimage.segmentation.relabel_sequential(all_nuclei_no_bord)[0]
 
-        bad_nuclei = all_nuclei.astype(bool) ^ all_nuclei_no_bord.astype(bool)
+        # Remove cytoplasms associated with border or suspected overlapping nuclei
+        bad_nuclei = all_nuclei[z].astype(bool) ^ good_nuclei[z].astype(bool)
         bad_labels = skimage.measure.label(bad_nuclei.astype(int))
         props = skimage.measure.regionprops(bad_labels)
         for x in np.where([props[x].area < 100 for x in range(len(props))])[0]:
             bad_labels[bad_labels == x + 1] = 0
         bad_nuclei = deepcopy(bad_labels).astype(bool)
         bad_cyto = np.unique(cyto_labels[bad_nuclei])
-        cyto_labels_no_bord = deepcopy(cyto_labels)
-        cyto_labels_no_bord[np.isin(cyto_labels_no_bord, bad_cyto)] = 0
-        cyto_labels = deepcopy(cyto_labels_no_bord)
+        final_labels = deepcopy(cyto_labels)
+        final_labels[np.isin(cyto_labels, bad_cyto)] = 0
 
-    # Expand labels
-    all_cyto_labels = skimage.segmentation.expand_labels(cyto_labels, distance=label_exp_size)
-    good_cyto_labels = skimage.segmentation.expand_labels(final_labels, distance=label_exp_size)
+        # Remove small
+        props = skimage.measure.regionprops(final_labels)
+        area_small = [p.area < 20000 for p in props]
+        for x in range(1, len(area_small) + 1):
+            if area_small[x - 1]:
+                final_labels[final_labels == x] = 0
+        final_labels = skimage.segmentation.relabel_sequential(final_labels)[0]
 
-    return good_cyto_labels, all_cyto_labels
+        # Remove bg
+        props = skimage.measure.regionprops(final_labels)
+        area_big = [p.area > 200000 for p in props]
+        for x in range(1, len(area_big) + 1):
+            if area_big[x - 1]:
+                final_labels[final_labels == x] = 0
+        final_labels = skimage.segmentation.relabel_sequential(final_labels)[0]
+
+        # Remove cytoplasm that have multiple nuclei in them
+        for label in range(1, final_labels.max() + 1):
+            nuclei_in_cyto = np.unique(all_nuclei[z][final_labels == label])
+            if len(nuclei_in_cyto) > 2:
+                final_labels[final_labels == label] = 0
+        final_labels = skimage.segmentation.relabel_sequential(final_labels)[0]
+
+        if border_buffer is not None:
+            # Remove cytoplasms associated with border nuclei (for full cytoplasm set if border_buffer is set)
+            all_nuclei_no_bord = skimage.segmentation.clear_border(
+                all_nuclei[z], buffer_size=border_buffer
+            )
+            all_nuclei_no_bord = skimage.segmentation.relabel_sequential(all_nuclei_no_bord)[0]
+
+            bad_nuclei = all_nuclei[z].astype(bool) ^ all_nuclei_no_bord.astype(bool)
+            bad_labels = skimage.measure.label(bad_nuclei.astype(int))
+            props = skimage.measure.regionprops(bad_labels)
+            for x in np.where([props[x].area < 100 for x in range(len(props))])[0]:
+                bad_labels[bad_labels == x + 1] = 0
+            bad_nuclei = deepcopy(bad_labels).astype(bool)
+            bad_cyto = np.unique(cyto_labels[bad_nuclei])
+            cyto_labels_no_bord = deepcopy(cyto_labels)
+            cyto_labels_no_bord[np.isin(cyto_labels_no_bord, bad_cyto)] = 0
+            cyto_labels = deepcopy(cyto_labels_no_bord)
+
+        # Expand labels
+        if label_exp_size is not None:
+            all_cyto_labels = skimage.segmentation.expand_labels(
+                cyto_labels, distance=label_exp_size
+            )
+            good_cyto_labels = skimage.segmentation.expand_labels(
+                final_labels, distance=label_exp_size
+            )
+
+        good_cyto_all_z[z] = deepcopy(good_cyto_labels)
+        all_cyto_all_z[z] = deepcopy(all_cyto_labels)
+
+    # Adjust values so there are no repeats across slices
+    for z in range(1, good_cyto_all_z.shape[0]):
+        good_prev_max = np.max(good_cyto_all_z[z - 1])
+        good_cyto_all_z[z] = good_cyto_all_z[z] + good_prev_max
+        good_cyto_all_z[z][good_cyto_all_z[z] == good_prev_max] = 0
+
+        all_prev_max = np.max(all_cyto_all_z[z - 1])
+        all_cyto_all_z[z] = all_cyto_all_z[z] + all_prev_max
+        all_cyto_all_z[z][all_cyto_all_z[z] == all_prev_max] = 0
+
+    return good_cyto_all_z, all_cyto_all_z
 
 
 def segmentByDensity(
@@ -427,37 +466,29 @@ def segmentByDensity(
     thresh_block_size=51,
     watershed_footprint_size=100,
     label_exp_size=20,
+    nuclei_view="",
 ):
 
     """
     Parameters
-
         nuclei: Nuclei images.
-
         decoded_targets: Decoded transcripts (DecodedIntensityTable).
-
         cyto_seg: Boolean whether to segment the cytoplasm or not.
-
         correct_seg: Boolean whether to remove suspected nuclei/cytoplasms that have overlapping nuclei.
-
         border_buffer: If not None, removes cytoplasms whose nuclei lie within the given distance from the border.
-
         area_thresh: Threshold used when determining if an object is one nucleus or two or more overlapping nuclei.
                      Objects whose ratio of convex hull area to normal area are above this threshold are removed if
                      the option to remove overlapping nuclei is set.
-
         thesh_block_size: Size of structuring element for local thresholding of nuclei. If nuclei interiors aren't
                           passing threshold, increase this value, if too much non-nuclei is passing threshold, lower
                           it.
-
         wtshd_ftprnt_size: Size of structuring element for watershed segmentation. Larger values will segment the
                            nuclei into larger objects and smaller values will result in smaller objects. Adjust
                            according to nucleus size.
-
         label_exp_size: Pixel size labels are dilated by in final step. Helpful for closing small holes that are
                         common from thresholding but can also cause cell boundaries to exceed their true boundaries
                         if set too high. Label dilation respects label borders and does not mix labels.
-
+        nuclei_view: dummy variable to prevent issues with how we load in kwargs.
     """
 
     # TODO: Currently only works for 2D images, will modify to work with 3D images that are treated as stacks of
@@ -499,23 +530,26 @@ def segmentByDensity(
         # Non overlapping nuclei
         if correct_seg:
             if label_exp_size is not None:
-                good_nuclei = skimage.segmentation.expand_labels(
-                    good_nuclei, distance=label_exp_size
-                )
+                for z in range(nuclei.num_zplanes):
+                    good_nuclei[z] = skimage.segmentation.expand_labels(
+                        good_nuclei[z], distance=label_exp_size
+                    )
             return good_nuclei
         # All nuclei
         else:
 
             # Had to put this here because I need border nuclei for cytoplasm segmentation.
             if border_buffer is not None:
-                all_nuclei = skimage.segmentation.clear_border(
-                    all_nuclei, buffer_size=border_buffer
-                )
-                all_nuclei = skimage.segmentation.relabel_sequential(all_nuclei)[0]
+                for z in range(nuclei.num_zplanes):
+                    all_nuclei[z] = skimage.segmentation.clear_border(
+                        all_nuclei[z], buffer_size=border_buffer
+                    )
+                    all_nuclei[z] = skimage.segmentation.relabel_sequential(all_nuclei[z])[0]
             if label_exp_size is not None:
-                all_nuclei = skimage.segmentation.expand_labels(
-                    all_nuclei, distance=label_exp_size
-                )
+                for z in range(nuclei.num_zplanes):
+                    all_nuclei[z] = skimage.segmentation.expand_labels(
+                        all_nuclei[z], distance=label_exp_size
+                    )
 
             return all_nuclei
 
@@ -524,7 +558,6 @@ def run(
     input_loc: Path,
     exp_loc: Path,
     output_loc: str,
-    fov_count: int,
     aux_name: str,
     roiKwargs: dict,
     labeledKwargs: dict,
@@ -542,8 +575,6 @@ def run(
         Directory that contains "experiment.json" file for the experiment.
     output_loc: str
         Path to directory where output will be saved.
-    fov_count: int
-        The number of FOVs in the experiment.
     aux_name: str
         The name of the auxillary view to look at for image segmentation.
     roiKwargs: dict
@@ -582,14 +613,11 @@ def run(
     #    print("made " + output_dir + "h5ad")
 
     # read in netcdfs based on how we saved prev step
-    results = []
-    keys = []
-    masks = []
+    results = {}
     for f in glob("{}/cdf/*_decoded.cdf".format(input_loc)):
-        results.append(DecodedIntensityTable.open_netcdf(f))
         name = f[len(str(input_loc)) + 5 : -12]
         print("found fov key: " + name)
-        keys.append(name)
+        results[name] = DecodedIntensityTable.open_netcdf(f)
         print("loaded " + f)
         if not path.isdir(output_dir + name):
             makedirs(output_dir + name)
@@ -602,79 +630,53 @@ def run(
     print("loaded " + str(exp_loc / "experiment.json"))
 
     # IF WE'RE DOING DENSITY BASED, THAT's DIFFERENT'
-    # TODO: rearrange this to be more memory efficient by only loading in one image at a time.
-    if "nuclei_view" in densityKwargs:
-        nuclei_imgs = {}
-        for key in exp.keys():
-            nuclei_imgs[key] = exp[key].get_image(densityKwargs["nuclei_view"])
-        del densityKwargs["nuclei_view"]
-        for i in range(len(keys)):
-            print(f"Segmenting {keys[i]}")
+    for key in results.keys():
+        if "nuclei_view" in densityKwargs:
+            nuclei_img = exp[key].get_image(densityKwargs["nuclei_view"])
+            print(f"Segmenting {key}")
             raw_mask = segmentByDensity(
-                nuclei=nuclei_imgs[keys[i]], decoded_targets=results[i], **densityKwargs
+                nuclei=nuclei_img, decoded_targets=results[key], **densityKwargs
             )
-            maskname = f"{output_dir}/{keys[i]}/mask.tiff"
-            skimage.io.imsave(maskname, raw_mask)
-            masks.append(
-                BinaryMaskCollection.from_external_labeled_image(maskname, nuclei_imgs[keys[i]])
-            )
-
-    else:
-        img_stack = []
-        for key in exp.keys():
+            maskname = f"{output_dir}/{key}/mask.tiff"
+            skimage.io.imsave(maskname, np.squeeze(raw_mask))
+            mask = BinaryMaskCollection.from_external_labeled_image(maskname, nuclei_img)
+        else:
             print(f"looking at {key}, {aux_name}")
             cur_img = exp[key].get_image(aux_name)
-            img_stack.append(cur_img)
-        # determine how we generate mask, then make it
-        if len(roiKwargs.keys()) > 0:
-            # then apply roi
-            print("applying Roi mask")
-            masks = masksFromRoi(img_stack, **roiKwargs)
-        elif len(labeledKwargs.keys()) > 0:
-            # then apply images
-            print("applying labeled image mask")
-            masks = masksFromLabeledImages(img_stack, **labeledKwargs)
-        elif len(watershedKwargs.keys()) > 0:
-            # then go thru watershed pipeline
-            print("running basic threshold and watershed pipeline")
-            masks = masksFromWatershed(img_stack, **watershedKwargs)
-        else:
-            # throw error
-            raise Exception("Parameters do not specify means of defining mask.")
+            # determine how we generate mask, then make it
+            if len(roiKwargs.keys()) > 0:
+                # then apply roi
+                print("applying Roi mask")
+                mask = maskFromRoi(cur_img, key, **roiKwargs)
+            elif len(labeledKwargs.keys()) > 0:
+                # then apply images
+                print("applying labeled image mask")
+                mask = maskFromLabeledImages(cur_img, key, **labeledKwargs)
+            elif len(watershedKwargs.keys()) > 0:
+                # then go thru watershed pipeline
+                print("running basic threshold and watershed pipeline")
+                mask = maskFromWatershed(cur_img, **watershedKwargs)
+            else:
+                # throw error
+                raise Exception("Parameters do not specify means of defining mask.")
 
-        # save masks to tiffs for later processing
-        for i in range(len(masks)):
-            binmask = masks[i].to_label_image().xarray.values
-            while len(binmask.shape) > 2:
-                binmask = np.sum(binmask, axis=0)
-            binmask = binmask > 0
-            PIL.Image.fromarray(binmask).save("{}/{}/mask.tiff".format(output_dir, keys[i]))
+            # save masks to tiffs for later processing
+            intmask = mask.to_label_image().xarray.values
+            skimage.io.imsave(f"{output_dir}/{key}/mask.tiff", np.squeeze(intmask))
 
-    # apply mask to tables, save results
-    al = AssignTargets.Label()
-    for i in range(fov_count):
-        labeled = al.run(masks[i], results[i])
+        # apply mask to tables, save results
+        al = AssignTargets.Label()
+        labeled = al.run(mask, results[key])
         # labeled = labeled[labeled.cell_id != "nan"]
-        if "xc" not in labeled.features.coords:
-            temp = labeled.to_dict()
-            temp["coords"]["xc"] = temp["coords"]["x"]
-            labeled = DecodedIntensityTable.from_dict(temp)
-        if "yc" not in labeled.features.coords:
-            temp = labeled.to_dict()
-            temp["coords"]["yc"] = temp["coords"]["y"]
-            labeled = DecodedIntensityTable.from_dict(temp)
-        if "zc" not in labeled.features.coords:
-            temp = labeled.to_dict()
-            temp["coords"]["zc"] = temp["coords"]["z"]
-            labeled = DecodedIntensityTable.from_dict(temp)
-        labeled.to_decoded_dataframe().save_csv(output_dir + keys[i] + "/segmentation.csv")
-        labeled.to_netcdf(output_dir + keys[i] + "/df_segmented.cdf")
-        labeled.to_expression_matrix().to_pandas().to_csv(
-            output_dir + keys[i] + "/exp_segmented.csv"
-        )
-        labeled.to_expression_matrix().save(output_dir + keys[i] + "/exp_segmented.cdf")
-        labeled.to_expression_matrix().save_anndata(output_dir + keys[i] + "/exp_segmented.h5ad")
-        print("saved fov key: {}, index {}".format(keys[i], i))
+        labeled.to_features_dataframe().to_csv(output_dir + key + "/segmentation.csv")
+        labeled.to_netcdf(output_dir + key + "/df_segmented.cdf")
+        labeled.to_expression_matrix().to_pandas().to_csv(output_dir + key + "/exp_segmented.csv")
+        labeled.to_expression_matrix().save(output_dir + key + "/exp_segmented.cdf")
+        labeled.to_expression_matrix().save_anndata(output_dir + key + "/exp_segmented.h5ad")
+        print("saved fov key: {}".format(key))
+
+    if len(results) == 0:
+        print("No FOVs found! Did the decoding step complete correctly?")
 
     sys.stdout = sys.__stdout__
 
@@ -690,7 +692,6 @@ if __name__ == "__main__":
     p = ArgumentParser()
 
     p.add_argument("--decoded-loc", type=Path)
-    p.add_argument("--fov-count", type=int)
     p.add_argument("--exp-loc", type=Path)
     p.add_argument("--aux-name", type=str, nargs="?")
 
@@ -721,7 +722,6 @@ if __name__ == "__main__":
 
     args = p.parse_args()
 
-    fov_count = args.fov_count
     input_dir = args.decoded_loc
     exp_dir = args.exp_loc
     aux_name = args.aux_name
@@ -755,7 +755,6 @@ if __name__ == "__main__":
         input_dir,
         exp_dir,
         output_dir,
-        fov_count,
         aux_name,
         roiKwargs,
         labeledKwargs,
