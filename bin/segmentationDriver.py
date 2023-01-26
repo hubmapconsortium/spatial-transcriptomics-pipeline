@@ -616,7 +616,7 @@ def run(
     results = {}
     for f in glob("{}/cdf/*_decoded.cdf".format(input_loc)):
         name = f[len(str(input_loc)) + 5 : -12]
-        if name is not "composite":
+        if "comp" not in name:
             print("found fov key: " + name)
             results[name] = DecodedIntensityTable.open_netcdf(f)
             print("loaded " + f)
