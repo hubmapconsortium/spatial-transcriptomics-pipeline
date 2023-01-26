@@ -1458,7 +1458,8 @@ if __name__ == "__main__":
         # load transcripts from exp dir
         for f in glob("{}/cdf/*_decoded.cdf".format(args.exp_output)):
             name = f[len(str(args.exp_output)) + 5 : -12]
-            transcripts[name] = DecodedIntensityTable.open_netcdf(f)
+            if name is not "composite":
+                transcripts[name] = DecodedIntensityTable.open_netcdf(f)
 
     segmentation = None
     if (
