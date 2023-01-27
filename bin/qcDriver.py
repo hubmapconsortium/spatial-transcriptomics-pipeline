@@ -1361,6 +1361,7 @@ def run(
                                 results[f]["transcripts"]["FPR"]["tally"][k]
                                 for f in fovs
                                 if "FPR" in results[f]["transcripts"].keys()
+                                and "tally" in results[f]["transcripts"]["FPR"]
                             ]
                         )
                     trRes["FPR"] = getFPR(results=FPR_raw, pdf=pdf)
