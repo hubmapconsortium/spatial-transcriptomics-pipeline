@@ -77,6 +77,15 @@ inputs:
         detector_method:
           type: string?
           doc: Name of the scikit-image spot detection method to use
+        composite_decode:
+          type: boolean?
+          doc: Whether to composite all FOVs into one image, typically for PoSTcode decoding.
+        composite_pmin:
+          type: float?
+          doc: pmin value for clip and scale of composite image.
+        composite_pmax:
+          type: float?
+          doc: pmax value for clip and scale of composite image.
         decode_method:
           type: string
           doc: Method name for spot decoding. Refer to starfish documentation.
@@ -204,7 +213,7 @@ steps:
     in:
       datafile: parameter_json
       schema: read_schema/data
-    out: [level_method, use_ref_img, is_volume, anchor_view, rescale, not_filtered_results, n_processes, decoding_min_sigma, decoding_max_sigma, decoding_num_sigma, decoding_threshold, decoding_overlap, decoding_decode_method, decoding_decoder_trace_building_strategy, decoding_decoder_max_distance, decoding_decoder_min_intensity, decoding_decoder_metric, decoding_decoder_norm_order, decoding_decoder_anchor_round, decoding_decoder_search_radius, decoding_decoder_return_original_intensities, decoding_decoder_error_rounds, decoding_decoder_mode, decoding_decoder_physical_coords, decoding_metric, decoding_distance_threshold, decoding_magnitude_threshold, decoding_min_area, decoding_max_area, decoding_norm_order]
+    out: [level_method, use_ref_img, is_volume, anchor_view, rescale, not_filtered_results, n_processes, decoding_min_sigma, decoding_max_sigma, decoding_num_sigma, decoding_threshold, decoding_overlap, decoding_decode_method, decoding_decoder_trace_building_strategy, decoding_decoder_max_distance, decoding_decoder_min_intensity, decoding_decoder_metric, decoding_decoder_norm_order, decoding_decoder_anchor_round, decoding_decoder_search_radius, decoding_decoder_return_original_intensities, decoding_decoder_error_rounds, decoding_decoder_mode, decoding_decoder_physical_coords, decoding_metric, decoding_distance_threshold, decoding_magnitude_threshold, decoding_min_area, decoding_max_area, decoding_norm_order, decoding_composite_decode, decoding_composite_pmin, decoding_composite_pmax]
     when: $(inputs.datafile != null)
 
   execute_runner:
@@ -287,6 +296,18 @@ steps:
                 type: string?
                 inputBinding:
                   prefix: --detector-method
+              composite_decode:
+                type: boolean?
+                inputBinding:
+                  prefix: --composite-decode
+              composite_pmin:
+                type: float?
+                inputBinding:
+                  prefix: --composite-pmin
+              composite_pmax:
+                type: float?
+                inputBinding:
+                  prefix: --composite-pmax
               decode_method:
                 type: string
                 inputBinding:
@@ -468,7 +489,7 @@ steps:
             }
           }
       decoding_blob:
-        source: [decoding_blob, stage_runner/decoding_min_sigma, stage_runner/decoding_max_sigma, stage_runner/decoding_num_sigma, stage_runner/decoding_threshold, stage_runner/decoding_overlap, stage_runner/decoding_decode_method, stage_runner/decoding_decoder_trace_building_strategy, stage_runner/decoding_decoder_max_distance, stage_runner/decoding_decoder_min_intensity, stage_runner/decoding_decoder_metric, stage_runner/decoding_decoder_norm_order, stage_runner/decoding_decoder_anchor_round, stage_runner/decoding_decoder_search_radius, stage_runner/decoding_decoder_return_original_intensities, stage_runner/decoding_decoder_error_rounds, stage_runner/decoding_decoder_mode, stage_runner/decoding_decoder_physical_coords]
+        source: [decoding_blob, stage_runner/decoding_min_sigma, stage_runner/decoding_max_sigma, stage_runner/decoding_num_sigma, stage_runner/decoding_threshold, stage_runner/decoding_overlap, stage_runner/decoding_decode_method, stage_runner/decoding_decoder_trace_building_strategy, stage_runner/decoding_decoder_max_distance, stage_runner/decoding_decoder_min_intensity, stage_runner/decoding_decoder_metric, stage_runner/decoding_decoder_norm_order, stage_runner/decoding_decoder_anchor_round, stage_runner/decoding_decoder_search_radius, stage_runner/decoding_decoder_return_original_intensities, stage_runner/decoding_decoder_error_rounds, stage_runner/decoding_decoder_mode, stage_runner/decoding_decoder_physical_coords, stage_runner/decoding_composite_decode, stage_runner/decoding_composite_pmin, stage_runner/decoding_composite_pmax]
         valueFrom: |
           ${
             if(!self[6]){
@@ -481,6 +502,9 @@ steps:
                 threshold: self[4],
                 overlap: self[5],
                 decode_method: self[6],
+                composite_decode: self[18],
+                composite_pmin: self[19],
+                composite_pmax: self[20]
               };
               if(self[9]){
                 /* metric distance decoder */

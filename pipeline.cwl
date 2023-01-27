@@ -297,6 +297,15 @@ inputs:
         detector_method:
           type: string?
           doc: Name of the scikit-image spot detection method to use
+        composite_decode:
+          type: boolean?
+          doc: Whether to composite all FOVs into one image, typically for PoSTcode decoding.
+        composite_pmin:
+          type: float?
+          doc: pmin value for clip and scale of composite image.
+        composite_pmax:
+          type: float?
+          doc: pmax value for clip and scale of composite image.
         decode_method:
           type: string
           doc: Method name for spot decoding. Refer to starfish documentation.
