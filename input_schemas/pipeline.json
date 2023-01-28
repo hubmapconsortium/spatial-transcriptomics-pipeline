@@ -1,5 +1,6 @@
 [
 	"run_baysor",
+	"skip_formatting",
 	"skip_processing",
 	"register_aux_view",
 	{

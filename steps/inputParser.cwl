@@ -48,6 +48,7 @@ outputs:
   fov_positioning_z_shape: int
   fov_positioning_z_voxel: float
   add_blanks: boolean
+  skip_formatting: boolean
   skip_processing: boolean
   clip_min: float
   clip_max: float

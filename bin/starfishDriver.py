@@ -794,7 +794,7 @@ def run(
             decoded.to_netcdf(output_dir + "cdf/composite_decoded.cdf")
             print(f"Saved cdf file {output_dir}cdf/composite_decoded.cdf")
         else:
-            print(f"No transcripts found for composite! Not saving a DecodedIntensityTable file.")
+            print("No transcripts found for composite! Not saving a DecodedIntensityTable file.")
 
         # Saves per FOV spots and decoded results
         saveCompositeResults(blobs, decoded, exploc, output_name=f"{output_dir}")

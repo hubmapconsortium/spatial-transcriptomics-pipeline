@@ -10,6 +10,10 @@ requirements:
 
 inputs:
 
+  skip_formatting:
+    type: boolean?
+    doc: If true, will skip first two stages and start at processing.
+
 # pseudochannel sorting vars, if present then it will be assumed that sorting must be performed.
 
   channel_yml:
@@ -25,7 +29,7 @@ inputs:
 # can be read into converter or sorter, followed by string literal input will be used for conversion
 
   tiffs:
-    type: Directory
+    type: Directory?
     doc: The directory containing all .tiff files
 
   codebook_csv:
@@ -184,6 +188,10 @@ inputs:
 
 # image processing
 
+  input_dir:
+    type: Directory?
+    doc: Root directory containing space_tx formatted experiment. Only used if skip_formatting is true.
+
   skip_processing:
     type: boolean?
     doc: If true, image processing step will be skipped.
@@ -246,6 +254,10 @@ inputs:
     doc: Radius for white top hat filter. Should be slightly larger than the expected spot radius. Will not be run if not provided.
 
 # starfishRunner
+
+  exp_loc:
+    type: Directory?
+    doc: Location of directory containing starfish experiment.json file. Only used when both skip_formatting and skip_processing are true.
 
   use_ref_img:
     type: boolean?
@@ -539,7 +551,7 @@ steps:
     in:
       datafile: parameter_json
       schema: read_schema/data
-    out: [run_baysor, skip_processing, register_aux_view, fov_positioning_x_locs, fov_positioning_x_shape, fov_positioning_x_voxel, fov_positioning_y_locs, fov_positioning_y_shape, fov_positioning_y_voxel, fov_positioning_z_locs, fov_positioning_z_shape, fov_positioning_z_voxel, add_blanks]
+    out: [run_baysor, skip_formatting, skip_processing, register_aux_view, fov_positioning_x_locs, fov_positioning_x_shape, fov_positioning_x_voxel, fov_positioning_y_locs, fov_positioning_y_shape, fov_positioning_y_voxel, fov_positioning_z_locs, fov_positioning_z_shape, fov_positioning_z_voxel, add_blanks]
     when: $(inputs.datafile != null)
 
   sorter:
@@ -571,7 +583,17 @@ steps:
       file_vars: file_vars
       cache_read_order: cache_read_order
       aux_tilesets: aux_tilesets
-    when: $(inputs.channel_yml != null)
+      skip_formatting:
+        source: [stage/skip_formatting, skip_formatting]
+        valueFrom: |
+          ${
+            if(self[0] || self[1]){
+              return true;
+            } else {
+              return false;
+            };
+          }
+    when: $(inputs.channel_yml != null && !inputs.skip_formatting)
     out: [pseudosorted_dir]
 
   stagedSorted:
@@ -602,7 +624,17 @@ steps:
                 return null;
             }
           }
-    when: $(inputs.channel_yml != null)
+      skip_formatting:
+        source: [stage/skip_formatting, skip_formatting]
+        valueFrom: |
+          ${
+            if(self[0] || self[1]){
+              return true;
+            } else {
+              return false;
+            };
+          }
+    when: $(inputs.channel_yml != null && !inputs.skip_formatting)
     out: [codebook, round_count, fov_count, channel_count, zplane_count, round_offset, fov_offset, channel_offset, zplane_offset, file_format, file_vars, cache_read_order, aux_names, aux_file_formats, aux_file_vars, aux_cache_read_order, aux_channel_count, aux_channel_slope, aux_channel_intercept]
 
   spaceTxConversion:
@@ -822,6 +854,17 @@ steps:
               return false;
             }
           }
+      skip_formatting:
+        source: [stage/skip_formatting, skip_formatting]
+        valueFrom: |
+          ${
+            if(self[0] || self[1]){
+              return true;
+            } else {
+              return false;
+            };
+          }
+    when: $(inputs.channel_yml != null && !inputs.skip_formatting)
     out: [spaceTx_converted]
 
   processing:
@@ -837,7 +880,18 @@ steps:
               return false;
             };
           }
-      input_dir: spaceTxConversion/spaceTx_converted
+      input_dir:
+        source: [spaceTxConversion/spaceTx_converted, input_dir]
+        valueFrom: |
+          ${
+            if(self[0]){
+              return self[0];
+            } else if(self[1]) {
+              return self[1];
+            } else {
+              return null;
+            };
+          }
       parameter_json: parameter_json
       clip_min: clip_min
       clip_max: clip_max
@@ -881,7 +935,7 @@ steps:
     run: steps/starfishRunner.cwl
     in:
       exp_loc:
-        source: [processing/processed_exp, spaceTxConversion/spaceTx_converted]
+        source: [processing/processed_exp, spaceTxConversion/spaceTx_converted, exp_loc]
         pickValue: first_non_null
       parameter_json: parameter_json
       level_method: level_method
@@ -948,7 +1002,7 @@ steps:
     run: steps/qc.cwl
     in:
       codebook:
-        source: [sorter/pseudosorted_dir, spaceTxConversion/spaceTx_converted]
+        source: [sorter/pseudosorted_dir, spaceTxConversion/spaceTx_converted, exp_loc]
         pickValue: first_non_null
         valueFrom: |
           ${
