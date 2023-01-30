@@ -447,7 +447,7 @@ def add_corrected_rounds(codebook, decoded, ham_dist):
     return decoded.assign_coords(corrected_rounds=("features", corrected_rounds))
 
 
-def getPhysicalCoords(exploc: str):
+def getCoords(exploc: str):
     """
     Extracts physical coordinates of each FOV from the primary-fov_*.json files. Used in creating composite images.
     """
@@ -457,6 +457,7 @@ def getPhysicalCoords(exploc: str):
     fov_count = len(img_jsons)
 
     # Get x_min, x_max, y_min, and y_max values for all FOVs and keep track of the absolute x_min and y_min
+    composite_coords = defaultdict(dict)
     physical_coords = defaultdict(dict)
     x_min_all = np.inf
     x_max_all = 0
@@ -467,39 +468,62 @@ def getPhysicalCoords(exploc: str):
         with open(img_jsons[pos], "r") as file:
             metadata = json.load(file)
 
-        physical_coords[pos]["x_min"] = metadata["tiles"][0]["coordinates"]["xc"][0]
+        # Convert physical coordinates to pixel coordinates to find each FOVs place in the composite image
+        xc = metadata["tiles"][0]["coordinates"]["xc"]
+        yc = metadata["tiles"][0]["coordinates"]["yc"]
+        zc = metadata["tiles"][0]["coordinates"]["zc"]
+        tile_shape = metadata["tiles"][0]["tile_shape"]
+        x_size = (xc[1] - xc[0]) / tile_shape["x"]
+        y_size = (yc[1] - yc[0]) / tile_shape["y"]
+        z_size = (zc[1] - zc[0]) / metadata["shape"]["z"]
+
+        # Save physical distance values for later use
+        physical_coords[pos]["xc"] = xc
+        physical_coords[pos]["yc"] = yc
+        physical_coords[pos]["zc"] = zc
+        physical_coords["x_size"] = x_size
+        physical_coords["y_size"] = y_size
+        physical_coords["z_size"] = z_size
+
+        # Save min and max values for x and y for each FOV and track the min/max values across all FOVs
+        composite_coords[pos]["x_min"] = int(xc[0] / x_size)
         x_min_all = (
             x_min_all
-            if x_min_all < physical_coords[pos]["x_min"]
-            else physical_coords[pos]["x_min"]
+            if x_min_all < composite_coords[pos]["x_min"]
+            else composite_coords[pos]["x_min"]
         )
-        physical_coords[pos]["x_max"] = metadata["tiles"][0]["coordinates"]["xc"][1]
+        composite_coords[pos]["x_max"] = int(xc[1] / x_size)
         x_max_all = (
             x_max_all
-            if x_max_all > physical_coords[pos]["x_max"]
-            else physical_coords[pos]["x_max"]
+            if x_max_all > composite_coords[pos]["x_max"]
+            else composite_coords[pos]["x_max"]
         )
-        physical_coords[pos]["y_min"] = metadata["tiles"][0]["coordinates"]["yc"][0]
+        composite_coords[pos]["y_min"] = int(yc[0] / y_size)
         y_min_all = (
             y_min_all
-            if y_min_all < physical_coords[pos]["y_min"]
-            else physical_coords[pos]["y_min"]
+            if y_min_all < composite_coords[pos]["y_min"]
+            else composite_coords[pos]["y_min"]
         )
-        physical_coords[pos]["y_max"] = metadata["tiles"][0]["coordinates"]["yc"][1]
+        composite_coords[pos]["y_max"] = int(yc[1] / y_size)
         y_max_all = (
             y_max_all
-            if y_max_all > physical_coords[pos]["y_max"]
-            else physical_coords[pos]["y_max"]
+            if y_max_all > composite_coords[pos]["y_max"]
+            else composite_coords[pos]["y_max"]
         )
 
     # Subtract minimum coord values from xs and ys (ensures (0,0) is the top left corner)
     for pos in range(fov_count):
-        physical_coords[pos]["x_min"] = int(physical_coords[pos]["x_min"] - x_min_all)
-        physical_coords[pos]["x_max"] = int(physical_coords[pos]["x_max"] - x_min_all)
-        physical_coords[pos]["y_min"] = int(physical_coords[pos]["y_min"] - y_min_all)
-        physical_coords[pos]["y_max"] = int(physical_coords[pos]["y_max"] - y_min_all)
+        composite_coords[pos]["x_min"] = composite_coords[pos]["x_min"] - x_min_all
+        composite_coords[pos]["x_max"] = composite_coords[pos]["x_max"] - x_min_all
+        composite_coords[pos]["y_min"] = composite_coords[pos]["y_min"] - y_min_all
+        composite_coords[pos]["y_max"] = composite_coords[pos]["y_max"] - y_min_all
 
-    return physical_coords, y_max_all, x_max_all, metadata["shape"]
+    y_max_all -= y_min_all
+    x_max_all -= x_min_all
+    physical_coords["y_offset"] = y_min_all
+    physical_coords["x_offset"] = x_min_all
+
+    return composite_coords, physical_coords, y_max_all, x_max_all, metadata["shape"]
 
 
 def createComposite(
@@ -517,8 +541,8 @@ def createComposite(
     """
 
     # Get physical coordinates
-    physical_coords, y_max_all, x_max_all, shape = getPhysicalCoords(exploc)
-    fov_count = len(physical_coords)
+    composite_coords, physical_coords, y_max_all, x_max_all, shape = getCoords(exploc)
+    fov_count = len(composite_coords)
 
     # Create empty combined images
     combined_img = np.zeros(
@@ -535,10 +559,10 @@ def createComposite(
         fov = "fov_" + "0" * (3 - len(str(pos))) + str(pos)
         img = experiment[fov].get_image("primary")
 
-        x_min = physical_coords[pos]["x_min"]
-        x_max = physical_coords[pos]["x_max"]
-        y_min = physical_coords[pos]["y_min"]
-        y_max = physical_coords[pos]["y_max"]
+        x_min = composite_coords[pos]["x_min"]
+        x_max = composite_coords[pos]["x_max"]
+        y_min = composite_coords[pos]["y_min"]
+        y_max = composite_coords[pos]["y_max"]
         combined_img[:, :, :, y_min:y_max, x_min:x_max] = deepcopy(img.xarray.data)
 
         if anchor_name:
@@ -580,16 +604,16 @@ def saveCompositeResults(spots, decoded, exploc, output_name):
     for rch in spot_items:
         spot_items[rch] = spot_items[rch].spot_attrs.data
 
-    physical_coords, y_max_all, x_max_all, shape = getPhysicalCoords(exploc)
+    composite_coords, physical_coords, y_max_all, x_max_all, shape = getCoords(exploc)
 
     # Create a new SpotFindingResults object with only spots from each position and save separately
-    for pos in range(len(physical_coords)):
-        fov = "fov_{:03}".format(pos)
+    for pos in range(len(composite_coords)):
+        fov = "fov_" + "0" * (3 - len(str(pos))) + str(pos)
         spot_attrs = {}
-        x_min = physical_coords[pos]["x_min"]
-        x_max = physical_coords[pos]["x_max"]
-        y_min = physical_coords[pos]["y_min"]
-        y_max = physical_coords[pos]["y_max"]
+        x_min = composite_coords[pos]["x_min"]
+        x_max = composite_coords[pos]["x_max"]
+        y_min = composite_coords[pos]["y_min"]
+        y_max = composite_coords[pos]["y_max"]
         for rch in spot_items:
             if y_min == 0:
                 spot_attrs[rch] = spot_items[rch][
@@ -619,6 +643,7 @@ def saveCompositeResults(spots, decoded, exploc, output_name):
             spot_attrs[rch]["x"] = spot_attrs[rch]["x"] - x_min
             spot_attrs[rch]["x_min"] = spot_attrs[rch]["x_min"] - x_min
             spot_attrs[rch]["x_max"] = spot_attrs[rch]["x_max"] - x_min
+
         spot_attrs_list = []
         for ch in range(shape["c"]):
             for r in range(shape["r"]):
@@ -627,17 +652,25 @@ def saveCompositeResults(spots, decoded, exploc, output_name):
                 )
                 spot_attrs_list.append((spot_results, {Axes.ROUND: r, Axes.CH: ch}))
 
+        # Correctly adds correct physical coordinate info for each FOV
         coords = {}
-        coords["xc"] = xr.DataArray(
-            data=np.arange(int(x_max)), dims=["x"], coords=dict(xc=(["x"], np.arange(int(x_max))))
-        )
-        coords["yc"] = xr.DataArray(
-            data=np.arange(int(y_max)), dims=["y"], coords=dict(yc=(["y"], np.arange(int(y_max))))
-        )
+        xc = physical_coords[pos]["xc"]
+        yc = physical_coords[pos]["yc"]
+        zc = physical_coords[pos]["zc"]
+        x_size = physical_coords["x_size"]
+        y_size = physical_coords["y_size"]
+        z_size = physical_coords["z_size"]
+        x_offset = physical_coords["x_offset"]
+        y_offset = physical_coords["y_offset"]
+        xrange = np.arange(xc[0] + x_offset, xc[1] + x_offset, x_size)
+        coords["xc"] = xr.DataArray(data=xrange, dims=["x"], coords=dict(xc=(["x"], xrange)))
+        yrange = np.arange(yc[0] + y_offset, yc[1] + y_offset, y_size)
+        coords["yc"] = xr.DataArray(data=yrange, dims=["y"], coords=dict(yc=(["y"], xrange)))
+        zrange = np.arange(zc[0], zc[1], z_size)
         coords["zc"] = xr.DataArray(
-            data=np.arange(shape["z"]),
+            data=zrange,
             dims=["z"],
-            coords=dict(z=(["z"], np.arange(shape["z"])), zc=(["z"], np.arange(shape["z"]))),
+            coords=dict(z=(["z"], zrange), zc=(["z"], zrange)),
         )
 
         fov_spots = SpotFindingResults(
@@ -646,46 +679,49 @@ def saveCompositeResults(spots, decoded, exploc, output_name):
 
         if fov_spots.count_total_spots() > 0:
             if output_name:
-                fov_spots.save(f"{output_name}spots/{fov}_")
+                fov_spots.save(f"{output_name}spots/fov_")
     print("spots saved.")
 
     # Save decoded transcripts
-    for pos in physical_coords:
+    for pos in composite_coords:
         fov = "fov_" + "0" * (3 - len(str(pos))) + str(pos)
-        x_min = physical_coords[pos]["x_min"]
-        x_max = physical_coords[pos]["x_max"]
-        y_min = physical_coords[pos]["y_min"]
-        y_max = physical_coords[pos]["y_max"]
-        if y_min == 0:
-            decoded_results = decoded[
-                (decoded["y"] >= y_min)
-                & (decoded["y"] <= y_max)
-                & (decoded["x"] > x_min)
-                & (decoded["x"] <= x_max)
-            ]
-        elif x_min == 0:
-            decoded_results = decoded[
-                (decoded["y"] > y_min)
-                & (decoded["y"] <= y_max)
-                & (decoded["x"] >= x_min)
-                & (decoded["x"] <= x_max)
-            ]
-        else:
-            decoded_results = decoded[
-                (decoded["y"] > y_min)
-                & (decoded["y"] <= y_max)
-                & (decoded["x"] > x_min)
-                & (decoded["x"] <= x_max)
-            ]
 
-        decoded["xc"].data = decoded["x"].data
-        decoded["yc"].data = decoded["y"].data
-        decoded["x"].data = decoded["x"].data - y_min
-        decoded["y"].data = decoded["y"].data - x_min
+        # Subset transcripts for this FOV based on the FOV's composite coordinates
+        x_min = composite_coords[pos]["x_min"]
+        x_max = composite_coords[pos]["x_max"]
+        y_min = composite_coords[pos]["y_min"]
+        y_max = composite_coords[pos]["y_max"]
+        decoded_results = decoded[
+            (decoded["y"] >= y_min)
+            & (decoded["y"] < y_max)
+            & (decoded["x"] >= x_min)
+            & (decoded["x"] < x_max)
+        ]
 
-        if len(decoded) > 0:
-            saveTable(decoded, f"{output_name}csv/{fov}_decoded.csv")
-            decoded.to_netcdf(f"{output_name}cdf/{fov}_decoded.cdf")
+        # Adjusts x and y values back to thier FOV pixel values
+        decoded_results["x"].data -= x_min
+        decoded_results["y"].data -= y_min
+
+        # Correctly adds correct physical coordinate info for each FOV
+        xc = physical_coords[pos]["xc"]
+        yc = physical_coords[pos]["yc"]
+        zc = physical_coords[pos]["zc"]
+        x_size = physical_coords["x_size"]
+        y_size = physical_coords["y_size"]
+        z_size = physical_coords["z_size"]
+        x_offset = physical_coords["x_offset"]
+        y_offset = physical_coords["y_offset"]
+        decoded_results["xc"].data = [
+            x * x_size + xc[0] + x_offset for x in decoded_results["x"].data
+        ]
+        decoded_results["yc"].data = [
+            y * y_size + yc[0] + y_offset for y in decoded_results["y"].data
+        ]
+        decoded_results["zc"].data = [z * z_size + zc[0] for z in decoded_results["z"].data]
+
+        if len(decoded_results) > 0:
+            saveTable(decoded_results, f"{output_name}csv/{fov}_decoded.csv")
+            decoded_results.to_netcdf(f"{output_name}cdf/{fov}_decoded.cdf")
             print(f"Saved cdf file {output_name}cdf/{fov}_decoded.cdf")
         else:
             print(f"No transcripts found for {fov}! Not saving a DecodedIntensityTable file.")
@@ -752,11 +788,11 @@ def run(
     if blob_based and not path.isdir(output_dir + "spots/"):
         makedirs(output_dir + "spots")
 
-    reporter = open(
-        path.join(output_dir, datetime.now().strftime("%Y%m%d_%H%M_starfish_runner.log")), "w"
-    )
-    sys.stdout = reporter
-    sys.stderr = reporter
+    # reporter = open(
+    #    path.join(output_dir, datetime.now().strftime("%Y%m%d_%H%M_starfish_runner.log")), "w"
+    # )
+    # sys.stdout = reporter
+    # sys.stderr = reporter
 
     print(locals())
 
