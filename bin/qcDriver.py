@@ -588,15 +588,19 @@ def getFPR(segmentation=None, results=None, pdf=False):
     sorted_reals_all = real_per_cell_all.sort_values(ascending=False)
     sorted_blanks_all = blank_per_cell_all[sorted_reals_all.index]
 
-    final_results = {
-        "FP": sum(blank_per_cell_all),
-        "TP": sum(real_per_cell_all),
-        "FPR": sum(blank_per_cell_all) / (sum(blank_per_cell_all) + sum(real_per_cell_all)),
-        "tally": {
-            "reals_all": list(sorted_reals_all),
-            "blanks_all": list(sorted_blanks_all),
-        },
-    }
+    if (sum(blank_per_cell_all) + sum(real_per_cell_all)) > 0:
+        final_results = {
+            "FP": sum(blank_per_cell_all),
+            "TP": sum(real_per_cell_all),
+            "FPR": sum(blank_per_cell_all) / (sum(blank_per_cell_all) + sum(real_per_cell_all)),
+            "tally": {
+                "reals_all": list(sorted_reals_all),
+                "blanks_all": list(sorted_blanks_all),
+            },
+        }
+    else:
+        print("No cells within boundaries, was segmentation performed properly?")
+        return {}
 
     # If error-correction is used, do the same for only non-error-corrected barcodes
     if (segmentation is not None and "corrected_rounds" in segmentation.keys()) or (
@@ -1349,12 +1353,18 @@ def run(
                     [results[f]["transcripts"]["per_cell"]["counts"] for f in fovs]
                 )
                 trRes["per_cell"] = getTranscriptsPerCell(results=cell_counts, pdf=pdf)
-                FPR_raw = {}
-                for k in results[fovs[0]]["transcripts"]["FPR"]["tally"].keys():
-                    FPR_raw[k] = flatten(
-                        [results[f]["transcripts"]["FPR"]["tally"][k] for f in fovs]
-                    )
-                trRes["FPR"] = getFPR(results=FPR_raw, pdf=pdf)
+                if "FPR" in results[fovs[0]]["transcripts"].keys():
+                    FPR_raw = {}
+                    for k in results[fovs[0]]["transcripts"]["FPR"]["tally"].keys():
+                        FPR_raw[k] = flatten(
+                            [
+                                results[f]["transcripts"]["FPR"]["tally"][k]
+                                for f in fovs
+                                if "FPR" in results[f]["transcripts"].keys()
+                                and "tally" in results[f]["transcripts"]["FPR"]
+                            ]
+                        )
+                    trRes["FPR"] = getFPR(results=FPR_raw, pdf=pdf)
 
             print("\tRe-computing barcode metrics")
             barcodeTallies = {}
@@ -1458,7 +1468,8 @@ if __name__ == "__main__":
         # load transcripts from exp dir
         for f in glob("{}/cdf/*_decoded.cdf".format(args.exp_output)):
             name = f[len(str(args.exp_output)) + 5 : -12]
-            transcripts[name] = DecodedIntensityTable.open_netcdf(f)
+            if "comp" not in name:
+                transcripts[name] = DecodedIntensityTable.open_netcdf(f)
 
     segmentation = None
     if (

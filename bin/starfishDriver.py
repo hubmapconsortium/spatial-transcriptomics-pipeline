@@ -508,7 +508,8 @@ def createComposite(
     anchor_name: str,
     is_volume: bool,
     level_method: Levels,
-    compositeKwargs: dict,
+    composite_pmin: float = 0.0,
+    composite_pmax: float = 100.0,
 ):
     """
     Creates a composite image by taking all FOVs and placing that according to their fov_positioning input. Used
@@ -556,8 +557,8 @@ def createComposite(
 
     # Scale composite images
     clip = starfish.image.Filter.ClipPercentileToZero(
-        p_min=compositeKwargs["composite_pmin"],
-        p_max=compositeKwargs["composite_pmax"],
+        p_min=composite_pmin,
+        p_max=composite_pmax,
         is_volume=is_volume,
         level_method=level_method,
     )
@@ -583,7 +584,7 @@ def saveCompositeResults(spots, decoded, exploc, output_name):
 
     # Create a new SpotFindingResults object with only spots from each position and save separately
     for pos in range(len(physical_coords)):
-        fov = "fov_" + "0" * (3 - len(str(pos))) + str(pos)
+        fov = "fov_{:03}".format(pos)
         spot_attrs = {}
         x_min = physical_coords[pos]["x_min"]
         x_max = physical_coords[pos]["x_max"]
@@ -645,7 +646,7 @@ def saveCompositeResults(spots, decoded, exploc, output_name):
 
         if fov_spots.count_total_spots() > 0:
             if output_name:
-                fov_spots.save(f"{output_name}spots/fov_")
+                fov_spots.save(f"{output_name}spots/{fov}_")
     print("spots saved.")
 
     # Save decoded transcripts
@@ -699,6 +700,7 @@ def run(
     rescale: bool,
     level_method: Levels,
     is_volume: bool,
+    is_composite: bool,
     not_filtered_results: bool,
     blobRunnerKwargs: dict,
     decodeRunnerKwargs: dict,
@@ -721,6 +723,12 @@ def run(
         If provided, that aux view will be flattened and used as the reference image.
     rescale: bool
         If true, the image will be rescaled until convergence before running the decoder.
+    level_method: Levels
+        The level method to be used in clip and scale.
+    is_volume: bool
+        If true, zslices will be treated as 3D image, instead of being processed separately
+    is_composite: bool
+        If true, all fovs will be composited into one image. Only used for postcode decoding.
     not_filtered_results: bool
         If true, rows with no target or that do not pass thresholds will not be removed.
     blobRunnerKwargs: dict
@@ -758,10 +766,7 @@ def run(
     # If decoder is postcodeDecoder and composite_decode has been set to True then we combine images along edges
     # according to the information in fov_positioning input (extracted from json files) and then run spot finding
     # and decoding on the large composite image.
-    if (
-        decodeRunnerKwargs["callableDecoder"].__name__ == "postcodeDecode"
-        and "composite_decode" in compositeKwargs
-    ):
+    if decodeRunnerKwargs["callableDecoder"].__name__ == "postcodeDecode" and is_composite:
         if not anchor_name:
             print(
                 "No anchor image detected. Using max projection of primary image as reference for spot finding (required for postcodeDecode)"
@@ -769,7 +774,7 @@ def run(
 
         # Creates the big images. If not given an anchor_name then it takes the max projection of the primary image
         composite_img, composite_anchor = createComposite(
-            experiment, exploc, anchor_name, is_volume, level_method, compositeKwargs
+            experiment, exploc, anchor_name, is_volume, level_method, **compositeKwargs
         )
 
         # Find spots and decode the composite image
@@ -1048,13 +1053,13 @@ if __name__ == "__main__":
     addKwarg(args, decodeRunnerKwargs, "return_original_intensities")
 
     compositeKwargs = {}
-    addKwarg(args, compositeKwargs, "composite_decode")
     addKwarg(args, compositeKwargs, "composite_pmin")
     addKwarg(args, compositeKwargs, "composite_pmax")
 
     use_ref = args.use_ref_img
     anchor_name = args.anchor_view
     rescale = args.rescale
+    composite = args.composite_decode
     not_filtered_results = args.not_filtered_results
 
     level_method = args.level_method
@@ -1078,6 +1083,7 @@ if __name__ == "__main__":
         rescale,
         level_method,
         vol,
+        composite,
         not_filtered_results,
         blobRunnerKwargs,
         decodeRunnerKwargs,

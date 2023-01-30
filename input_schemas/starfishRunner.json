@@ -21,6 +21,9 @@
 				"min_area?",
 				"max_area?",
 				"norm_order?",
+				"composite_decode?",
+				"composite_pmin?",
+				"composite_pmax?",
 				{
 					"decoder":[
 						[

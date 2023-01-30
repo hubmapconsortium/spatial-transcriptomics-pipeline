@@ -616,12 +616,13 @@ def run(
     results = {}
     for f in glob("{}/cdf/*_decoded.cdf".format(input_loc)):
         name = f[len(str(input_loc)) + 5 : -12]
-        print("found fov key: " + name)
-        results[name] = DecodedIntensityTable.open_netcdf(f)
-        print("loaded " + f)
-        if not path.isdir(output_dir + name):
-            makedirs(output_dir + name)
-            print("made " + output_dir + name)
+        if "comp" not in name:
+            print("found fov key: " + name)
+            results[name] = DecodedIntensityTable.open_netcdf(f)
+            print("loaded " + f)
+            if not path.isdir(output_dir + name):
+                makedirs(output_dir + name)
+                print("made " + output_dir + name)
 
     # load in the images we want to look at
     exp = starfish.core.experiment.experiment.Experiment.from_json(

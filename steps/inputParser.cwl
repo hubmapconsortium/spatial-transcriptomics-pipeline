@@ -92,6 +92,9 @@ outputs:
   decoding_min_area: int
   decoding_max_area: int
   decoding_norm_order: int
+  decoding_composite_decode: boolean
+  decoding_composite_pmin: float
+  decoding_composite_pmax: float
   aux_name: string
   binary_mask_img_threshold: float
   binary_mask_min_dist: int
