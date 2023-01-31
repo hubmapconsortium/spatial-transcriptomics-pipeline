@@ -18,6 +18,10 @@ inputs:
     type: File?
     doc: json containing step parameters.
 
+  selected_fovs:
+    type: int[]?
+    doc: If provided, processing will only be run on FOVs with these indices.
+
   clip_min:
     type: float?
     doc: Pixels below this percentile are set to 0.
@@ -126,7 +130,7 @@ steps:
     in:
       datafile: parameter_json
       schema: read_schema/data
-    out: [clip_min, clip_max, level_method, rescale, register_aux_view, channels_per_reg, background_view, register_background, anchor_view, high_sigma, deconvolve_iter, deconvolve_sigma, low_sigma, rolling_radius, match_histogram, tophat_radius, channel_count, aux_tilesets_aux_names, aux_tilesets_aux_channel_count, is_volume, n_processes]
+    out: [selected_fovs, clip_min, clip_max, level_method, rescale, register_aux_view, channels_per_reg, background_view, register_background, anchor_view, high_sigma, deconvolve_iter, deconvolve_sigma, low_sigma, rolling_radius, match_histogram, tophat_radius, channel_count, aux_tilesets_aux_names, aux_tilesets_aux_channel_count, is_volume, n_processes]
     when: $(inputs.datafile != null)
 
   execute_processing:
@@ -144,6 +148,12 @@ steps:
           inputBinding:
             prefix: --input-dir
           doc: Root directory containing space_tx formatted experiment
+
+        selected_fovs:
+          type: int[]?
+          inputBinding:
+            prefix: --selected-fovs
+          doc: If provided, processing will only be run on FOVs with these indices.
 
         clip_min:
           type: float?
@@ -259,6 +269,18 @@ steps:
             glob: "3_processed"
     in:
       input_dir: input_dir
+      selected_fovs:
+        source: [stage_processing/selected_fovs, selected_fovs]
+        valueFrom: |
+          ${
+            if(self[0]){
+              return self[0];
+            } else if(self[1]) {
+              return self[1];
+            } else {
+              return null;
+            }
+          }
       clip_min:
         source: [stage_processing/clip_min, clip_min]
         valueFrom: |

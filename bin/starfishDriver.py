@@ -13,7 +13,7 @@ from datetime import datetime
 from functools import partialmethod, reduce
 from os import makedirs, path
 from pathlib import Path
-from typing import Callable, Tuple, Union
+from typing import Callable, List, Tuple, Union
 
 import numpy as np
 import starfish
@@ -738,6 +738,7 @@ def run(
     is_volume: bool,
     is_composite: bool,
     not_filtered_results: bool,
+    selected_fovs: List[int],
     blobRunnerKwargs: dict,
     decodeRunnerKwargs: dict,
     pixelRunnerKwargs: dict,
@@ -767,6 +768,8 @@ def run(
         If true, all fovs will be composited into one image. Only used for postcode decoding.
     not_filtered_results: bool
         If true, rows with no target or that do not pass thresholds will not be removed.
+    selected_fovs: List[int]
+        If provided, FOVs with the selected indices will be processed.
     blobRunnerKwargs: dict
         Dictionary with arguments for blob detection. Refer to blobRunner.
     decodeRunnerKwargs: dict
@@ -837,7 +840,13 @@ def run(
 
     # Otherwise run on a per FOV basis
     else:
-        for fov in experiment.keys():
+
+        if selected_fovs is not None:
+            fovs = ["fov_{:03}".format(int(f)) for f in selected_fovs]
+        else:
+            fovs = experiment.keys()
+
+        for fov in fovs:
             start0 = time.time()
             print("fov", fov)
 
@@ -928,6 +937,7 @@ if __name__ == "__main__":
     p.add_argument("--level-method", type=str, nargs="?")
     p.add_argument("--anchor-view", type=str, nargs="?")
     p.add_argument("--not-filtered-results", dest="not_filtered_results", action="store_true")
+    p.add_argument("--selected-fovs", nargs="+", const=None)
 
     # blobRunner kwargs
     p.add_argument("--min-sigma", type=float, nargs="*")
@@ -1121,6 +1131,7 @@ if __name__ == "__main__":
         vol,
         composite,
         not_filtered_results,
+        args.selected_fovs,
         blobRunnerKwargs,
         decodeRunnerKwargs,
         pixelRunnerKwargs,

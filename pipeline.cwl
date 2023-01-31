@@ -25,6 +25,10 @@ inputs:
     doc: PyYML-formatted dictionary outlining how the truerounds in imaging relate to the pseudorounds in the decoding codebook. The keys are truerounds and the values are the corresponding pseudorounds.
 
 
+  selected_fovs:
+    type: int[]?
+    doc: If provided, steps after conversion will only be run on FOVs with these indices.
+
 # format of input vars
 # can be read into converter or sorter, followed by string literal input will be used for conversion
 
@@ -893,6 +897,7 @@ steps:
             };
           }
       parameter_json: parameter_json
+      selected_fovs: selected_fovs
       clip_min: clip_min
       clip_max: clip_max
       level_method: level_method
@@ -938,6 +943,7 @@ steps:
         source: [processing/processed_exp, spaceTxConversion/spaceTx_converted, exp_loc]
         pickValue: first_non_null
       parameter_json: parameter_json
+      selected_fovs: selected_fovs
       level_method: level_method
       use_ref_img: use_ref_img
       anchor_view: anchor_view
@@ -956,6 +962,7 @@ steps:
       decoded_loc: starfishRunner/decoded
       exp_loc: spaceTxConversion/spaceTx_converted
       parameter_json: parameter_json
+      selected_fovs: selected_fovs
       aux_name: aux_name
       binary_mask:
         source: [binary_mask, mask_roi_files, mask_roi_formats, mask_labeled_files, mask_labeled_formats]
@@ -1029,6 +1036,7 @@ steps:
               return null;
             }
           }
+      selected_fovs: selected_fovs
       has_spots:
         source: decoding_blob
         valueFrom: |

@@ -18,6 +18,10 @@ inputs:
     type: File?
     doc: JSON formatted input parameters.
 
+  selected_fovs:
+    type: int[]?
+    doc: If provided, starfish will only be run on FOVs with these indices.
+
   use_ref_img:
     type: boolean?
     doc: Whether to generate a reference image and use it alongside spot detection.
@@ -213,7 +217,7 @@ steps:
     in:
       datafile: parameter_json
       schema: read_schema/data
-    out: [level_method, use_ref_img, is_volume, anchor_view, rescale, not_filtered_results, n_processes, decoding_min_sigma, decoding_max_sigma, decoding_num_sigma, decoding_threshold, decoding_overlap, decoding_decode_method, decoding_decoder_trace_building_strategy, decoding_decoder_max_distance, decoding_decoder_min_intensity, decoding_decoder_metric, decoding_decoder_norm_order, decoding_decoder_anchor_round, decoding_decoder_search_radius, decoding_decoder_return_original_intensities, decoding_decoder_error_rounds, decoding_decoder_mode, decoding_decoder_physical_coords, decoding_metric, decoding_distance_threshold, decoding_magnitude_threshold, decoding_min_area, decoding_max_area, decoding_norm_order, decoding_composite_decode, decoding_composite_pmin, decoding_composite_pmax]
+    out: [selected_fovs, level_method, use_ref_img, is_volume, anchor_view, rescale, not_filtered_results, n_processes, decoding_min_sigma, decoding_max_sigma, decoding_num_sigma, decoding_threshold, decoding_overlap, decoding_decode_method, decoding_decoder_trace_building_strategy, decoding_decoder_max_distance, decoding_decoder_min_intensity, decoding_decoder_metric, decoding_decoder_norm_order, decoding_decoder_anchor_round, decoding_decoder_search_radius, decoding_decoder_return_original_intensities, decoding_decoder_error_rounds, decoding_decoder_mode, decoding_decoder_physical_coords, decoding_metric, decoding_distance_threshold, decoding_magnitude_threshold, decoding_min_area, decoding_max_area, decoding_norm_order, decoding_composite_decode, decoding_composite_pmin, decoding_composite_pmax]
     when: $(inputs.datafile != null)
 
   execute_runner:
@@ -231,6 +235,12 @@ steps:
           type: Directory
           inputBinding:
             prefix: --exp-loc
+
+        selected_fovs:
+          type: int[]?
+          inputBinding:
+            prefix: --selected-fovs
+          doc: If provided, processing will only be run on FOVs with these indices.
 
         use_ref_img:
           type: boolean?
@@ -422,6 +432,18 @@ steps:
 
     in:
       exp_loc: exp_loc
+      selected_fovs:
+        source: [stage_runner/selected_fovs, selected_fovs]
+        valueFrom: |
+          ${
+            if(self[0]){
+              return self[0];
+            } else if(self[1]) {
+              return self[1];
+            } else {
+              return null;
+            }
+          }
       use_ref_img:
         source: [stage_runner/use_ref_img, use_ref_img]
         pickValue: first_non_null

@@ -69,6 +69,10 @@ inputs:
           type: Directory
           doc: The location of output of starfish runner step, 4_Decoded. Contains spots (if applicable) and netcdfs containing the DecodedIntensityTable.
 
+  selected_fovs:
+    type: int[]?
+    doc: If provided, QC will only be run on FOVs with these indices.
+
   has_spots:
     type: boolean?
     doc: If true, will look for spots within the experiment field.
@@ -153,7 +157,7 @@ steps:
     in:
       datafile: parameter_json
       schema: read_schema/data
-    out: [find_ripley, save_pdf, fov_positioning_x_shape, fov_positioning_y_shape, fov_positioning_z_shape, decoding_decode_method, decoding_magnitude_threshold, decoding_decoder_min_intensity]
+    out: [selected_fovs, find_ripley, save_pdf, fov_positioning_x_shape, fov_positioning_y_shape, fov_positioning_z_shape, decoding_decode_method, decoding_magnitude_threshold, decoding_decoder_min_intensity]
     when: $(inputs.datafile != null)
 
   execute_qc:
@@ -208,6 +212,12 @@ steps:
                 type: Directory
                 inputBinding:
                   prefix: --exp-output
+
+        selected_fovs:
+          type: int[]?
+          inputBinding:
+            prefix: --selected-fovs
+          doc: If provided, processing will only be run on FOVs with these indices.
 
         has_spots:
           type: boolean?
@@ -272,6 +282,18 @@ steps:
             }
           }
       segmentation_loc: segmentation_loc
+      selected_fovs:
+        source: [stage_qc/selected_fovs, selected_fovs]
+        valueFrom: |
+          ${
+            if(self[0]){
+              return self[0];
+            } else if(self[1]) {
+              return self[1];
+            } else {
+              return null;
+            }
+          }
       has_spots:
         source: [stage_qc/decoding_decode_method, has_spots]
         valueFrom: |

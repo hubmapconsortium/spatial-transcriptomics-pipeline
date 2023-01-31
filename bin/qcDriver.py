@@ -33,6 +33,7 @@ from starfish.core.types import (
 )
 from starfish.types import Axes, Coordinates
 from tqdm import tqdm
+from Typing import List
 
 # utility methods
 
@@ -1440,6 +1441,7 @@ if __name__ == "__main__":
 
     p.add_argument("--codebook-exp", type=Path)
     p.add_argument("--exp-output", type=Path)
+    p.add_argument("--selected-fovs", nargs="+", const=None)
     p.add_argument("--has-spots", dest="has_spots", action="store_true")
 
     p.add_argument("--codebook-pkl", type=Path)
@@ -1532,7 +1534,10 @@ if __name__ == "__main__":
         size[2] = args.z_size
 
     fovs = False
-    if args.exp_output:
+    if args.selected_fovs is not None:
+        # manually specified FOVs override anything else
+        fovs = ["fov_{:03}".format(int(f)) for f in args.selected_fovs]
+    elif args.exp_output:
         # reading in from experiment can have multiple FOVs
         fovs = [k for k in transcripts.keys()]
     if not args.exp_output or len(transcripts.keys()) > 0:

@@ -1,4 +1,5 @@
 [
+	"selected_fovs?",
 	"level_method?",
 	"use_ref_img?",
 	"is_volume?",

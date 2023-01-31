@@ -1,4 +1,5 @@
 [
+	"selected_fovs",
 	"clip_min?",
 	"clip_max?",
 	"level_method?",

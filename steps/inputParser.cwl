@@ -50,6 +50,7 @@ outputs:
   add_blanks: boolean
   skip_formatting: boolean
   skip_processing: boolean
+  selected_fovs: int[]
   clip_min: float
   clip_max: float
   level_method: string
