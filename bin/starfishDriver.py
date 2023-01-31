@@ -608,7 +608,7 @@ def saveCompositeResults(spots, decoded, exploc, output_name):
 
     # Create a new SpotFindingResults object with only spots from each position and save separately
     for pos in range(len(composite_coords)):
-        fov = "fov_" + "0" * (3 - len(str(pos))) + str(pos)
+        fov = "fov_{:03}".format(pos)
         spot_attrs = {}
         x_min = composite_coords[pos]["x_min"]
         x_max = composite_coords[pos]["x_max"]
@@ -679,7 +679,7 @@ def saveCompositeResults(spots, decoded, exploc, output_name):
 
         if fov_spots.count_total_spots() > 0:
             if output_name:
-                fov_spots.save(f"{output_name}spots/fov_")
+                fov_spots.save(f"{output_name}spots/{fov}_")
     print("spots saved.")
 
     # Save decoded transcripts
