@@ -112,6 +112,7 @@ outputs:
   binary_mask_watershed_footprint_size: int
   binary_mask_label_exp_size: int
   run_baysor: boolean
+  skip_qc: boolean
   find_ripley: boolean
   save_pdf: boolean
 

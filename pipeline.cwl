@@ -489,7 +489,12 @@ inputs:
   run_baysor:
     type: boolean?
     doc: If true, the baysor step will be run.
-    default: false
+    default: False
+
+  skip_qc:
+    type: boolean?
+    doc: If true, QC will not be run.
+    default: False
 
   find_ripley:
     type: boolean?
@@ -555,7 +560,7 @@ steps:
     in:
       datafile: parameter_json
       schema: read_schema/data
-    out: [run_baysor, skip_formatting, skip_processing, register_aux_view, fov_positioning_x_locs, fov_positioning_x_shape, fov_positioning_x_voxel, fov_positioning_y_locs, fov_positioning_y_shape, fov_positioning_y_voxel, fov_positioning_z_locs, fov_positioning_z_shape, fov_positioning_z_voxel, add_blanks]
+    out: [run_baysor, skip_formatting, skip_processing, register_aux_view, fov_positioning_x_locs, fov_positioning_x_shape, fov_positioning_x_voxel, fov_positioning_y_locs, fov_positioning_y_shape, fov_positioning_y_voxel, fov_positioning_z_locs, fov_positioning_z_shape, fov_positioning_z_voxel, add_blanks, skip_qc]
     when: $(inputs.datafile != null)
 
   sorter:
@@ -1008,6 +1013,16 @@ steps:
   qc:
     run: steps/qc.cwl
     in:
+      skip_qc:
+        source: [stage/skip_qc, skip_qc]
+        valueFrom: |
+          ${
+            if(self[0] || self[1]){
+              return true;
+            } else {
+              return false;
+            }
+          }
       codebook:
         source: [sorter/pseudosorted_dir, spaceTxConversion/spaceTx_converted, exp_loc]
         pickValue: first_non_null
@@ -1069,5 +1084,6 @@ steps:
               "exp": self
             };
           }
+    when: $(inputs.skip_qc == false)
     out:
       [qc_metrics]

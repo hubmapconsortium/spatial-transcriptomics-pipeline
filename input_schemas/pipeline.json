@@ -18,5 +18,6 @@
 			]
 		]
 	},
-	"add_blanks"
+	"add_blanks",
+	"skip_qc"
 ]
