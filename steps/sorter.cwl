@@ -118,7 +118,7 @@ steps:
 
       requirements:
         DockerRequirement:
-          dockerPull: hubmap/starfish-custom:1.32
+          dockerPull: hubmap/starfish-custom:latest
 
       inputs:
         schema:
@@ -149,7 +149,7 @@ steps:
 
       requirements:
         DockerRequirement:
-          dockerPull: hubmap/starfish-custom:1.32
+          dockerPull: hubmap/starfish-custom:latest
 
       inputs:
         input_dir:
