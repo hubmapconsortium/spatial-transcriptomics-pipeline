@@ -22,10 +22,6 @@ inputs:
     type: File?
     doc: File containing parameters to run this step.
 
-  selected_fovs:
-    type: int[]?
-    doc: If provided, segmentation will only be run on FOVs with these indices.
-
   aux_name:
     type: string?
     doc: The name of the aux view to look at in the experiment file.
@@ -125,7 +121,7 @@ steps:
 
       requirements:
         DockerRequirement:
-          dockerPull: hubmap/starfish-custom:2.32
+          dockerPull: hubmap/starfish-custom:1.32
 
       inputs:
         schema:
@@ -147,7 +143,7 @@ steps:
     in:
       datafile: parameter_json
       schema: read_schema/data
-    out: [selected_fovs, aux_name, binary_mask_img_threshold, binary_mask_min_dist, binary_mask_min_allowed_size, binary_mask_max_allowed_size, binary_mask_masking_radius, binary_mask_nuclei_view, binary_mask_cyto_seg, binary_mask_correct_seg, binary_mask_border_buffer, binary_mask_area_thresh, binary_mask_thresh_block_size, binary_mask_watershed_footprint_size, binary_mask_label_exp_size]
+    out: [aux_name, binary_mask_img_threshold, binary_mask_min_dist, binary_mask_min_allowed_size, binary_mask_max_allowed_size, binary_mask_masking_radius, binary_mask_nuclei_view, binary_mask_cyto_seg, binary_mask_correct_seg, binary_mask_border_buffer, binary_mask_area_thresh, binary_mask_thresh_block_size, binary_mask_watershed_footprint_size, binary_mask_label_exp_size]
     when: $(inputs.datafile != null)
   execute_segmentation:
     run:
@@ -156,7 +152,7 @@ steps:
 
       requirements:
         DockerRequirement:
-          dockerPull: hubmap/starfish-custom:2.32
+          dockerPull: hubmap/starfish-custom:1.32
 
       inputs:
         decoded_loc:
@@ -168,12 +164,6 @@ steps:
           type: Directory
           inputBinding:
             prefix: --exp-loc
-
-        selected_fovs:
-          type: int[]?
-          inputBinding:
-            prefix: --selected-fovs
-          doc: If provided, processing will only be run on FOVs with these indices.
 
         aux_name:
           type: string?
@@ -272,18 +262,6 @@ steps:
     in:
       decoded_loc: decoded_loc
       exp_loc: exp_loc
-      selected_fovs:
-        source: [stage_segmentation/selected_fovs, selected_fovs]
-        valueFrom: |
-          ${
-            if(self[0]){
-              return self[0];
-            } else if(self[1]) {
-              return self[1];
-            } else {
-              return null;
-            }
-          }
       aux_name:
         source: [stage_segmentation/aux_name, aux_name]
         valueFrom: |

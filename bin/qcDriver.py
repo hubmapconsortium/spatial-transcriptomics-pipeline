@@ -33,7 +33,6 @@ from starfish.core.types import (
 )
 from starfish.types import Axes, Coordinates
 from tqdm import tqdm
-from Typing import List
 
 # utility methods
 
@@ -589,19 +588,15 @@ def getFPR(segmentation=None, results=None, pdf=False):
     sorted_reals_all = real_per_cell_all.sort_values(ascending=False)
     sorted_blanks_all = blank_per_cell_all[sorted_reals_all.index]
 
-    if (sum(blank_per_cell_all) + sum(real_per_cell_all)) > 0:
-        final_results = {
-            "FP": sum(blank_per_cell_all),
-            "TP": sum(real_per_cell_all),
-            "FPR": sum(blank_per_cell_all) / (sum(blank_per_cell_all) + sum(real_per_cell_all)),
-            "tally": {
-                "reals_all": list(sorted_reals_all),
-                "blanks_all": list(sorted_blanks_all),
-            },
-        }
-    else:
-        print("No cells within boundaries, was segmentation performed properly?")
-        return {}
+    final_results = {
+        "FP": sum(blank_per_cell_all),
+        "TP": sum(real_per_cell_all),
+        "FPR": sum(blank_per_cell_all) / (sum(blank_per_cell_all) + sum(real_per_cell_all)),
+        "tally": {
+            "reals_all": list(sorted_reals_all),
+            "blanks_all": list(sorted_blanks_all),
+        },
+    }
 
     # If error-correction is used, do the same for only non-error-corrected barcodes
     if (segmentation is not None and "corrected_rounds" in segmentation.keys()) or (
@@ -1354,18 +1349,12 @@ def run(
                     [results[f]["transcripts"]["per_cell"]["counts"] for f in fovs]
                 )
                 trRes["per_cell"] = getTranscriptsPerCell(results=cell_counts, pdf=pdf)
-                if "FPR" in results[fovs[0]]["transcripts"].keys():
-                    FPR_raw = {}
-                    for k in results[fovs[0]]["transcripts"]["FPR"]["tally"].keys():
-                        FPR_raw[k] = flatten(
-                            [
-                                results[f]["transcripts"]["FPR"]["tally"][k]
-                                for f in fovs
-                                if "FPR" in results[f]["transcripts"].keys()
-                                and "tally" in results[f]["transcripts"]["FPR"]
-                            ]
-                        )
-                    trRes["FPR"] = getFPR(results=FPR_raw, pdf=pdf)
+                FPR_raw = {}
+                for k in results[fovs[0]]["transcripts"]["FPR"]["tally"].keys():
+                    FPR_raw[k] = flatten(
+                        [results[f]["transcripts"]["FPR"]["tally"][k] for f in fovs]
+                    )
+                trRes["FPR"] = getFPR(results=FPR_raw, pdf=pdf)
 
             print("\tRe-computing barcode metrics")
             barcodeTallies = {}
@@ -1441,7 +1430,6 @@ if __name__ == "__main__":
 
     p.add_argument("--codebook-exp", type=Path)
     p.add_argument("--exp-output", type=Path)
-    p.add_argument("--selected-fovs", nargs="+", const=None)
     p.add_argument("--has-spots", dest="has_spots", action="store_true")
 
     p.add_argument("--codebook-pkl", type=Path)
@@ -1470,8 +1458,7 @@ if __name__ == "__main__":
         # load transcripts from exp dir
         for f in glob("{}/cdf/*_decoded.cdf".format(args.exp_output)):
             name = f[len(str(args.exp_output)) + 5 : -12]
-            if "comp" not in name:
-                transcripts[name] = DecodedIntensityTable.open_netcdf(f)
+            transcripts[name] = DecodedIntensityTable.open_netcdf(f)
 
     segmentation = None
     if (
@@ -1534,10 +1521,7 @@ if __name__ == "__main__":
         size[2] = args.z_size
 
     fovs = False
-    if args.selected_fovs is not None:
-        # manually specified FOVs override anything else
-        fovs = ["fov_{:03}".format(int(f)) for f in args.selected_fovs]
-    elif args.exp_output:
+    if args.exp_output:
         # reading in from experiment can have multiple FOVs
         fovs = [k for k in transcripts.keys()]
     if not args.exp_output or len(transcripts.keys()) > 0:

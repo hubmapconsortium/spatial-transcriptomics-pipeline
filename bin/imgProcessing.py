@@ -13,7 +13,6 @@ from functools import partial, partialmethod
 from os import path
 from pathlib import Path
 from time import time
-from typing import List
 
 import cv2
 import numpy as np
@@ -242,7 +241,6 @@ def cli(
     match_hist: bool = False,
     wth_rad: int = None,
     rescale: bool = False,
-    selected_fovs: List[int] = None,
 ):
     """
     n_processes: If provided, the number of threads to use for processing. Otherwise, the max number of
@@ -287,8 +285,6 @@ def cli(
 
     rescale: If true, will not run final clip and scale on image, because it is expected to rescale
         the images in the following decoding step.
-
-    selected_fovs: If provided, only FOVs with the provided indicies will be run.
     """
 
     os.makedirs(output_dir, exist_ok=True)
@@ -319,12 +315,7 @@ def cli(
     exp = starfish.core.experiment.experiment.Experiment.from_json(
         str(input_dir / "experiment.json")
     )
-    if selected_fovs is not None:
-        fovs = ["fov_{:03}".format(int(f)) for f in selected_fovs]
-    else:
-        fovs = exp.keys()
-
-    for fov in fovs:
+    for fov in exp.keys():
         img = exp[fov].get_image("primary")
         t1 = time()
         print("Fetched view " + fov)
@@ -410,7 +401,7 @@ def cli(
             print("\taligning to " + aux_name)
             img = register_primary(img, register, ch_per_reg)
 
-        if not rescale and not (clip_min == 0 and clip_max == 0):
+        if not rescale:
             print("\tclip and scaling...")
             # Scale image, clipping all but the highest intensities to zero
             clip = starfish.image.Filter.ClipPercentileToZero(
@@ -425,7 +416,7 @@ def cli(
                 clip.run(anchor, in_place=True)
 
         else:
-            print("\tskipping clip and scale.")
+            print("\tskipping clip and scale, will be performed during rescaling.")
 
         print(f"\tView {fov} complete")
         # save modified image
@@ -471,7 +462,6 @@ if __name__ == "__main__":
     p.add_argument("--tophat-radius", type=int, nargs="?")
     p.add_argument("--rescale", dest="rescale", action="store_true")
     p.add_argument("--n-processes", type=int, nargs="?")
-    p.add_argument("--selected-fovs", nargs="+", const=None)
 
     args = p.parse_args()
 
@@ -505,5 +495,4 @@ if __name__ == "__main__":
         wth_rad=args.tophat_radius,
         rescale=args.rescale,
         n_processes=n_processes,
-        selected_fovs=args.selected_fovs,
     )

@@ -8,7 +8,6 @@ from functools import partialmethod
 from glob import glob
 from os import makedirs, path
 from pathlib import Path
-from typing import List
 
 import cv2
 import numpy as np
@@ -560,7 +559,6 @@ def run(
     exp_loc: Path,
     output_loc: str,
     aux_name: str,
-    selected_fovs: List[int],
     roiKwargs: dict,
     labeledKwargs: dict,
     watershedKwargs: dict,
@@ -579,8 +577,6 @@ def run(
         Path to directory where output will be saved.
     aux_name: str
         The name of the auxillary view to look at for image segmentation.
-    selected_fovs: List[int]
-        If provided, FOVs with the selected indices will be processed.
     roiKwargs: dict
         Dictionary with arguments for reading in masks from an RoiSet. See masksFromRoi.
     labeledKwargs: dict
@@ -620,13 +616,12 @@ def run(
     results = {}
     for f in glob("{}/cdf/*_decoded.cdf".format(input_loc)):
         name = f[len(str(input_loc)) + 5 : -12]
-        if "comp" not in name:
-            print("found fov key: " + name)
-            results[name] = DecodedIntensityTable.open_netcdf(f)
-            print("loaded " + f)
-            if not path.isdir(output_dir + name):
-                makedirs(output_dir + name)
-                print("made " + output_dir + name)
+        print("found fov key: " + name)
+        results[name] = DecodedIntensityTable.open_netcdf(f)
+        print("loaded " + f)
+        if not path.isdir(output_dir + name):
+            makedirs(output_dir + name)
+            print("made " + output_dir + name)
 
     # load in the images we want to look at
     exp = starfish.core.experiment.experiment.Experiment.from_json(
@@ -634,13 +629,8 @@ def run(
     )
     print("loaded " + str(exp_loc / "experiment.json"))
 
-    # IF WE'RE DOING DENSITY BASED, THAT's DIFFERENT
-    if selected_fovs is not None:
-        fovs = ["fov_{:03}".format(int(f)) for f in selected_fovs]
-    else:
-        fovs = results.keys()
-
-    for key in fovs:
+    # IF WE'RE DOING DENSITY BASED, THAT's DIFFERENT'
+    for key in results.keys():
         if "nuclei_view" in densityKwargs:
             nuclei_img = exp[key].get_image(densityKwargs["nuclei_view"])
             print(f"Segmenting {key}")
@@ -704,7 +694,6 @@ if __name__ == "__main__":
     p.add_argument("--decoded-loc", type=Path)
     p.add_argument("--exp-loc", type=Path)
     p.add_argument("--aux-name", type=str, nargs="?")
-    p.add_argument("--selected-fovs", nargs="+", const=None)
 
     # for importing roi set
     p.add_argument("--roi-set", type=Path, nargs="?")
@@ -767,7 +756,6 @@ if __name__ == "__main__":
         exp_dir,
         output_dir,
         aux_name,
-        args.selected_fovs,
         roiKwargs,
         labeledKwargs,
         watershedKwargs,

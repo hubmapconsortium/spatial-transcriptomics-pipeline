@@ -1,5 +1,4 @@
 [
-	"selected_fovs?",
 	"level_method?",
 	"use_ref_img?",
 	"is_volume?",
@@ -22,9 +21,6 @@
 				"min_area?",
 				"max_area?",
 				"norm_order?",
-				"composite_decode?",
-				"composite_pmin?",
-				"composite_pmax?",
 				{
 					"decoder":[
 						[

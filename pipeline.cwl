@@ -10,10 +10,6 @@ requirements:
 
 inputs:
 
-  skip_formatting:
-    type: boolean?
-    doc: If true, will skip first two stages and start at processing.
-
 # pseudochannel sorting vars, if present then it will be assumed that sorting must be performed.
 
   channel_yml:
@@ -25,15 +21,11 @@ inputs:
     doc: PyYML-formatted dictionary outlining how the truerounds in imaging relate to the pseudorounds in the decoding codebook. The keys are truerounds and the values are the corresponding pseudorounds.
 
 
-  selected_fovs:
-    type: int[]?
-    doc: If provided, steps after conversion will only be run on FOVs with these indices.
-
 # format of input vars
 # can be read into converter or sorter, followed by string literal input will be used for conversion
 
   tiffs:
-    type: Directory?
+    type: Directory
     doc: The directory containing all .tiff files
 
   codebook_csv:
@@ -192,10 +184,6 @@ inputs:
 
 # image processing
 
-  input_dir:
-    type: Directory?
-    doc: Root directory containing space_tx formatted experiment. Only used if skip_formatting is true.
-
   skip_processing:
     type: boolean?
     doc: If true, image processing step will be skipped.
@@ -259,10 +247,6 @@ inputs:
 
 # starfishRunner
 
-  exp_loc:
-    type: Directory?
-    doc: Location of directory containing starfish experiment.json file. Only used when both skip_formatting and skip_processing are true.
-
   use_ref_img:
     type: boolean?
     doc: Whether to generate a reference image and use it alongside spot detection.
@@ -313,15 +297,6 @@ inputs:
         detector_method:
           type: string?
           doc: Name of the scikit-image spot detection method to use
-        composite_decode:
-          type: boolean?
-          doc: Whether to composite all FOVs into one image, typically for PoSTcode decoding.
-        composite_pmin:
-          type: float?
-          doc: pmin value for clip and scale of composite image.
-        composite_pmax:
-          type: float?
-          doc: pmax value for clip and scale of composite image.
         decode_method:
           type: string
           doc: Method name for spot decoding. Refer to starfish documentation.
@@ -489,12 +464,7 @@ inputs:
   run_baysor:
     type: boolean?
     doc: If true, the baysor step will be run.
-    default: False
-
-  skip_qc:
-    type: boolean?
-    doc: If true, QC will not be run.
-    default: False
+    default: false
 
   find_ripley:
     type: boolean?
@@ -538,7 +508,7 @@ steps:
 
       requirements:
         DockerRequirement:
-          dockerPull: hubmap/starfish-custom:2.32
+          dockerPull: hubmap/starfish-custom:1.32
 
       inputs:
         schema:
@@ -560,7 +530,7 @@ steps:
     in:
       datafile: parameter_json
       schema: read_schema/data
-    out: [run_baysor, skip_formatting, skip_processing, register_aux_view, fov_positioning_x_locs, fov_positioning_x_shape, fov_positioning_x_voxel, fov_positioning_y_locs, fov_positioning_y_shape, fov_positioning_y_voxel, fov_positioning_z_locs, fov_positioning_z_shape, fov_positioning_z_voxel, add_blanks, skip_qc]
+    out: [run_baysor, skip_processing, register_aux_view, fov_positioning_x_locs, fov_positioning_x_shape, fov_positioning_x_voxel, fov_positioning_y_locs, fov_positioning_y_shape, fov_positioning_y_voxel, fov_positioning_z_locs, fov_positioning_z_shape, fov_positioning_z_voxel, add_blanks]
     when: $(inputs.datafile != null)
 
   sorter:
@@ -592,17 +562,7 @@ steps:
       file_vars: file_vars
       cache_read_order: cache_read_order
       aux_tilesets: aux_tilesets
-      skip_formatting:
-        source: [stage/skip_formatting, skip_formatting]
-        valueFrom: |
-          ${
-            if(self[0] || self[1]){
-              return true;
-            } else {
-              return false;
-            };
-          }
-    when: $(inputs.channel_yml != null && !inputs.skip_formatting)
+    when: $(inputs.channel_yml != null)
     out: [pseudosorted_dir]
 
   stagedSorted:
@@ -633,17 +593,7 @@ steps:
                 return null;
             }
           }
-      skip_formatting:
-        source: [stage/skip_formatting, skip_formatting]
-        valueFrom: |
-          ${
-            if(self[0] || self[1]){
-              return true;
-            } else {
-              return false;
-            };
-          }
-    when: $(inputs.channel_yml != null && !inputs.skip_formatting)
+    when: $(inputs.channel_yml != null)
     out: [codebook, round_count, fov_count, channel_count, zplane_count, round_offset, fov_offset, channel_offset, zplane_offset, file_format, file_vars, cache_read_order, aux_names, aux_file_formats, aux_file_vars, aux_cache_read_order, aux_channel_count, aux_channel_slope, aux_channel_intercept]
 
   spaceTxConversion:
@@ -863,17 +813,6 @@ steps:
               return false;
             }
           }
-      skip_formatting:
-        source: [stage/skip_formatting, skip_formatting]
-        valueFrom: |
-          ${
-            if(self[0] || self[1]){
-              return true;
-            } else {
-              return false;
-            };
-          }
-    when: $(inputs.skip_formatting == false)
     out: [spaceTx_converted]
 
   processing:
@@ -889,20 +828,8 @@ steps:
               return false;
             };
           }
-      input_dir:
-        source: [spaceTxConversion/spaceTx_converted, input_dir]
-        valueFrom: |
-          ${
-            if(self[0]){
-              return self[0];
-            } else if(self[1]) {
-              return self[1];
-            } else {
-              return null;
-            };
-          }
+      input_dir: spaceTxConversion/spaceTx_converted
       parameter_json: parameter_json
-      selected_fovs: selected_fovs
       clip_min: clip_min
       clip_max: clip_max
       level_method: level_method
@@ -945,10 +872,9 @@ steps:
     run: steps/starfishRunner.cwl
     in:
       exp_loc:
-        source: [processing/processed_exp, spaceTxConversion/spaceTx_converted, exp_loc]
+        source: [processing/processed_exp, spaceTxConversion/spaceTx_converted]
         pickValue: first_non_null
       parameter_json: parameter_json
-      selected_fovs: selected_fovs
       level_method: level_method
       use_ref_img: use_ref_img
       anchor_view: anchor_view
@@ -967,7 +893,6 @@ steps:
       decoded_loc: starfishRunner/decoded
       exp_loc: spaceTxConversion/spaceTx_converted
       parameter_json: parameter_json
-      selected_fovs: selected_fovs
       aux_name: aux_name
       binary_mask:
         source: [binary_mask, mask_roi_files, mask_roi_formats, mask_labeled_files, mask_labeled_formats]
@@ -1013,18 +938,8 @@ steps:
   qc:
     run: steps/qc.cwl
     in:
-      skip_qc:
-        source: [stage/skip_qc, skip_qc]
-        valueFrom: |
-          ${
-            if(self[0] || self[1]){
-              return true;
-            } else {
-              return false;
-            }
-          }
       codebook:
-        source: [sorter/pseudosorted_dir, spaceTxConversion/spaceTx_converted, exp_loc]
+        source: [sorter/pseudosorted_dir, spaceTxConversion/spaceTx_converted]
         pickValue: first_non_null
         valueFrom: |
           ${
@@ -1051,7 +966,6 @@ steps:
               return null;
             }
           }
-      selected_fovs: selected_fovs
       has_spots:
         source: decoding_blob
         valueFrom: |
@@ -1084,6 +998,5 @@ steps:
               "exp": self
             };
           }
-    when: $(inputs.skip_qc == false)
     out:
       [qc_metrics]
