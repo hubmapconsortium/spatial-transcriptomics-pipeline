@@ -894,10 +894,9 @@ def plotBarcodeAbundance(pdf, decoded=None, results=None):
         [all_conf, get_y_offset(all_conf, disp_range / 4.35, ax)],
         color="black",
     )
-    top_txt_y = get_y_offset(all_conf, disp_range / 3.95, ax)
     plt.text(
         len(all_counts) * 0.4,
-        top_txt_y,
+        get_y_offset(all_conf, disp_range / 3.95, ax),
         f"{good_codes_all*100:.2f}% barcodes above {all_conf:.2f} threshold",
         horizontalalignment="center",
         fontsize=8,
@@ -967,9 +966,6 @@ def plotBarcodeAbundance(pdf, decoded=None, results=None):
 
         final_results["reals_full"] = dict(full_real_counts_raw)
         final_results["blanks_full"] = dict(full_blank_counts_raw)
-
-    if top_txt_y > max(all_counts) * 1.1:
-        plt.ylim([0.9, top_txt_y * 2])
 
     # Create and plot legend
     if (decoded is not None and "corrected_rounds" in decoded.coords) or (
