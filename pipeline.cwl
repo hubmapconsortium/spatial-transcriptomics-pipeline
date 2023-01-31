@@ -873,7 +873,7 @@ steps:
               return false;
             };
           }
-    when: $(inputs.channel_yml != null && !inputs.skip_formatting)
+    when: $(inputs.skip_formatting == false)
     out: [spaceTx_converted]
 
   processing:
