@@ -38,7 +38,9 @@ def saveImg(loc: str, prefix: str, img: ImageStack):
                 )
 
 
-def saveExp(source_dir: str, save_dir: str, exp: Experiment = None):
+def saveExp(
+    source_dir: str, save_dir: str, exp: Experiment = None, selected_fovs: List[int] = None
+):
     # go through and save all images, if an experiment is provided
     if exp:
         for fov in exp.keys():
@@ -50,7 +52,11 @@ def saveExp(source_dir: str, save_dir: str, exp: Experiment = None):
     # copy the non-tiff files to the new directory
     cp_files = [x for x in os.listdir(source_dir) if x[-5:] != ".tiff" and x[-4:] != ".log"]
     for file in cp_files:
-        if "fov" in file:
+        # images were only updated if we looked at that fov
+        print(f"looking at {file}.")
+        if "fov" in file and (
+            (selected_fovs is None) or (True in [f in file for f in selected_fovs])
+        ):
             # if file contains images, we need to update sha's
             data = json.load(open(str(source_dir) + "/" + file))
             for i in range(len(data["tiles"])):
@@ -442,7 +448,7 @@ def cli(
         print(f"View {fov} saved")
         print(f"Time for {fov}: {time() - t1}")
 
-    saveExp(input_dir, output_dir)
+    saveExp(input_dir, output_dir, selected_fovs=fovs)
     print(f"\n\nTotal time elapsed for processing: {time() - t0}")
 
 
