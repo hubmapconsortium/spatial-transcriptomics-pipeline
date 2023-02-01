@@ -111,15 +111,19 @@ class FISHTile(FetchedTile):
             return {
                 Coordinates.X: (
                     self.locs[Axes.X] * self.voxel[Axes.X],
-                    (self.locs[Axes.X] + self.img_shape[Axes.X]) * self.voxel[Axes.X],
+                    (self.locs[Axes.X] + self.img_shape[Axes.X]) * self.voxel[Axes.X]
+                    - self.voxel[Axes.X],
                 ),
                 Coordinates.Y: (
                     self.locs[Axes.Y] * self.voxel[Axes.Y],
-                    (self.locs[Axes.Y] + self.img_shape[Axes.Y]) * self.voxel[Axes.Y],
+                    (self.locs[Axes.Y] + self.img_shape[Axes.Y]) * self.voxel[Axes.Y]
+                    - self.voxel[Axes.Y],
                 ),
                 Coordinates.Z: (
-                    (self.locs[Axes.ZPLANE] + self._zplane) * self.voxel[Axes.ZPLANE],
-                    (self.locs[Axes.ZPLANE] + self._zplane + 1) * self.voxel[Axes.ZPLANE],
+                    self.locs[Axes.ZPLANE] * self.voxel[Axes.ZPLANE],
+                    (self.locs[Axes.ZPLANE] + self.img_shape[Axes.ZPLANE])
+                    * self.voxel[Axes.ZPLANE]
+                    - self.voxel[Axes.ZPLANE],
                 ),
             }
         else:

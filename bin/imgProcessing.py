@@ -13,6 +13,7 @@ from functools import partial, partialmethod
 from os import path
 from pathlib import Path
 from time import time
+from typing import List
 
 import cv2
 import numpy as np
@@ -37,7 +38,9 @@ def saveImg(loc: str, prefix: str, img: ImageStack):
                 )
 
 
-def saveExp(source_dir: str, save_dir: str, exp: Experiment = None):
+def saveExp(
+    source_dir: str, save_dir: str, exp: Experiment = None, selected_fovs: List[int] = None
+):
     # go through and save all images, if an experiment is provided
     if exp:
         for fov in exp.keys():
@@ -49,7 +52,11 @@ def saveExp(source_dir: str, save_dir: str, exp: Experiment = None):
     # copy the non-tiff files to the new directory
     cp_files = [x for x in os.listdir(source_dir) if x[-5:] != ".tiff" and x[-4:] != ".log"]
     for file in cp_files:
-        if "fov" in file:
+        # images were only updated if we looked at that fov
+        print(f"looking at {file}.")
+        if "fov" in file and (
+            (selected_fovs is None) or (True in [f in file for f in selected_fovs])
+        ):
             # if file contains images, we need to update sha's
             data = json.load(open(str(source_dir) + "/" + file))
             for i in range(len(data["tiles"])):
@@ -241,6 +248,7 @@ def cli(
     match_hist: bool = False,
     wth_rad: int = None,
     rescale: bool = False,
+    selected_fovs: List[int] = None,
 ):
     """
     n_processes: If provided, the number of threads to use for processing. Otherwise, the max number of
@@ -285,6 +293,8 @@ def cli(
 
     rescale: If true, will not run final clip and scale on image, because it is expected to rescale
         the images in the following decoding step.
+
+    selected_fovs: If provided, only FOVs with the provided indicies will be run.
     """
 
     os.makedirs(output_dir, exist_ok=True)
@@ -315,7 +325,12 @@ def cli(
     exp = starfish.core.experiment.experiment.Experiment.from_json(
         str(input_dir / "experiment.json")
     )
-    for fov in exp.keys():
+    if selected_fovs is not None:
+        fovs = ["fov_{:03}".format(int(f)) for f in selected_fovs]
+    else:
+        fovs = exp.keys()
+
+    for fov in fovs:
         img = exp[fov].get_image("primary")
         t1 = time()
         print("Fetched view " + fov)
@@ -401,7 +416,7 @@ def cli(
             print("\taligning to " + aux_name)
             img = register_primary(img, register, ch_per_reg)
 
-        if not rescale:
+        if not rescale and not (clip_min == 0 and clip_max == 0):
             print("\tclip and scaling...")
             # Scale image, clipping all but the highest intensities to zero
             clip = starfish.image.Filter.ClipPercentileToZero(
@@ -416,7 +431,7 @@ def cli(
                 clip.run(anchor, in_place=True)
 
         else:
-            print("\tskipping clip and scale, will be performed during rescaling.")
+            print("\tskipping clip and scale.")
 
         print(f"\tView {fov} complete")
         # save modified image
@@ -433,7 +448,7 @@ def cli(
         print(f"View {fov} saved")
         print(f"Time for {fov}: {time() - t1}")
 
-    saveExp(input_dir, output_dir)
+    saveExp(input_dir, output_dir, selected_fovs=fovs)
     print(f"\n\nTotal time elapsed for processing: {time() - t0}")
 
 
@@ -462,6 +477,7 @@ if __name__ == "__main__":
     p.add_argument("--tophat-radius", type=int, nargs="?")
     p.add_argument("--rescale", dest="rescale", action="store_true")
     p.add_argument("--n-processes", type=int, nargs="?")
+    p.add_argument("--selected-fovs", nargs="+", const=None)
 
     args = p.parse_args()
 
@@ -495,4 +511,5 @@ if __name__ == "__main__":
         wth_rad=args.tophat_radius,
         rescale=args.rescale,
         n_processes=n_processes,
+        selected_fovs=args.selected_fovs,
     )
