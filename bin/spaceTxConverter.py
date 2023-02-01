@@ -120,10 +120,8 @@ class FISHTile(FetchedTile):
                     - self.voxel[Axes.Y],
                 ),
                 Coordinates.Z: (
-                    self.locs[Axes.ZPLANE] * self.voxel[Axes.ZPLANE],
-                    (self.locs[Axes.ZPLANE] + self.img_shape[Axes.ZPLANE])
-                    * self.voxel[Axes.ZPLANE]
-                    - self.voxel[Axes.ZPLANE],
+                    (self.locs[Axes.ZPLANE] + self._zplane) * self.voxel[Axes.ZPLANE],
+                    (self.locs[Axes.ZPLANE] + self._zplane + 1) * self.voxel[Axes.ZPLANE],
                 ),
             }
         else:
