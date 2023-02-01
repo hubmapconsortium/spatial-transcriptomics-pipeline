@@ -135,7 +135,7 @@ steps:
 
       requirements:
         DockerRequirement:
-          dockerPull: hubmap/starfish-custom:latest
+          dockerPull: hubmap/starfish-custom:2.33
 
       inputs:
         schema:
@@ -167,7 +167,7 @@ steps:
 
       requirements:
         DockerRequirement:
-          dockerPull: hubmap/starfish-custom:latest
+          dockerPull: hubmap/starfish-custom:2.33
 
       inputs:
         codebook:
@@ -226,7 +226,7 @@ steps:
 
         roi:
           type: File?
-          inputBinding: 
+          inputBinding:
             prefix: --roi
 
         imagesize:

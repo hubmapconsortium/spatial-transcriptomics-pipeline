@@ -7,7 +7,7 @@ baseCommand: ["baysor","run"]
 requirements:
   DockerRequirement:
     dockerPull: vpetukhov/baysor@sha256:ce58af2bbd81ca29f7382497223afe9dbfbcc674e810155964722b447b676087
-    #dockerPull: hubmap/baysor:latest
+    #dockerPull: hubmap/baysor:2.33
 
 inputs:
   csv:
