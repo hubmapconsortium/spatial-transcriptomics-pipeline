@@ -607,7 +607,6 @@ def getFPR(segmentation=None, results=None, pdf=False):
     if (segmentation is not None and "corrected_rounds" in segmentation.keys()) or (
         results is not None and "reals_full" in results.keys()
     ):
-
         if segmentation is not None:
             # Get counts per cell
             full_counts = segmentation[segmentation["corrected_rounds"] == 0]
@@ -1060,7 +1059,6 @@ def runFOV(
     doRipley=False,
     savePdf=False,
 ):
-
     t0 = time()
 
     # print("transcripts {}\ncodebook {}\nspots {}\nsegmented {}".format(transcripts, codebook, spots, segmentation))
@@ -1191,7 +1189,6 @@ def run(
     doRipley=False,
     savePdf=False,
 ):
-
     t0 = time()
 
     output_dir = "7_QC/"
@@ -1433,7 +1430,6 @@ def run(
 
 
 if __name__ == "__main__":
-
     # disabling tdqm for pipeline runs
     tqdm.__init__ = partialmethod(tqdm.__init__, disable=True)
 

@@ -305,7 +305,6 @@ def scale_img(
     mod_mean = 1
     iters = 0
     while mod_mean > 0.01:
-
         scaling_mods = optimize_scale(
             cropped_img, scaling_factors, codebook, pixelRunnerKwargs, is_volume
         )
@@ -464,7 +463,6 @@ def getCoords(exploc: str):
     y_min_all = np.inf
     y_max_all = 0
     for pos in range(fov_count):
-
         with open(img_jsons[pos], "r") as file:
             metadata = json.load(file)
 
@@ -598,7 +596,6 @@ def createComposite(
 
 
 def saveCompositeResults(spots, decoded, exploc, output_name):
-
     # Splits large spots object into lots of smaller ones
     spot_items = dict(spots.items())
     for rch in spot_items:
@@ -844,7 +841,6 @@ def run(
 
     # Otherwise run on a per FOV basis
     else:
-
         if selected_fovs is not None:
             fovs = ["fov_{:03}".format(int(f)) for f in selected_fovs]
         else:
@@ -929,7 +925,6 @@ def addKwarg(parser, kwargdict, var):
 
 
 if __name__ == "__main__":
-
     output_dir = "4_Decoded/"
 
     p = ArgumentParser()
@@ -1029,7 +1024,6 @@ if __name__ == "__main__":
     blob_based = args.decode_spots_method is not None
     vol = False
     if blob_based:
-
         # checking dims on sigma, because scipy throws an unhelpful error
         # in the event of a mismatch.
         if args.min_sigma:

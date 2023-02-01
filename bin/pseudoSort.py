@@ -80,7 +80,6 @@ def reformatter(
     aux_channel_slope: List[float] = [],
     aux_channel_intercept: List[int] = [],
 ):
-
     reportFile = path.join(output_dir, datetime.now().strftime("%Y%d%m_%H%M_psorting.log"))
     sys.stdout = open(reportFile, "w")
 

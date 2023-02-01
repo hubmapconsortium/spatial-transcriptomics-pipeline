@@ -94,7 +94,7 @@ def register_primary(img, reg_img, chs_per_reg):
     # Create transformation matrices
     shape = img.raw_shape
     tforms = {}
-    for (r, ch) in shifts:
+    for r, ch in shifts:
         tform = np.diag([1.0] * 4)
         # Start from 1 because we don't want to shift in the z direction (if there is one)
         for i in range(1, 3):
@@ -453,7 +453,6 @@ def cli(
 
 
 if __name__ == "__main__":
-
     output_dir = "3_processed/"
 
     p = ArgumentParser()

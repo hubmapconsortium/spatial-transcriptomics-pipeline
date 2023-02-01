@@ -754,7 +754,6 @@ def blank_codebook(real_codebook, num_blanks):
 
     # if hamming distance is 2, need to drop real codes and those with hamming distance equal to 1
     elif hamming_distance == 2:
-
         # Remove codes that have hamming distance <= 1 to any code in the real codebook
         cb_codes = real_codebook.argmax(Axes.CH.value)
         drop_cb_codes = {}
