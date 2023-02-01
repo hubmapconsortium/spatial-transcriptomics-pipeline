@@ -802,7 +802,11 @@ def run(
     # If decoder is postcodeDecoder and composite_decode has been set to True then we combine images along edges
     # according to the information in fov_positioning input (extracted from json files) and then run spot finding
     # and decoding on the large composite image.
-    if decodeRunnerKwargs["callableDecoder"].__name__ == "postcodeDecode" and is_composite:
+    if (
+        decodeRunnerKwargs["callableDecoder"]
+        and decodeRunnerKwargs["callableDecoder"].__name__ == "postcodeDecode"
+        and is_composite
+    ):
         if not anchor_name:
             print(
                 "No anchor image detected. Using max projection of primary image as reference for spot finding (required for postcodeDecode)"
