@@ -119,6 +119,8 @@ class FISHTile(FetchedTile):
                     (self.locs[Axes.Y] + self.img_shape[Axes.Y]) * self.voxel[Axes.Y]
                     - self.voxel[Axes.Y],
                 ),
+                # Note that each tile is a unique (r,ch,z) combination--
+                # The Z coordinate needs to pull from THIS tile, unlike x and y
                 Coordinates.Z: (
                     (self.locs[Axes.ZPLANE] + self._zplane) * self.voxel[Axes.ZPLANE],
                     (self.locs[Axes.ZPLANE] + self._zplane + 1) * self.voxel[Axes.ZPLANE],

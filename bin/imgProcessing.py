@@ -39,7 +39,7 @@ def saveImg(loc: str, prefix: str, img: ImageStack):
 
 
 def saveExp(
-    source_dir: str, save_dir: str, exp: Experiment = None, selected_fovs: List[int] = None
+    source_dir: str, save_dir: str, exp: Experiment = None, selected_fovs: List[str] = None
 ):
     # go through and save all images, if an experiment is provided
     if exp:
@@ -448,7 +448,8 @@ def cli(
         print(f"View {fov} saved")
         print(f"Time for {fov}: {time() - t1}")
 
-    saveExp(input_dir, output_dir, selected_fovs=fovs)
+    print(f"Saving updated .jsons for {fovs}, copying other jsons.")
+    saveExp(input_dir, output_dir, exp=None, selected_fovs=fovs)
     print(f"\n\nTotal time elapsed for processing: {time() - t0}")
 
 
