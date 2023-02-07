@@ -11,7 +11,6 @@ from glob import glob
 from os import makedirs, path
 from pathlib import Path
 from time import time
-from typing import List
 
 import matplotlib.patches as mpatches
 import matplotlib.pyplot as plt
