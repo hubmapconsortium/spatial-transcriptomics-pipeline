@@ -52,26 +52,43 @@ def saveExp(
     # copy the non-tiff files to the new directory
     cp_files = [x for x in os.listdir(source_dir) if x[-5:] != ".tiff" and x[-4:] != ".log"]
     for file in cp_files:
-        # images were only updated if we looked at that fov
         print(f"looking at {file}.")
-        if "fov" in file and (
-            (selected_fovs is None) or (True in [f in file for f in selected_fovs])
-        ):
-            # if file contains images, we need to update sha's
-            data = json.load(open(str(source_dir) + "/" + file))
-            for i in range(len(data["tiles"])):
-                abspath = str(save_dir) + "/" + data["tiles"][i]["file"]
-                with open(os.fspath(abspath), "rb") as fh:
-                    hsh = hashlib.sha256(fh.read()).hexdigest()
-                data["tiles"][i]["sha256"] = hsh
-                print(f"\tupdated hash for {data['tiles'][i]['file']}")
-            with open(str(save_dir) + "/" + file, "w") as f:
-                json.dump(data, f)
-            print(f"saved {file} with modified hashes")
+        if "fov" in file:
+            # images were only updated if we looked at that fov
+            if (selected_fovs is None) or (True in [f in file for f in selected_fovs]):
+                # if file contains images, we need to update sha's
+                data = json.load(open(str(source_dir) + "/" + file))
+                for i in range(len(data["tiles"])):
+                    abspath = str(save_dir) + "/" + data["tiles"][i]["file"]
+                    with open(os.fspath(abspath), "rb") as fh:
+                        hsh = hashlib.sha256(fh.read()).hexdigest()
+                    data["tiles"][i]["sha256"] = hsh
+                    print(f"\tupdated hash for {data['tiles'][i]['file']}")
+                with open(str(save_dir) + "/" + file, "w") as f:
+                    json.dump(data, f)
+                print(f"saved {file} with modified hashes")
+            else:
+                print(f"skipping file {file}")
         else:
-            # we can just copy the rest of the files
-            shutil.copyfile(f"{source_dir}/{file}", f"{save_dir}/{file}")
-            print(f"copied {file}")
+            # if we're using a subset of fovs, we'll need to modify view files
+            if (selected_fovs is not None) and (
+                "json" in file and "codebook" not in file and "experiment" not in file
+            ):
+                data = json.load(open(str(source_dir) + "/" + file))
+                new_data = {}
+                for k, v in data.items():
+                    if k == "contents":
+                        # this is where we select only fovs that we care about
+                        new_data["contents"] = {f: v[f] for f in selected_fovs}
+                    else:
+                        new_data[k] = v
+                with open(str(save_dir) + "/" + file, "w") as f:
+                    json.dump(new_data, f)
+                print(f"saved {file} with used FOVs.")
+            else:
+                # we can just copy the rest of the files
+                shutil.copyfile(f"{source_dir}/{file}", f"{save_dir}/{file}")
+                print(f"copied {file}")
 
 
 def register_primary(img, reg_img, chs_per_reg):
@@ -328,7 +345,7 @@ def cli(
     if selected_fovs is not None:
         fovs = ["fov_{:03}".format(int(f)) for f in selected_fovs]
     else:
-        fovs = [k for k in exp.keys()]
+        fovs = exp.keys()
 
     for fov in fovs:
         img = exp[fov].get_image("primary")
