@@ -285,9 +285,9 @@ steps:
         source: [stage_processing/clip_min, clip_min]
         valueFrom: |
           ${
-            if(self[0]){
+            if(!(self[0] === null)){
               return self[0];
-            } else if(self[1]) {
+            } else if(!(self[1] === null)) {
               return self[1];
             } else {
               return null;
@@ -297,9 +297,9 @@ steps:
         source: [stage_processing/clip_max, clip_max]
         valueFrom: |
           ${
-            if(self[0]){
+            if(!(self[0] === null)){
               return self[0];
-            } else if(self[1]) {
+            } else if(!(self[1] === null)) {
               return self[1];
             } else {
               return null;

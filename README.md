@@ -136,6 +136,7 @@ The following are used in `processing.cwl` for basic image formatting.
   Pixels with brightness below this percentile are set to zero. Defaults to 0.
 - `clip_max` *float?*
   Pixels with brightness above this percentile are set to one. Defaults to 99.9.
+**Note**: if both `clip_min` and `clip_max` are set to 0, the step will be skipped.
 - `register_aux_view` *string?*
   The name of the auxiliary view to be used for image registration.  If not provided, no registration will happen.
 - `channels_per_reg` *int?*
