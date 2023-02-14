@@ -43,7 +43,7 @@ The following parameters can be used when invoking the entire pipeline through `
 - `skip_processing` *boolean?*
   If true, the stage of *Image Processing* will be skipped.
 - `run_baysor` *boolean?*
-  If true, the stage of *Baysor* will be run after segmentation. **Only works with 1D Datasets**.
+  If true, the stage of *Baysor* will be run after segmentation. **Only works with 2D Datasets**.
 - `skip_qc` *boolean?*
   If true, the stage of *QC* will be skipped.
 
@@ -51,6 +51,7 @@ The following parameters can be used when invoking the entire pipeline through `
 
 - `selected_fovs` *int[]?*
   If provided, any stage after *SpaceTx Conversion* will only run on the selected FOVs. Useful for running large datasets in environments with limited disk space.
+
   Results from partial-fov runs can be combined by merging output folders. **The only files that need modification are in `3_processing`**. Due to how starfish loads Experiment files, the `json` files for each view (including the primary view) will need to merge the 'contents' field across runs to include all relevant FOVs.
 - `n_processes` *int?*
   The number of processes to be used for computationally intense methods in *Image Processing* and *Decoding*. If not provided, this will set this to the number of logical processors on the system, which are not guaranteed to be accessible if the tool is run on a shared cluster. If the number of logical processors cannot be determined for some reason, it will default to 1.

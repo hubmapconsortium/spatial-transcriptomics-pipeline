@@ -68,7 +68,7 @@ def saveExp(
                     json.dump(data, f)
                 print(f"saved {file} with modified hashes")
             else:
-                print(f"skipping file {file}")
+                print(f"\tskipping file {file}")
         else:
             # if we're using a subset of fovs, we'll need to modify view files
             if (selected_fovs is not None) and (
@@ -84,11 +84,11 @@ def saveExp(
                         new_data[k] = v
                 with open(str(save_dir) + "/" + file, "w") as f:
                     json.dump(new_data, f)
-                print(f"saved {file} with used FOVs.")
+                print(f"\tsaved {file} with used FOVs.")
             else:
                 # we can just copy the rest of the files
                 shutil.copyfile(f"{source_dir}/{file}", f"{save_dir}/{file}")
-                print(f"copied {file}")
+                print(f"\tcopied {file}")
 
 
 def register_primary(img, reg_img, chs_per_reg):
@@ -465,7 +465,7 @@ def cli(
         print(f"View {fov} saved")
         print(f"Time for {fov}: {time() - t1}")
 
-    print(f"Saving updated .jsons for {fovs}, copying other jsons.")
+    print(f"Saving updated .jsons for {fovs}, copying other jsons\n")
     saveExp(input_dir, output_dir, exp=None, selected_fovs=fovs)
     print(f"\n\nTotal time elapsed for processing: {time() - t0}")
 
