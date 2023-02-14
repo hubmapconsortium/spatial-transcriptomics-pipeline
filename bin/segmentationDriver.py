@@ -676,9 +676,13 @@ def run(
         # labeled = labeled[labeled.cell_id != "nan"]
         labeled.to_features_dataframe().to_csv(output_dir + key + "/segmentation.csv")
         labeled.to_netcdf(output_dir + key + "/df_segmented.cdf")
-        labeled.to_expression_matrix().to_pandas().to_csv(output_dir + key + "/exp_segmented.csv")
-        labeled.to_expression_matrix().save(output_dir + key + "/exp_segmented.cdf")
-        labeled.to_expression_matrix().save_anndata(output_dir + key + "/exp_segmented.h5ad")
+
+        labeled_exp = labeled.to_expression_matrix()
+        labeled_exp.to_pandas().set_index(labeled_exp["cell_id"].values).to_csv(
+            output_dir + key + "/exp_segmented.csv"
+        )
+        labeled_exp.save(output_dir + key + "/exp_segmented.cdf")
+        labeled_exp.save_anndata(output_dir + key + "/exp_segmented.h5ad")
         print("saved fov key: {}".format(key))
 
     if len(results) == 0:
