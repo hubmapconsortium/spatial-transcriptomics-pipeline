@@ -473,9 +473,9 @@ def getCoords(exploc: str):
         yc = metadata["tiles"][0]["coordinates"]["yc"]
         zc = metadata["tiles"][0]["coordinates"]["zc"]
         tile_shape = metadata["tiles"][0]["tile_shape"]
-        x_size = (xc[1] - xc[0]) / tile_shape["x"]
-        y_size = (yc[1] - yc[0]) / tile_shape["y"]
-        z_size = (zc[1] - zc[0]) / metadata["shape"]["z"]
+        x_size = (xc[1] - xc[0] + 1) / tile_shape["x"]
+        y_size = (yc[1] - yc[0] + 1) / tile_shape["y"]
+        z_size = (zc[1] - zc[0] + 1) / metadata["shape"]["z"]
 
         # Save physical distance values for later use
         physical_coords[pos]["xc"] = xc
