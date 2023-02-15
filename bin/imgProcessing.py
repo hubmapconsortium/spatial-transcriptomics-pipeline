@@ -345,7 +345,7 @@ def cli(
     if selected_fovs is not None:
         fovs = ["fov_{:03}".format(int(f)) for f in selected_fovs]
     else:
-        fovs = exp.keys()
+        fovs = list(exp.keys())
 
     for fov in fovs:
         img = exp[fov].get_image("primary")
