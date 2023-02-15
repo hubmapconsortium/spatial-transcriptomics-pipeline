@@ -473,7 +473,7 @@ def getCoords(exploc: str):
         tile_shape = metadata["tiles"][0]["tile_shape"]
         x_size = (xc[1] - xc[0] + 1) / tile_shape["x"]
         y_size = (yc[1] - yc[0] + 1) / tile_shape["y"]
-        z_size = (zc[1] - zc[0] + 1) / metadata["shape"]["z"]
+        z_size = (zc[1] - zc[0]) / metadata["shape"]["z"]
 
         # Save physical distance values for later use
         physical_coords[pos]["xc"] = xc
@@ -544,10 +544,11 @@ def createComposite(
 
     # Create empty combined images
     combined_img = np.zeros(
-        (shape["r"], shape["c"], shape["z"], int(y_max_all), int(x_max_all)), dtype="float32"
+        (shape["r"], shape["c"], shape["z"], int(y_max_all) + 1, int(x_max_all) + 1),
+        dtype="float32",
     )
     combined_anchor = np.zeros(
-        (shape["r"], 1, shape["z"], int(y_max_all), int(x_max_all)), dtype="float32"
+        (shape["r"], 1, shape["z"], int(y_max_all) + 1, int(x_max_all) + 1), dtype="float32"
     )
 
     # Fill in image
@@ -561,11 +562,13 @@ def createComposite(
         x_max = composite_coords[pos]["x_max"]
         y_min = composite_coords[pos]["y_min"]
         y_max = composite_coords[pos]["y_max"]
-        combined_img[:, :, :, y_min:y_max, x_min:x_max] = deepcopy(img.xarray.data)
+        combined_img[:, :, :, y_min : y_max + 1, x_min : x_max + 1] = deepcopy(img.xarray.data)
 
         if anchor_name:
             anchor = experiment[fov].get_image(anchor_name)
-            combined_anchor[:, :, :, y_min:y_max, x_min:x_max] = deepcopy(anchor.xarray.data)
+            combined_anchor[:, :, :, y_min : y_max + 1, x_min : x_max + 1] = deepcopy(
+                anchor.xarray.data
+            )
 
     # Turn into ImageStacks and delete original arrays to save memory
     # If no anchor image was provided create one by take the max projection along the channel axis
