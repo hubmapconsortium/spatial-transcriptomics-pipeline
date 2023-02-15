@@ -774,7 +774,6 @@ def getFPR(segmentation=None, results=None, pdf=False):
             [0, len(real_per_cell_all)],
             [np.median(real_per_cell_all), np.median(real_per_cell_all)],
             color="black",
-            linewidth=3,
         )
         if (segmentation is not None and "corrected_rounds" in segmentation.keys()) or (
             results is not None and "reals_full" in results.keys()
@@ -784,7 +783,6 @@ def getFPR(segmentation=None, results=None, pdf=False):
                 [np.median(real_per_cell_full), np.median(real_per_cell_full)],
                 color="black",
                 linestyle="dashed",
-                linewidth=3,
             )
 
         # Create and plot legend
