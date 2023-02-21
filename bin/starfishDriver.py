@@ -305,7 +305,6 @@ def scale_img(
     mod_mean = 1
     iters = 0
     while mod_mean > 0.01:
-
         scaling_mods = optimize_scale(
             cropped_img, scaling_factors, codebook, pixelRunnerKwargs, is_volume
         )
@@ -464,7 +463,6 @@ def getCoords(exploc: str):
     y_min_all = np.inf
     y_max_all = 0
     for pos in range(fov_count):
-
         with open(img_jsons[pos], "r") as file:
             metadata = json.load(file)
 
@@ -473,8 +471,8 @@ def getCoords(exploc: str):
         yc = metadata["tiles"][0]["coordinates"]["yc"]
         zc = metadata["tiles"][0]["coordinates"]["zc"]
         tile_shape = metadata["tiles"][0]["tile_shape"]
-        x_size = (xc[1] - xc[0]) / tile_shape["x"]
-        y_size = (yc[1] - yc[0]) / tile_shape["y"]
+        x_size = (xc[1] - xc[0] + 1) / tile_shape["x"]
+        y_size = (yc[1] - yc[0] + 1) / tile_shape["y"]
         z_size = (zc[1] - zc[0]) / metadata["shape"]["z"]
 
         # Save physical distance values for later use
@@ -546,10 +544,11 @@ def createComposite(
 
     # Create empty combined images
     combined_img = np.zeros(
-        (shape["r"], shape["c"], shape["z"], int(y_max_all), int(x_max_all)), dtype="float32"
+        (shape["r"], shape["c"], shape["z"], int(y_max_all) + 1, int(x_max_all) + 1),
+        dtype="float32",
     )
     combined_anchor = np.zeros(
-        (shape["r"], 1, shape["z"], int(y_max_all), int(x_max_all)), dtype="float32"
+        (shape["r"], 1, shape["z"], int(y_max_all) + 1, int(x_max_all) + 1), dtype="float32"
     )
 
     # Fill in image
@@ -563,11 +562,13 @@ def createComposite(
         x_max = composite_coords[pos]["x_max"]
         y_min = composite_coords[pos]["y_min"]
         y_max = composite_coords[pos]["y_max"]
-        combined_img[:, :, :, y_min:y_max, x_min:x_max] = deepcopy(img.xarray.data)
+        combined_img[:, :, :, y_min : y_max + 1, x_min : x_max + 1] = deepcopy(img.xarray.data)
 
         if anchor_name:
             anchor = experiment[fov].get_image(anchor_name)
-            combined_anchor[:, :, :, y_min:y_max, x_min:x_max] = deepcopy(anchor.xarray.data)
+            combined_anchor[:, :, :, y_min : y_max + 1, x_min : x_max + 1] = deepcopy(
+                anchor.xarray.data
+            )
 
     # Turn into ImageStacks and delete original arrays to save memory
     # If no anchor image was provided create one by take the max projection along the channel axis
@@ -598,7 +599,6 @@ def createComposite(
 
 
 def saveCompositeResults(spots, decoded, exploc, output_name):
-
     # Splits large spots object into lots of smaller ones
     spot_items = dict(spots.items())
     for rch in spot_items:
@@ -844,7 +844,6 @@ def run(
 
     # Otherwise run on a per FOV basis
     else:
-
         if selected_fovs is not None:
             fovs = ["fov_{:03}".format(int(f)) for f in selected_fovs]
         else:
@@ -929,7 +928,6 @@ def addKwarg(parser, kwargdict, var):
 
 
 if __name__ == "__main__":
-
     output_dir = "4_Decoded/"
 
     p = ArgumentParser()
@@ -1029,7 +1027,6 @@ if __name__ == "__main__":
     blob_based = args.decode_spots_method is not None
     vol = False
     if blob_based:
-
         # checking dims on sigma, because scipy throws an unhelpful error
         # in the event of a mismatch.
         if args.min_sigma:

@@ -148,7 +148,7 @@ inputs:
                   doc: Accuracy mode to run in.  Can be 'high', 'med', or 'low'.
                 physical_coords:
                   type: boolean?
-                  doc: Whether to use physical coordinates or pixel coordinates
+                  doc: Whether to use physical coordinates or pixel coordinates 
 
 
   decoding_pixel:
@@ -195,7 +195,7 @@ steps:
 
       requirements:
         DockerRequirement:
-          dockerPull: hubmap/starfish-custom:2.33
+          dockerPull: hubmap/starfish-custom:latest
 
       inputs:
         schema:
@@ -228,7 +228,7 @@ steps:
 
       requirements:
         DockerRequirement:
-          dockerPull: hubmap/starfish-custom:2.33
+          dockerPull: hubmap/starfish-custom:latest
 
       inputs:
         exp_loc:

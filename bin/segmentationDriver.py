@@ -134,12 +134,10 @@ def _clip_percentile_to_zero(image, p_min, p_max, min_coeff=1, max_coeff=1):
 def segment_nuclei(
     nuclei, border_buffer=None, area_thresh=1.05, thresh_block_size=51, wtshd_ftprnt_size=100
 ):
-
     good_nuclei_all_z = np.zeros(nuclei.xarray.data[0, 0].shape, dtype="int32")
     all_nuclei_all_z = np.zeros(nuclei.xarray.data[0, 0].shape, dtype="int32")
     og_nuclei = deepcopy(nuclei)
     for z in range(nuclei.num_zplanes):
-
         nuclei = deepcopy(og_nuclei)
 
         # Even out background of nuclei image using large morphological opening
@@ -203,7 +201,6 @@ def segment_nuclei(
         props = skimage.measure.regionprops(good_nuclei)
         deformed_border = []
         for x in range(1, len(props) + 1):
-
             object_area = props[x - 1].area
             con_hull_area = props[x - 1].convex_area
 
@@ -279,9 +276,7 @@ def segment_nuclei(
             merge_count = 0
             removed_labels = []
             for pair in neighbor_pairs:
-
                 if pair[0] not in removed_labels and pair[1] not in removed_labels:
-
                     pair_image1 = np.zeros((ymax, xmax))
                     bbox = props[pair[0] - 1].bbox
                     pair_image1[bbox[0] : bbox[2], bbox[1] : bbox[3]] = props[
@@ -328,7 +323,6 @@ def segment_nuclei(
 def segment_cytoplasm(
     good_nuclei, all_nuclei, decoded_targets, border_buffer=None, label_exp_size=None
 ):
-
     # Convert transcripts to dataframe
     data = deepcopy(decoded_targets.to_features_dataframe())
 
@@ -337,7 +331,6 @@ def segment_cytoplasm(
     all_cyto_all_z = np.zeros(all_nuclei.shape, dtype="int32")
 
     for z in range(all_nuclei.shape[0]):
-
         # Subset data for current z slice
         data = data[data["z"] == z]
 
@@ -469,7 +462,6 @@ def segmentByDensity(
     label_exp_size=20,
     nuclei_view="",
 ):
-
     """
     Parameters
         nuclei: Nuclei images.
@@ -538,7 +530,6 @@ def segmentByDensity(
             return good_nuclei
         # All nuclei
         else:
-
             # Had to put this here because I need border nuclei for cytoplasm segmentation.
             if border_buffer is not None:
                 for z in range(nuclei.num_zplanes):
@@ -685,9 +676,13 @@ def run(
         # labeled = labeled[labeled.cell_id != "nan"]
         labeled.to_features_dataframe().to_csv(output_dir + key + "/segmentation.csv")
         labeled.to_netcdf(output_dir + key + "/df_segmented.cdf")
-        labeled.to_expression_matrix().to_pandas().to_csv(output_dir + key + "/exp_segmented.csv")
-        labeled.to_expression_matrix().save(output_dir + key + "/exp_segmented.cdf")
-        labeled.to_expression_matrix().save_anndata(output_dir + key + "/exp_segmented.h5ad")
+
+        labeled_exp = labeled.to_expression_matrix()
+        labeled_exp.to_pandas().set_index(labeled_exp["cell_id"].values).to_csv(
+            output_dir + key + "/exp_segmented.csv"
+        )
+        labeled_exp.save(output_dir + key + "/exp_segmented.cdf")
+        labeled_exp.save_anndata(output_dir + key + "/exp_segmented.h5ad")
         print("saved fov key: {}".format(key))
 
     if len(results) == 0:

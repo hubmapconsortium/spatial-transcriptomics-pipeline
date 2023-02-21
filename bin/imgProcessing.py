@@ -39,7 +39,7 @@ def saveImg(loc: str, prefix: str, img: ImageStack):
 
 
 def saveExp(
-    source_dir: str, save_dir: str, exp: Experiment = None, selected_fovs: List[int] = None
+    source_dir: str, save_dir: str, exp: Experiment = None, selected_fovs: List[str] = None
 ):
     # go through and save all images, if an experiment is provided
     if exp:
@@ -52,26 +52,43 @@ def saveExp(
     # copy the non-tiff files to the new directory
     cp_files = [x for x in os.listdir(source_dir) if x[-5:] != ".tiff" and x[-4:] != ".log"]
     for file in cp_files:
-        # images were only updated if we looked at that fov
         print(f"looking at {file}.")
-        if "fov" in file and (
-            (selected_fovs is None) or (True in [f in file for f in selected_fovs])
-        ):
-            # if file contains images, we need to update sha's
-            data = json.load(open(str(source_dir) + "/" + file))
-            for i in range(len(data["tiles"])):
-                abspath = str(save_dir) + "/" + data["tiles"][i]["file"]
-                with open(os.fspath(abspath), "rb") as fh:
-                    hsh = hashlib.sha256(fh.read()).hexdigest()
-                data["tiles"][i]["sha256"] = hsh
-                print(f"\tupdated hash for {data['tiles'][i]['file']}")
-            with open(str(save_dir) + "/" + file, "w") as f:
-                json.dump(data, f)
-            print(f"saved {file} with modified hashes")
+        if "fov" in file:
+            # images were only updated if we looked at that fov
+            if (selected_fovs is None) or (True in [f in file for f in selected_fovs]):
+                # if file contains images, we need to update sha's
+                data = json.load(open(str(source_dir) + "/" + file))
+                for i in range(len(data["tiles"])):
+                    abspath = str(save_dir) + "/" + data["tiles"][i]["file"]
+                    with open(os.fspath(abspath), "rb") as fh:
+                        hsh = hashlib.sha256(fh.read()).hexdigest()
+                    data["tiles"][i]["sha256"] = hsh
+                    print(f"\tupdated hash for {data['tiles'][i]['file']}")
+                with open(str(save_dir) + "/" + file, "w") as f:
+                    json.dump(data, f)
+                print(f"saved {file} with modified hashes")
+            else:
+                print(f"\tskipping file {file}")
         else:
-            # we can just copy the rest of the files
-            shutil.copyfile(f"{source_dir}/{file}", f"{save_dir}/{file}")
-            print(f"copied {file}")
+            # if we're using a subset of fovs, we'll need to modify view files
+            if (selected_fovs is not None) and (
+                "json" in file and "codebook" not in file and "experiment" not in file
+            ):
+                data = json.load(open(str(source_dir) + "/" + file))
+                new_data = {}
+                for k, v in data.items():
+                    if k == "contents":
+                        # this is where we select only fovs that we care about
+                        new_data["contents"] = {f: v[f] for f in selected_fovs}
+                    else:
+                        new_data[k] = v
+                with open(str(save_dir) + "/" + file, "w") as f:
+                    json.dump(new_data, f)
+                print(f"\tsaved {file} with used FOVs.")
+            else:
+                # we can just copy the rest of the files
+                shutil.copyfile(f"{source_dir}/{file}", f"{save_dir}/{file}")
+                print(f"\tcopied {file}")
 
 
 def register_primary(img, reg_img, chs_per_reg):
@@ -94,7 +111,7 @@ def register_primary(img, reg_img, chs_per_reg):
     # Create transformation matrices
     shape = img.raw_shape
     tforms = {}
-    for (r, ch) in shifts:
+    for r, ch in shifts:
         tform = np.diag([1.0] * 4)
         # Start from 1 because we don't want to shift in the z direction (if there is one)
         for i in range(1, 3):
@@ -328,7 +345,7 @@ def cli(
     if selected_fovs is not None:
         fovs = ["fov_{:03}".format(int(f)) for f in selected_fovs]
     else:
-        fovs = exp.keys()
+        fovs = list(exp.keys())
 
     for fov in fovs:
         img = exp[fov].get_image("primary")
@@ -448,12 +465,12 @@ def cli(
         print(f"View {fov} saved")
         print(f"Time for {fov}: {time() - t1}")
 
-    saveExp(input_dir, output_dir, selected_fovs=fovs)
+    print(f"Saving updated .jsons for {fovs}, copying other jsons\n")
+    saveExp(input_dir, output_dir, exp=None, selected_fovs=fovs)
     print(f"\n\nTotal time elapsed for processing: {time() - t0}")
 
 
 if __name__ == "__main__":
-
     output_dir = "3_processed/"
 
     p = ArgumentParser()

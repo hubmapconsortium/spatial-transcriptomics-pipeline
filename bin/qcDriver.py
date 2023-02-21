@@ -11,7 +11,6 @@ from glob import glob
 from os import makedirs, path
 from pathlib import Path
 from time import time
-from typing import List
 
 import matplotlib.patches as mpatches
 import matplotlib.pyplot as plt
@@ -607,7 +606,6 @@ def getFPR(segmentation=None, results=None, pdf=False):
     if (segmentation is not None and "corrected_rounds" in segmentation.keys()) or (
         results is not None and "reals_full" in results.keys()
     ):
-
         if segmentation is not None:
             # Get counts per cell
             full_counts = segmentation[segmentation["corrected_rounds"] == 0]
@@ -776,7 +774,6 @@ def getFPR(segmentation=None, results=None, pdf=False):
             [0, len(real_per_cell_all)],
             [np.median(real_per_cell_all), np.median(real_per_cell_all)],
             color="black",
-            linewidth=3,
         )
         if (segmentation is not None and "corrected_rounds" in segmentation.keys()) or (
             results is not None and "reals_full" in results.keys()
@@ -786,7 +783,6 @@ def getFPR(segmentation=None, results=None, pdf=False):
                 [np.median(real_per_cell_full), np.median(real_per_cell_full)],
                 color="black",
                 linestyle="dashed",
-                linewidth=3,
             )
 
         # Create and plot legend
@@ -894,9 +890,10 @@ def plotBarcodeAbundance(pdf, decoded=None, results=None):
         [all_conf, get_y_offset(all_conf, disp_range / 4.35, ax)],
         color="black",
     )
+    top_txt_y = get_y_offset(all_conf, disp_range / 3.95, ax)
     plt.text(
         len(all_counts) * 0.4,
-        get_y_offset(all_conf, disp_range / 3.95, ax),
+        top_txt_y,
         f"{good_codes_all*100:.2f}% barcodes above {all_conf:.2f} threshold",
         horizontalalignment="center",
         fontsize=8,
@@ -966,6 +963,9 @@ def plotBarcodeAbundance(pdf, decoded=None, results=None):
 
         final_results["reals_full"] = dict(full_real_counts_raw)
         final_results["blanks_full"] = dict(full_blank_counts_raw)
+
+    if top_txt_y > max(all_counts) * 1.1:
+        plt.ylim([0.9, top_txt_y * 2])
 
     # Create and plot legend
     if (decoded is not None and "corrected_rounds" in decoded.coords) or (
@@ -1056,7 +1056,6 @@ def runFOV(
     doRipley=False,
     savePdf=False,
 ):
-
     t0 = time()
 
     # print("transcripts {}\ncodebook {}\nspots {}\nsegmented {}".format(transcripts, codebook, spots, segmentation))
@@ -1187,7 +1186,6 @@ def run(
     doRipley=False,
     savePdf=False,
 ):
-
     t0 = time()
 
     output_dir = "7_QC/"
@@ -1429,7 +1427,6 @@ def run(
 
 
 if __name__ == "__main__":
-
     # disabling tdqm for pipeline runs
     tqdm.__init__ = partialmethod(tqdm.__init__, disable=True)
 
