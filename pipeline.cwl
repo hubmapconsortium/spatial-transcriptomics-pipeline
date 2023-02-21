@@ -538,7 +538,7 @@ steps:
 
       requirements:
         DockerRequirement:
-          dockerPull: hubmap/starfish-custom:2.32
+          dockerPull: hubmap/starfish-custom:2.33
 
       inputs:
         schema:
@@ -651,7 +651,16 @@ steps:
     in:
       tiffs:
         source: [sorter/pseudosorted_dir, tiffs]
-        pickValue: first_non_null
+        valueFrom: |
+          ${
+            if(self[0]){
+              return self[0];
+            } else if (self[1]){
+              return self[1];
+            } else {
+              return null;
+            }
+          }
       codebook:
         source: [stagedSorted/codebook, codebook, codebook_csv, codebook_json]
         linkMerge: merge_flattened
@@ -965,7 +974,9 @@ steps:
     run: steps/segmentation.cwl
     in:
       decoded_loc: starfishRunner/decoded
-      exp_loc: spaceTxConversion/spaceTx_converted
+      exp_loc:
+        source: [processing/processed_exp, spaceTxConversion/spaceTx_converted, exp_loc]
+        pickValue: first_non_null
       parameter_json: parameter_json
       selected_fovs: selected_fovs
       aux_name: aux_name
@@ -1024,7 +1035,7 @@ steps:
             }
           }
       codebook:
-        source: [sorter/pseudosorted_dir, spaceTxConversion/spaceTx_converted, exp_loc]
+        source: [sorter/pseudosorted_dir, spaceTxConversion/spaceTx_converted, processing/processed_exp, exp_loc]
         pickValue: first_non_null
         valueFrom: |
           ${

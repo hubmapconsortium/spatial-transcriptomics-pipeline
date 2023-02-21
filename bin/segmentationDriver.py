@@ -628,6 +628,11 @@ def run(
                 makedirs(output_dir + name)
                 print("made " + output_dir + name)
 
+    if len(results) == 0:
+        print("No prior results found! Quitting segmentation.")
+        sys.stdout = sys.__stdout__
+        return
+
     # load in the images we want to look at
     exp = starfish.core.experiment.experiment.Experiment.from_json(
         str(exp_loc / "experiment.json")
