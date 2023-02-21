@@ -1,7 +1,8 @@
 [![Build Status](https://travis-ci.com/hubmapconsortium/spatial-transcriptomics-pipeline.svg?branch=master)](https://travis-ci.com/hubmapconsortium/spatial-transcriptomics-pipeline)
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 
-# HuBMAP Spatial Transcriptomics Pipeline
+# PIPEFISH, the HuBMAP Spatial Transcriptomics Pipeline
+![The logo for PIPEFISH, a pipefish with the diagram for the pipeline workflow on its back](logo.png)
 A [CWL](https://www.commonwl.org/) pipeline for processing spatial transcriptomics data.
 
 ## Installation
