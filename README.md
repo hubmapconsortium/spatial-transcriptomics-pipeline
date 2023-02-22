@@ -295,7 +295,7 @@ Depending on pre-existing segmentation data, one of four methods can be used.
     - `label_exp_size` *int*
       Pixel size labels are dilated by in final step. Helpful for closing small holes that are common from thresholding but can also cause cell boundaries to exceed their true boundaries if set too high. Label dilation respects label borders and does not mix labels.
 
-### Segmentation
+### QC
 - `find_ripley` *boolean?*
   If true, Ripley's Spatial Statistic will be run on spot data. Defaults to False.
 - `save_pdf` *boolean?*
