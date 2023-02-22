@@ -172,6 +172,8 @@ The following are used in `starfishRunner.cwl`, which is effectively a wrapper f
   Whether to treat zplanes as a 3D image. Defaults to False.
 - `rescale` *boolean?*
   Whether to iteratively rescale image intensity before running the decoder. Can be run with any decoder, but requires that a valid set of parameters are provided to `decoding_pixel`.
+- `not_filtered_results` *boolean?*
+  If true, will not remove genes that do not match a target and do not meet criteria. Defaults to false.
 - **Blob-based Decoding** `decoding`
   Will run decoding in two steps, [blob detection](https://spacetx-starfish.readthedocs.io/en/stable/api/spots/index.html?highlight=blobdetector#starfish.spots.FindSpots.BlobDetector) followed by decoding.
   - `min_sigma` *float[]?*
@@ -186,13 +188,19 @@ The following are used in `starfishRunner.cwl`, which is effectively a wrapper f
     Amount of overlap allowed between blob. Defaults to 0.5.
   - `detector_method` *string?*
     The name of the sciki-image spot detection method to use.  Valid options are `blob_dog`, `blob_doh`, and `blob_log` (default).
-  - `filtered_results` *boolean?*
-    Automatically remove barcodes that do not match a gene. Defaults to False.
+  - `composite_decode` *boolean?*
+    Whether to composite all FOVs into one image, typically for PoSTcode decoding.
+  - `composite_pmin` *float?*
+    pmin value for clip and scale of composite image.
+  - `composite_pmax` *float?*
+    pmax value for clip and scale of composite image.
   - `decode_method` *string?*
     Method name for spot decoding.  Valid options and corresponding required parameters are listed below.
   - `decoder`
     - `SimpleLookupDecoder`
-      Does not have any futher parameters.
+      Does not have any further parameters.
+    - [`postcodeDecode`](https://github.com/gerstung-lab/postcode)
+      Does not have any further parameters.
     - [`MetricDistance`](https://spacetx-starfish.readthedocs.io/en/stable/api/spots/index.html#starfish.spots.DecodeSpots.MetricDistance)
       - `trace_building_strategy` *string*
         Which tracing strategy to use.  Valid options are `SEQUENTIAL`, `EXACT_MATCH`, `NEAREST_NEIGHBOR`.
@@ -287,6 +295,13 @@ Depending on pre-existing segmentation data, one of four methods can be used.
     - `label_exp_size` *int*
       Pixel size labels are dilated by in final step. Helpful for closing small holes that are common from thresholding but can also cause cell boundaries to exceed their true boundaries if set too high. Label dilation respects label borders and does not mix labels.
 
+### Segmentation
+- `find_ripley` *boolean?*
+  If true, Ripley's Spatial Statistic will be run on spot data. Defaults to False.
+- `save_pdf` *boolean?*
+  If true, all QC metrics will save plots to pdf. If false, only `yml` output will be provided. Defaults to True.
+Note: Some values from earlier stages are optionally read in to provide select metrics. If not using singular `json` file as input, refer to `input_schemas/qc.json` for values that can be passed for more precise results.
+
 ## Development
 Code in this repository is formatted with [black](https://github.com/psf/black) and
 [isort](https://pypi.org/project/isort/), and this is checked via Travis CI.
@@ -295,12 +310,12 @@ A [pre-commit](https://pre-commit.com/) hook configuration is provided, which ru
 Run `pre-commit install` in each clone of this repository which you will use for development (after `pip install pre-commit`
 into an appropriate Python environment, if necessary).
 
-## Building Docker images
+### Building Docker images
 Run `build_docker_images` in the root of the repository, assuming you have an up-to-date
 installation of the Python [`multi-docker-build`](https://github.com/mruffalo/multi-docker-build)
 package.
 
-## Release process
+### Release process
 
 The `master` branch is intended to be production-ready at all times, and should always reference Docker containers
 with the `latest` tag.
