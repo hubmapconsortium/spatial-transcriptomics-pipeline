@@ -5,13 +5,49 @@
 ![The logo for PIPEFISH, a pipefish with the diagram for the pipeline workflow on its back](logo.png)
 A [CWL](https://www.commonwl.org/) pipeline for processing spatial transcriptomics data.
 
+ * [Installation](#installation)
+    * [Method 1: Local Python Install](#method-1-local-python-install)
+    * [Method 2: Running in a Docker container](#method-2-running-in-a-docker-container)
+ * [Example PIPEFISH Run](#example-pipefish-run)
+ * [Steps](#steps)
+ * [Inputs](#inputs)
+    * [Overall pipeline.cwl Program Flow](#overall-pipelinecwl-program-flow)
+       * [Parameters Applied Over Multiple Stages](#parameters-applied-over-multiple-stages)
+    * [Psuedoround Sorting](#psuedoround-sorting)
+    * [Dataset Information](#dataset-information)
+       * [File Formatting](#file-formatting)
+       * [Auxiliary View Formatting](#auxiliary-view-formatting)
+    * [Image Processing](#image-processing)
+    * [Image Decoding](#image-decoding)
+    * [Segmentation](#segmentation)
+    * [QC](#qc)
+ * [Development](#development)
+    * [Building Docker images](#building-docker-images)
+    * [Release process](#release-process)
+
+
 ## Installation
 
-Currently, development is performed on the `master` branch, for the latest stable release use the `release` branch.
+This pipeline is compatible with Linux and Mac systems. Windows users can run the pipeline by installing [WSL2](https://learn.microsoft.com/en-us/windows/wsl/install) and taking [extra steps](https://docs.docker.com/desktop/windows/wsl/) to configure Docker Engine.
 
-To run this pipeline locally, you need [cwltool](https://pypi.org/project/cwltool/) and [Docker](https://docs.docker.com/engine/install/) installed.  The version of `cwltool` must be recent enough to read cwl 1.2, which means that it must be installed through `pip` and not `apt-get` (at the time of writing).
+### Method 1: Local Python Install
+1. Prerequisites: [Docker Engine](https://docs.docker.com/engine/install/) and Python > 3.7.
+2. Clone this repo with `git clone -b release https://github.com/hubmapconsortium/spatial-transcriptomics-pipeline.git`.
+3. Install `cwltool` with `pip install cwltool`.
+4. You can now run `pipeline.cwl` and the step files included in `/steps` by using `cwltool [file].cwl [inputs]`.
 
-To run this in a docker image, pull `ghcr.io/hubmapconsortium/spatial-transcriptomics-pipeline/starfish-docker-runner:latest` and invoke `cwltool --singularity` when running.
+### Method 2: Running in a Docker container
+This method is not recommended due to creating additional computational overhead, but can be useful in situations where the pipeline is deployed as a job on a cloud computer, such as kubernetes. The exact steps to run remotely will vary depending on infrastructure.
+1. Prerequisites: Install [Docker Engine](https://docs.docker.com/engine/install/).
+2. Obtain the runner image with `docker pull ghcr.io/hubmapconsortium/spatial-transcriptomics-pipeline/starfish-docker-runner:latest`.
+3. Refer to [Docker mount documentation](https://docs.docker.com/storage/bind-mounts/) for directions on how to make input/output directories accessible to the docker image. Run the docker image as `docker run --name PIPEFISH --mount [your mount string] ghcr.io/hubmapconsortium/spatial-transcriptomics-pipeline/starfish-docker-runner:latest`.
+4. Run PIPEFISH inside the docker image the same as you would in **Method 1** with `docker exec -d PIPEFISH cwltool --singularity --outdir [defined in prior step] [step].cwl [input parameters]`.
+## Example PIPEFISH Run
+1. Download and extract one of our [pre-formatted, open-access datasets](https://zenodo.org/record/7647746). *The mouse brain ISS data is recommended as a first choice due to filesize and short run time.*
+2. From inside the extracted directory, run the provided `prep_input.py` script. This will generate a `pipeline.yml` file with absolute paths to the downloaded data.
+3. The pipeline can now be run with `cwltool {path to cloned repo}/pipeline.cwl {path to downloaded data}/pipeline.yml`.
+
+The two provided input text files for the pipeline, `pipeline.yml` and `*metadata.json`, can be used as a template for new runs.
 
 ## Steps
 
@@ -305,6 +341,8 @@ Note: Some values from earlier stages are optionally read in to provide select m
 ## Development
 Code in this repository is formatted with [black](https://github.com/psf/black) and
 [isort](https://pypi.org/project/isort/), and this is checked via Travis CI.
+
+Currently, development is performed on the `master` branch, for the latest stable release use the `release` branch.
 
 A [pre-commit](https://pre-commit.com/) hook configuration is provided, which runs `black` and `isort` before committing.
 Run `pre-commit install` in each clone of this repository which you will use for development (after `pip install pre-commit`
