@@ -14,8 +14,17 @@ inputs:
     type: Directory
     doc: The root directory containing all images.
 
+  codebook_csv:
+    type: File?
+    doc: Flattened csv input, refer to record entry.
+
+  codebook_json:
+    type: File?
+    doc: Flattened json input, refer to record entry.
+
   codebook:
     type:
+      - 'null'
       - type: record
         name: csv
         fields:
@@ -268,7 +277,19 @@ steps:
           type: stdout
     in:
       input_dir: input_dir
-      codebook: codebook
+      codebook:
+        source: [codebook, codebook_csv, codebook_json]
+        linkMerge: merge_flattened
+        valueFrom: |
+          ${
+            if(self[0]){
+              return self[0];
+            } else if(self[1]){
+              return {csv: self[1]};
+            } else {
+              return {json: self[2]};
+            }
+          }
       channel_yml: channel_yml
       cycle_yml: cycle_yml
       file_format:
