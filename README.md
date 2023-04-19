@@ -94,36 +94,46 @@ The following parameters will be used by either `spaceTxConversion.cwl` or by `s
     JSON containing codebook information for the experiment, as formatted by Starfish.
 
 ##### Segmentation
-There are five possible segmentation methods in this pipeline. If external segmentation is to be used, then external files must be provided in one of two formats, otherwise parameters may be passed as `json` input.
+There are five possible segmentation methods in this pipeline. If cellpose integration or external segmentation are to be used external files must be provided. Other parameters may be passed as `json` input.
 
-1. External roi_set, such as from FIJI segmentation.
-  - `mask_roi_files` *directory*
-     Directory containing `RoiSet.zip` for each FOV.
-  - `mask_roi_formats` *string*
-     Layout of the name of each zip folder, per FOV.  Will be formatted as `file_formats.format([fov index])`.
-2. External labeled binary image.
-  - `mask_labeled_files` *directory*
-     Directory containing labeled segmentation images, such as from ilastik classification.
-  - `mask_labeled_formats` *string*
-     Layout of the name of each labelled image.  Will be formatted with `file_formats_labeled.format([fov index])`.
+- External Segmentation
+  1. External roi_set, such as from FIJI segmentation.
+     - `mask_roi_files` *directory*
+        Directory containing `RoiSet.zip` for each FOV.
+     - `mask_roi_formats` *string*
+        Layout of the name of each zip folder, per FOV.  Will be formatted as `file_formats.format([fov index])`.
+  2. External labeled binary image.
+     - `mask_labeled_files` *directory*
+        Directory containing labeled segmentation images, such as from ilastik classification.
+     - `mask_labeled_formats` *string*
+        Layout of the name of each labelled image.  Will be formatted with `file_formats_labeled.format([fov index])`.
+- Cellpose Segmentation
+   - `pretrained_model_dir` *file*
+      If a user-defined moded is to be used, then this file must be provided.
 
 #### Only Needed for Individual Steps
 The following parameters are only needed for running individual steps, such as for debugging. In a pipeline run, these will be automatically populated by prior steps.
 
 ##### Image Processing
-- `input_dir` *Directory*
+- `input_dir` *directory*
   Root directory that contains Starfish-formatted data, such as `2_tx_converted`.
 
 ##### Image Decoding
-- `exp_loc` *Directory*
+- `exp_loc` *directory*
   Root directory that contains Starfish-formatted data, such as `3_processed`.
+
+##### Segmentation
+- `decoded_loc` *directory*
+  Root directory from image decoding step, such as `4_Decoded`.
+- `exp_loc` *directory*
+  Location of directory containing `experiment.json` file, typically `3_processed`.
 
 ##### QC
 - `codebook_exp` *Directory*
   Directory containing both an `experiment.json` file and `codebook.json`, such as `2_tx_converted` or `3_processed`.
-- `segmentation_loc` *Directory*
+- `segmentation_loc` *directory*
   Directory containing segmented data from an experiment, such as `5_Segmentation` or `6_Baysor`.
-- `data_exp` *Directory*
+- `data_exp` *directory*
   Directory containing decoded data from an experiment, such as `4_Decoded`.
 
 ### Non-File Inputs
@@ -332,41 +342,64 @@ The following are used in `starfishRunner.cwl`, which is effectively a wrapper f
     Order of L_p norm to apply to intensities and codes when using metric_decode to pair each intensity to its closest target.  Defaults to 2.
 
 #### Segmentation
-Used by `segmentation.cwl`. Results from this step will be run through Baysor if `run_baysor` is set to `True`. Note that Baysor will only run on 2D data.
+Used by `cellpose.cwl` or `segmentation.cwl`. Results from this step will be run through Baysor if `run_baysor` is set to `True`. Note that Baysor will only run on 2D data.
 
-Depending on pre-existing segmentation data, one of four methods can be used. If either roi_set or labeled images are to be used, those must be provided as [file inputs](#file-inputs) and `binary_mask` should be provided as `binary_mask: {}`
+Depending on pre-existing segmentation data, one of five methods can be used. If a cellpose custom model, roi_set, or labeled images are to be used, those must be provided as [file inputs](#file-inputs) and `binary_mask` should be provided as `binary_mask: {}`
 
-- `aux_name` *string?*
-  The name of the aux view to look at for segmentation. May not required depending on `binary_mask` settings.
-- `binary_mask`
-  - Threshold and watershed segmentation (no provided data)
-    - `img_threshold` *float*
-      Global threshold value for images.
-    - `min_dist` *int*
-      Minimum distance (in pixels) between transformed peaks in watershedding.
-    - `min_allowed_size` *int*
-      Minimum size for a cell (in pixels).
-    - `max_allowed_size` *int*
-      Maximum allowed size for a cell (in pixels).
-    - `masking_radius` *int*
-      Radius for white tophat noise filter.
-  - Transcript-density based segmentation (provided transcript data)
-    - `nuclei_view` *string*
-      Name of the auxillary view with nuclei data
-    - `cyto_seg` *boolean*
-      If true, the cytoplasm will be segmented.
-    - `correct_seg` *boolean*
-      If true, suspected nuclei/cytoplasms that overlap will be removed.
-    - `border_buffer` *int*
-      If not zero, removes cytoplasms whose nuclei lie within the given distance from the border.
-    - `area_thresh` *float*
-      Threshold used when determining if an object is one nucleus or two or more overlapping nuclei. Objects whose ratio of convex hull area to normal area are above this threshold are removed if the option to remove overlapping nuclei is set.
-    - `thesh_block_size` *int*
-      Size of structuring element for local thresholding of nuclei. If nuclei interiors aren't passing threshold, increase this value, if too much non-nuclei is passing threshold, lower it.
-    - `watershed_footprint_size` *int*
-      Size of structuring element for watershed segmentation. Larger values will segment the nuclei into larger objects and smaller values will result in smaller objects. Adjust according to nucleus size.
-    - `label_exp_size` *int*
-      Pixel size labels are dilated by in final step. Helpful for closing small holes that are common from thresholding but can also cause cell boundaries to exceed their true boundaries if set too high. Label dilation respects label borders and does not mix labels.
+- **Cellpose segmentation**
+  - `use_mrna` *boolean?*
+    If true, decoded transcripts will be incorporated into segmentation.
+  - `use_gpu` *boolean?*
+    If true, GPU will be used for computation instead of CPU.
+  - `pretrained_model_str` *string?*
+    One of the [pretrained models](https://cellpose.readthedocs.io/en/latest/models.html) for cellpose. This model or a custom model must be provided.
+  - `diameter` *float?*
+    Expected diameter of cells. Only needs to be provided if a pre-trained model is used.
+  - `flow_threshold` *float?*
+    Threshold for filtering cell segmentations (increasing this will filter out lower confidence segmentations). Range is 0 to infinity.
+  - `stitch_threshold` *float?*
+    Threshold for stiching together segmentations that occur at the same xy location but in adjacent z slices, fange is 0 to 1. This should only be used when the image is 3D.
+  - `cellprob_threshold` *float?*
+    Determins the extent of the segmentations (0 is the default more negative values resulting in larger cells, more positive values result in smaller cells), range is -6 to 6.
+  - `border_buffer` *int?*
+    If not None, removes cytoplasms whose nuclei lie within the given distance of the FOV border.
+  - `label_exp_size` *int?* Pixel size labels are dilated by this much in the final step. Helpful for closing small holes that are common from thresholding but can also cause cell boundaries to exceed their true boundaries if set too high. Label dilation respects label borders and does not mix labels.
+  - `min_allowed_size` *int?*
+    Minimum size for a cell (in pixels).
+  - `max_allowed_size` *int?*
+    Maximum size for a cell (in pixels).
+- **Any other segmentation** *including imported external masks*
+  - `aux_name` *string?*
+    The name of the aux view to look at for segmentation. May not required depending on `binary_mask` settings.
+  - `binary_mask`
+    - Threshold and watershed segmentation (no provided data)
+      - `img_threshold` *float*
+         Global threshold value for images.
+      - `min_dist` *int*
+         Minimum distance (in pixels) between transformed peaks in watershedding.
+      - `min_allowed_size` *int*
+         Minimum size for a cell (in pixels).
+      - `max_allowed_size` *int*
+         Maximum allowed size for a cell (in pixels).
+      - `masking_radius` *int*
+         Radius for white tophat noise filter.
+    - Transcript-density based segmentation (provided transcript data)
+      - `nuclei_view` *string*
+         Name of the auxillary view with nuclei data
+      - `cyto_seg` *boolean*
+         If true, the cytoplasm will be segmented.
+      - `correct_seg` *boolean*
+         If true, suspected nuclei/cytoplasms that overlap will be removed.
+      - `border_buffer` *int*
+         If not zero, removes cytoplasms whose nuclei lie within the given distance from the border.
+      - `area_thresh` *float*
+         Threshold used when determining if an object is one nucleus or two or more overlapping nuclei. Objects whose ratio of convex hull area to normal area are above this threshold are removed if the option to remove overlapping nuclei is set.
+      - `thesh_block_size` *int*
+         Size of structuring element for local thresholding of nuclei. If nuclei interiors aren't passing threshold, increase this value, if too much non-nuclei is passing threshold, lower it.
+      - `watershed_footprint_size` *int*
+         Size of structuring element for watershed segmentation. Larger values will segment the nuclei into larger objects and smaller values will result in smaller objects. Adjust according to nucleus size.
+      - `label_exp_size` *int*
+         Pixel size labels are dilated by in final step. Helpful for closing small holes that are common from thresholding but can also cause cell boundaries to exceed their true boundaries if set too high. Label dilation respects label borders and does not mix labels.
 
 #### QC
 - `find_ripley` *boolean?*
