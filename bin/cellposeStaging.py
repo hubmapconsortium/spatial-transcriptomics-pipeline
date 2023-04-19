@@ -30,7 +30,6 @@ def _clip_percentile_to_zero(image, p_min, p_max, min_coeff=1, max_coeff=1):
 
 
 def cellpose_format(input_dir, aux_ch_names, mRNA_dir, selected_fovs):
-
     # Get all fov names
     if selected_fovs is None:
         primary_jsons = glob.glob(f"{input_dir}/primary-*.json")
@@ -91,7 +90,6 @@ def cellpose_format(input_dir, aux_ch_names, mRNA_dir, selected_fovs):
 def filter_cellpose(
     input_dir, border_buffer=None, label_exp_size=None, min_size=None, max_size=None
 ):
-
     # Make folder if it doesn't exist
     makedirs("5C_cellpose_filtered", exist_ok=True)
 
