@@ -36,13 +36,13 @@ A [CWL](https://www.commonwl.org/) pipeline for processing spatial transcriptomi
 
 ## Installation
 
-This pipeline is compatible with Linux and non-M1/2 Mac systems. Windows users can run the pipeline by installing [WSL2](https://learn.microsoft.com/en-us/windows/wsl/install) and taking [extra steps](https://docs.docker.com/desktop/windows/wsl/) to configure Docker Engine.
+This pipeline is compatible with Linux and Mac systems. Windows users can run the pipeline by installing [WSL2](https://learn.microsoft.com/en-us/windows/wsl/install) and taking [extra steps](https://docs.docker.com/desktop/windows/wsl/) to configure Docker Engine.
 
 ### Method 1: Local Python Install
 1. Prerequisites: [Docker Engine](https://docs.docker.com/engine/install/) and Python > 3.7.
 2. Clone this repo with `git clone -b release https://github.com/hubmapconsortium/spatial-transcriptomics-pipeline.git`.
 3. Install `cwltool` with `pip install cwltool`.
-4. You can now run `pipeline.cwl` and the step files included in `/steps` by using `cwltool [file].cwl [inputs]`. *Note: A long list of warnings is expected due to the way the pipeline fails with an explanation if incorrect inputs are provided.*
+4. You can now run `pipeline.cwl` and the step files included in `/steps` by using `cwltool [file].cwl [inputs]`. *Note: A long list of warnings is expected due to the way the pipeline fails with an explanation if incorrect inputs are provided. The tool ran successfully if the final output is `Final process status is success`.*
 
 ### Method 2: Running in a Docker container
 This method is not recommended due to creating additional computational overhead, but can be useful in situations where the pipeline is deployed as a job on a cloud computer, such as kubernetes. The exact steps to run remotely will vary depending on infrastructure.

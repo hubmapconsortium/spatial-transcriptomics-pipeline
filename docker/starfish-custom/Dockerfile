@@ -4,7 +4,9 @@ COPY requirements.txt /opt
 
 RUN python3 -m pip install -r /opt/requirements.txt \
  && rm -rf /root/cache/.pip /opt/requirements.txt
-RUN echo "import matplotlib.pyplot as plt" | python
+
+# needed for ARM build
+RUN apt-get update && apt-get install -y libhdf5-dev && rm -rf /var/lib/apt/lists/*
 
 RUN git clone --branch ctcisar-hubmap https://github.com/ctcisar/starfish.git
 RUN cd /starfish;make install-dev
