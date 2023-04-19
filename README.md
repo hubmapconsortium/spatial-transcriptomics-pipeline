@@ -55,7 +55,7 @@ This method is not recommended due to creating additional computational overhead
 2. From inside the extracted directory, run the provided `prep_input.py` script. This will generate a `pipeline.yml` file with absolute paths to the downloaded data.
 3. The pipeline can now be run with `cwltool {path to cloned repo}/pipeline.cwl {path to downloaded data}/pipeline.yml`. *Note: A long list of warnings is expected due to the way the pipeline fails with an explanation if incorrect inputs are provided.*
 
-The two provided input text files for the pipeline, `pipeline.yml` and `*metadata.json`, can be used as a template for new runs.
+The two provided input text files for the pipeline, `pipeline.yml` and `*metadata.json`, can be used as a template for user-defined datasets.
 
 ## Overall Program Flow
 
@@ -94,7 +94,7 @@ The following parameters will be used by either `spaceTxConversion.cwl` or by `s
     JSON containing codebook information for the experiment, as formatted by Starfish.
 
 ##### Segmentation
-There are five possible segmentation methods in this pipeline. If cellpose integration or external segmentation are to be used external files must be provided. Other parameters may be passed as `json` input.
+There are five possible segmentation methods in this pipeline. If [cellpose](https://cellpose.readthedocs.io/en/latest/index.html) user-in-the-loop models or external segmentation are to be used, external files must be provided. Other parameters may be passed as `json` input.
 
 - External Segmentation
   1. External roi_set, such as from FIJI segmentation.
@@ -109,7 +109,7 @@ There are five possible segmentation methods in this pipeline. If cellpose integ
         Layout of the name of each labelled image.  Will be formatted with `file_formats_labeled.format([fov index])`.
 - Cellpose Segmentation
    - `pretrained_model_dir` *file*
-      If a user-defined moded is to be used, then this file must be provided.
+      If a user-defined moded is to be used, then this file must be provided. Directions for user-in-the-loop training can be read [here](https://cellpose.readthedocs.io/en/latest/gui.html#training-your-own-cellpose-model).
 
 #### Only Needed for Individual Steps
 The following parameters are only needed for running individual steps, such as for debugging. In a pipeline run, these will be automatically populated by prior steps.
@@ -352,7 +352,7 @@ Depending on pre-existing segmentation data, one of five methods can be used. If
   - `use_gpu` *boolean?*
     If true, GPU will be used for computation instead of CPU.
   - `pretrained_model_str` *string?*
-    One of the [pretrained models](https://cellpose.readthedocs.io/en/latest/models.html) for cellpose. This model or a custom model must be provided.
+    One of the [pretrained models](https://cellpose.readthedocs.io/en/latest/models.html) for cellpose. This model or a [custom model](#segmentation) must be provided. Valid options are `cyto`, `nuclei`, `tissuenet`, `livecell`, `cyto2`, `general`, `CP`, `CPx`, `TN1`, `TN2`, `TN3`, `LC1`, `LC2`, `LC3`, `LC4`.
   - `diameter` *float?*
     Expected diameter of cells. Only needs to be provided if a pre-trained model is used.
   - `flow_threshold` *float?*
