@@ -3,6 +3,7 @@
 	"skip_formatting",
 	"skip_processing",
 	"register_aux_view",
+	"run_cellpose",
 	{
 		"fov_positioning":[
 			[

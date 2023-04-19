@@ -1,0 +1,16 @@
+[
+    "zplane_count?",
+    "selected_fovs?",
+    "use_mrna?",
+    "use_gpu?",
+    "pretrained_model_str?",
+    "diameter?",
+    "flow_threshold?",
+    "stitch_threshold?",
+    "cellprob_threshold?",
+    "border_buffer?",
+    "label_exp_size?",
+    "min_allowed_size?",
+    "max_allowed_size?",
+    "aux_views"
+]

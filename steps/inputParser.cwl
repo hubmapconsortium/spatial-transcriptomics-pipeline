@@ -97,6 +97,19 @@ outputs:
   decoding_composite_decode: boolean
   decoding_composite_pmin: float
   decoding_composite_pmax: float
+  run_cellpose: boolean
+  use_mrna: boolean
+  use_gpu: boolean
+  pretrained_model_str: string
+  diameter: float
+  flow_threshold: float
+  stitch_threshold: float
+  cellprob_threshold: float
+  border_buffer: int
+  label_exp_size: int
+  min_allowed_size: int
+  max_allowed_size: int
+  aux_views: string[]
   aux_name: string
   binary_mask_img_threshold: float
   binary_mask_min_dist: int
