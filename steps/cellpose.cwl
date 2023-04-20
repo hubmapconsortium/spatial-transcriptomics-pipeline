@@ -218,7 +218,7 @@ steps:
 
       requirements:
         DockerRequirement:
-          dockerPull: docker.pkg.github.com/hubmapconsortium/spatial-transcriptomics-pipeline/cellpose:latest
+          dockerPull: hubmap/cellpose:latest
         InitialWorkDirRequirement:
           listing:
             - entry: $(inputs.input_dir)

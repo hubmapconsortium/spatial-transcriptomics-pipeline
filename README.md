@@ -19,6 +19,7 @@ A [CWL](https://www.commonwl.org/) pipeline for processing spatial transcriptomi
       * [Only Needed for Individual Steps](#only-needed-for-individual-steps)
          * [Image Processing](#image-processing)
          * [Image Decoding](#image-decoding)
+         * [Segmentation](#segmentation-1)
          * [QC](#qc)
    * [Non-File Inputs](#non-file-inputs)
       * [Overall pipeline.cwl Program Flow](#overall-pipelinecwl-program-flow)
@@ -28,7 +29,7 @@ A [CWL](https://www.commonwl.org/) pipeline for processing spatial transcriptomi
          * [Auxiliary View Formatting](#auxiliary-view-formatting)
       * [Image Processing](#image-processing-1)
       * [Image Decoding](#image-decoding-1)
-      * [Segmentation](#segmentation-1)
+      * [Segmentation](#segmentation-2)
       * [QC](#qc-1)
 * [Development](#development)
    * [Building Docker images](#building-docker-images)
@@ -47,8 +48,8 @@ This pipeline is compatible with Linux and Mac systems. Windows users can run th
 ### Method 2: Running in a Docker container
 This method is not recommended due to creating additional computational overhead, but can be useful in situations where the pipeline is deployed as a job on a cloud computer, such as kubernetes. The exact steps to run remotely will vary depending on infrastructure.
 1. Prerequisites: Install [Docker Engine](https://docs.docker.com/engine/install/).
-2. Obtain the runner image with `docker pull ghcr.io/hubmapconsortium/spatial-transcriptomics-pipeline/starfish-docker-runner:latest`.
-3. Refer to [Docker mount documentation](https://docs.docker.com/storage/bind-mounts/) for directions on how to make input/output directories accessible to the docker image. Run the docker image as `docker run --name PIPEFISH --mount [your mount string] ghcr.io/hubmapconsortium/spatial-transcriptomics-pipeline/starfish-docker-runner:latest`.
+2. Obtain the runner image with `docker pull hubmap/starfish-docker-runner:latest`.
+3. Refer to [Docker mount documentation](https://docs.docker.com/storage/bind-mounts/) for directions on how to make input/output directories accessible to the docker image. Run the docker image as `docker run --name PIPEFISH --mount [your mount string] hubmap/starfish-docker-runner:latest`.
 4. Run PIPEFISH inside the docker image the same as you would in **Method 1** with `docker exec -d PIPEFISH cwltool --singularity --outdir [defined in prior step] [step].cwl [input parameters]`. *Note: A long list of warnings is expected due to the way the pipeline fails with an explanation if incorrect inputs are provided.*
 ## Example PIPEFISH Run
 1. Download and extract one of our [pre-formatted, open-access datasets](https://zenodo.org/record/7647746). *The mouse brain ISS data is recommended as a first choice due to filesize and short run time.*

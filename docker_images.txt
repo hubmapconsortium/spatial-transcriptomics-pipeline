@@ -1,7 +1,7 @@
 #hubmap/starfish docker/starfish/Dockerfile base_directory_build
 hubmap/starfish-custom docker/starfish-custom/Dockerfile base_directory_build
-docker.pkg.github.com/hubmapconsortium/spatial-transcriptomics-pipeline/starfish-docker-runner docker/starfish-docker-runner/Dockerfile base_directory_build
+hubmap/starfish-docker-runner docker/starfish-docker-runner/Dockerfile base_directory_build
 # As of v0.6.0 the build for the baysor docker image is broken.
 # Check up on it again later to see if it's working (last update 2023.04.13)
 # hubmap/baysor docker/baysor/Dockerfile base_directory_build
-docker.pkg.github.com/hubmapconsortium/spatial-transcriptomics-pipeline/cellpose docker/cellpose/Dockerfile base_directory_build
+hubmap/cellpose docker/cellpose/Dockerfile base_directory_build
