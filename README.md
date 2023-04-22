@@ -37,7 +37,7 @@ A [CWL](https://www.commonwl.org/) pipeline for processing spatial transcriptomi
 
 ## Installation
 
-This pipeline is compatible with Linux and Mac systems. Windows users can run the pipeline by installing [WSL2](https://learn.microsoft.com/en-us/windows/wsl/install) and taking [extra steps](https://docs.docker.com/desktop/windows/wsl/) to configure Docker Engine.
+This pipeline is natively compatible with Linux systems, and M1/2 Mac support is currently in the works. Windows users can run the pipeline by installing [WSL2](https://learn.microsoft.com/en-us/windows/wsl/install) and taking [extra steps](https://docs.docker.com/desktop/windows/wsl/) to configure Docker Engine.
 
 ### Method 1: Local Python Install
 1. Prerequisites: [Docker Engine](https://docs.docker.com/engine/install/) and Python > 3.7.
@@ -64,6 +64,8 @@ The two provided input text files for the pipeline, `pipeline.yml` and `*metadat
 
 ## Inputs
 Necessary parameters can be passed in through a `yml` file, or inline if the remaining required parameters are specified through the `parameter_json` input file. Nested entries need to be provided as input records (`yml`) or as a nested dictionary (`json`). Variable types noted with a *?* are optional inputs.
+
+Images are expected to be in `tiff` format with a consistent file structure for all FOVs. If needed, images can be converted from proprietary formats with [ImageJ Bioformats](https://bio-formats.readthedocs.io/en/stable/users/imagej/load-images.html#using-bio-formats-to-load-images-into-imagej).
 
 **File inputs cannot be provided through `json` input, and must be provided either in-line or as a `yml`**. A combination of `yml` and `json` input can be used, and it is recommended to store all values that will be true for any run of a dataset in the `json` file, and to store anything that may be run-dependent (ex. `selected_fovs` or `n_processes`) in the `yml` file. For any parameter defined in both the `yml` and `json` inputs, the `json` input takes priority.
 
