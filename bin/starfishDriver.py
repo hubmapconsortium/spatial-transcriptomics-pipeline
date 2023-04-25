@@ -578,7 +578,7 @@ def createComposite(
         combined_starfish_anchor = ImageStack.from_numpy(combined_anchor)
         del combined_anchor
     else:
-        combined_starfish_anchor = combined_starfish_img.reduce({Axes.CH})
+        combined_starfish_anchor = combined_starfish_img.reduce({Axes.CH}, func="max")
 
     # Scale composite images
     clip = starfish.image.Filter.ClipPercentileToZero(
@@ -729,6 +729,7 @@ def saveCompositeResults(spots, decoded, exploc, output_name):
 
 def run(
     output_dir: str,
+    input_dir: Path,
     experiment: Experiment,
     blob_based: bool,
     use_ref: bool,
@@ -817,7 +818,7 @@ def run(
 
         # Creates the big images. If not given an anchor_name then it takes the max projection of the primary image
         composite_img, composite_anchor = createComposite(
-            experiment, exploc, anchor_name, is_volume, level_method, **compositeKwargs
+            experiment, input_dir, anchor_name, is_volume, level_method, **compositeKwargs
         )
 
         # Find spots and decode the composite image
@@ -840,7 +841,7 @@ def run(
             print("No transcripts found for composite! Not saving a DecodedIntensityTable file.")
 
         # Saves per FOV spots and decoded results
-        saveCompositeResults(blobs, decoded, exploc, output_name=f"{output_dir}")
+        saveCompositeResults(blobs, decoded, input_dir, output_name=f"{output_dir}")
 
     # Otherwise run on a per FOV basis
     else:
@@ -1123,6 +1124,7 @@ if __name__ == "__main__":
 
     run(
         output_dir,
+        exploc,
         experiment,
         blob_based,
         use_ref,

@@ -322,6 +322,8 @@ def cli(
     sys.stdout = reporter
     sys.stderr = reporter
 
+    print(locals())
+
     tqdm.__init__ = partialmethod(tqdm.__init__, disable=True)
 
     if level_method and level_method.upper() == "SCALE_BY_CHUNK":
@@ -334,8 +336,6 @@ def cli(
         level_method = Levels.SCALE_SATURATED_BY_IMAGE
     else:
         level_method = Levels.SCALE_BY_IMAGE
-
-    print(locals())
 
     t0 = time()
 
