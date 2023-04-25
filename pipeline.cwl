@@ -629,7 +629,7 @@ steps:
     in:
       datafile: parameter_json
       schema: read_schema/data
-    out: [run_baysor, skip_formatting, skip_processing, register_aux_view, fov_positioning_x_locs, fov_positioning_x_shape, fov_positioning_x_voxel, fov_positioning_y_locs, fov_positioning_y_shape, fov_positioning_y_voxel, fov_positioning_z_locs, fov_positioning_z_shape, fov_positioning_z_voxel, run_cellpose, add_blanks, skip_qc]
+    out: [run_baysor, aux_views, skip_formatting, skip_processing, register_aux_view, fov_positioning_x_locs, fov_positioning_x_shape, fov_positioning_x_voxel, fov_positioning_y_locs, fov_positioning_y_shape, fov_positioning_y_voxel, fov_positioning_z_locs, fov_positioning_z_shape, fov_positioning_z_voxel, run_cellpose, add_blanks, skip_qc]
     when: $(inputs.datafile != null)
 
   sorter:
@@ -1085,7 +1085,18 @@ steps:
         pickValue: first_non_null
       parameter_json: parameter_json
       selected_fovs: selected_fovs
-      aux_name: aux_name
+      aux_name:
+        source: [aux_name, aux_views, stage/aux_views]
+        valueFrom: |
+          ${
+            if(self[1]){
+              return self[1][0];
+            } else if(self[2]){
+              return self[2][0];
+            } else {
+              return self[0];
+            }
+          }
       binary_mask:
         source: [binary_mask, mask_roi_files, mask_roi_formats, mask_labeled_files, mask_labeled_formats, cellpose/cellpose_filtered]
         valueFrom: |

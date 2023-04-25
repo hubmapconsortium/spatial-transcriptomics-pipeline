@@ -330,6 +330,17 @@ steps:
           doc: tells cellpose to calculate 4 nets and take the average, improves performance.
 
       outputs:
+        log:
+          type: stdout
+        log_file:
+          type: Directory
+          outputBinding:
+            glob: .
+            outputEval: |
+              ${
+                self[0].basename = "5B_cellpose_output";
+                return self[0];
+              }
         cellpose_output:
           type: Directory
           outputBinding:
