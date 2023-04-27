@@ -95,6 +95,11 @@ outputs:
 
 steps:
 
+  tmpname:
+    run: tmpdir.cwl
+    in: []
+    out: [tmp]
+
   read_schema:
     run:
       class: CommandLineTool
@@ -137,6 +142,11 @@ steps:
             dockerPull: hubmap/starfish-custom:latest
 
       inputs:
+        tmp_prefix:
+          type: string
+          inputBinding:
+            prefix: --tmp-prefix
+
         exp_loc:
           type: Directory
           doc: Root directory containing space_tx formatted experiment
@@ -172,8 +182,9 @@ steps:
         cellpose_input:
           type: Directory
           outputBinding:
-            glob: "5A_cellpose_input"
+            glob: $("tmp/" + inputs.tmp_prefix + "/5A_cellpose_input/")
     in:
+      tmp_prefix: tmpname/tmp
       exp_loc: exp_loc
       decoded_loc:
         source: [decoded_loc, stage_cellpose/use_mrna, use_mrna]
@@ -225,6 +236,9 @@ steps:
               writable: true
 
       inputs:
+        tmp_prefix:
+          type: string
+
         verbose:
           type: boolean?
           inputBinding:
@@ -282,7 +296,6 @@ steps:
           type: string?
           inputBinding:
             prefix: --savedir
-          default: 5B_cellpose_output
           doc: Name of directory to save to.
 
         pretrained_model_str:
@@ -332,21 +345,19 @@ steps:
       outputs:
         log:
           type: stdout
-        log_file:
-          type: Directory
-          outputBinding:
-            glob: .
-            outputEval: |
-              ${
-                self[0].basename = "5B_cellpose_output";
-                return self[0];
-              }
         cellpose_output:
           type: Directory
           outputBinding:
-            glob: "5B_cellpose_output"
+            glob: $("tmp/" + inputs.tmp_prefix + "/5B_cellpose_output")
 
     in:
+      tmp_prefix: tmpname/tmp
+      save_dir:
+        source: [tmpname/tmp]
+        valueFrom: |
+          ${
+            return "tmp/" + self[0] + "/5B_cellpose_output";
+          }
       use_gpu:
         source: [stage_cellpose/use_gpu, use_gpu]
         valueFrom: |
@@ -471,6 +482,11 @@ steps:
             dockerPull: hubmap/starfish-custom:latest
 
       inputs:
+        tmp_prefix:
+          type: string
+          inputBinding:
+            prefix: --tmp-prefix
+
         input_loc:
           type: Directory
           doc: Output from cellpose.
@@ -518,9 +534,10 @@ steps:
         cellpose_filtered:
           type: Directory
           outputBinding:
-            glob: "5C_cellpose_filtered"
+            glob: $("tmp/" + inputs.tmp_prefix + "/5C_cellpose_filtered")
 
     in:
+      tmp_prefix: tmpname/tmp
       input_loc: execute_cellpose/cellpose_output
       selected_fovs:
         source: [stage_cellpose/selected_fovs, selected_fovs]

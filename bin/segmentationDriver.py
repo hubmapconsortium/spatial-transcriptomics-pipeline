@@ -698,10 +698,10 @@ def addKwarg(parser, kwargdict, var):
 
 
 if __name__ == "__main__":
-    output_dir = "5_Segmented/"
     p = ArgumentParser()
 
     p.add_argument("--decoded-loc", type=Path)
+    p.add_argument("--tmp-prefix", type=str)
     p.add_argument("--exp-loc", type=Path)
     p.add_argument("--aux-name", type=str, nargs="?")
     p.add_argument("--selected-fovs", nargs="+", const=None)
@@ -761,6 +761,8 @@ if __name__ == "__main__":
     addKwarg(args, densityKwargs, "thresh_block_size")
     addKwarg(args, densityKwargs, "watershed_footprint_size")
     addKwarg(args, densityKwargs, "label_exp_size")
+
+    output_dir = f"tmp/{args.tmp_prefix}/5_Segmented/"
 
     run(
         input_dir,

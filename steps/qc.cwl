@@ -128,6 +128,11 @@ outputs:
 
 steps:
 
+  tmpname:
+    run: tmpdir.cwl
+    in: []
+    out: [tmp]
+
   read_schema:
     run:
       class: CommandLineTool
@@ -170,6 +175,10 @@ steps:
           dockerPull: hubmap/starfish-custom:latest
 
       inputs:
+        tmp_prefix:
+          type: string
+          inputBinding:
+            prefix: --tmp-prefix
         codebook:
           type:
             - type: record
@@ -267,8 +276,9 @@ steps:
         qc_metrics:
           type: Directory
           outputBinding:
-            glob: "7_QC/"
+            glob: $("tmp/" + inputs.tmp_prefix + "/7_QC/")
     in:
+      tmp_prefix: tmpname/tmp
       codebook:
         source: [codebook, codebook_exp, codebook_pkl]
         valueFrom: |

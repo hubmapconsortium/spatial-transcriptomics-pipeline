@@ -1175,6 +1175,7 @@ def runFOV(
 
 
 def run(
+    output_dir,
     transcripts,
     codebook,
     size,
@@ -1188,7 +1189,6 @@ def run(
 ):
     t0 = time()
 
-    output_dir = "7_QC/"
     if not path.isdir(output_dir):
         makedirs(output_dir)
 
@@ -1432,6 +1432,7 @@ if __name__ == "__main__":
 
     p = ArgumentParser()
 
+    p.add_argument("--tmp-prefix", type=str)
     p.add_argument("--codebook-exp", type=Path)
     p.add_argument("--exp-output", type=Path)
     p.add_argument("--selected-fovs", nargs="+", const=None)
@@ -1453,6 +1454,7 @@ if __name__ == "__main__":
 
     print(args)
 
+    output_dir = f"tmp/{args.tmp_prefix}/7_QC/"
     codebook = False
     roi = False
 
@@ -1536,6 +1538,7 @@ if __name__ == "__main__":
     if not args.exp_output or len(transcripts.keys()) > 0:
         # only run QC if we actually have input.
         run(
+            output_dir=output_dir,
             transcripts=transcripts,
             codebook=codebook,
             size=size,

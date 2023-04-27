@@ -29,7 +29,7 @@ def _clip_percentile_to_zero(image, p_min, p_max, min_coeff=1, max_coeff=1):
     return np.clip(image, v_min, v_max) - np.float32(v_min)
 
 
-def cellpose_format(input_dir, aux_ch_names, mRNA_dir, selected_fovs):
+def cellpose_format(output_dir, input_dir, aux_ch_names, mRNA_dir, selected_fovs):
     # Get all fov names
     if selected_fovs is None:
         primary_jsons = glob.glob(f"{input_dir}/primary-*.json")
@@ -47,7 +47,7 @@ def cellpose_format(input_dir, aux_ch_names, mRNA_dir, selected_fovs):
     zs = np.max([int(file.split("-")[-1][1]) for file in fov0_files])
 
     # Make folder for cellpose inputs if it doesn't exist
-    makedirs("5A_cellpose_input", exist_ok=True)
+    makedirs(output_dir, exist_ok=True)
 
     # Create cellpose inputs
     # Images have to be 16 bit and have dimension order z, ch, y, x
@@ -84,14 +84,14 @@ def cellpose_format(input_dir, aux_ch_names, mRNA_dir, selected_fovs):
             new_img[:, -1] = scale_img(mRNAs)
 
         # Save result, squeeze out any size 1 dimensions
-        tifffile.imsave(f"5A_cellpose_input/{fov}_image.tiff", np.squeeze(new_img))
+        tifffile.imsave(f"{output_dir}/{fov}_image.tiff", np.squeeze(new_img))
 
 
 def filter_cellpose(
-    input_dir, border_buffer=None, label_exp_size=None, min_size=None, max_size=None
+    output_dir, input_dir, border_buffer=None, label_exp_size=None, min_size=None, max_size=None
 ):
     # Make folder if it doesn't exist
-    makedirs("5C_cellpose_filtered", exist_ok=True)
+    makedirs(output_dir, exist_ok=True)
 
     # For each file, check for each function if it should be run then run it if yes
     files = glob.glob(f"{input_dir}/*cp_masks*")
@@ -135,13 +135,14 @@ def filter_cellpose(
             mask = skimage.segmentation.relabel_sequential(mask)[0]
 
         # Save result
-        tifffile.imsave(f'5C_cellpose_filtered/fov_{file.split("fov_")[-1][:3]}_masks.tiff', mask)
+        tifffile.imsave(f'{output_dir}/fov_{file.split("fov_")[-1][:3]}_masks.tiff', mask)
 
 
 if __name__ == "__main__":
     p = ArgumentParser()
 
     p.add_argument("--input-dir", type=Path)
+    p.add_argument("--tmp-prefix", type=str)
     p.add_argument("--selected-fovs", nargs="+", const=None)
 
     p.add_argument("--format", dest="format", action="store_true")
@@ -161,6 +162,7 @@ if __name__ == "__main__":
 
     if args.format:
         cellpose_format(
+            output_dir=f"tmp/{args.tmp_prefix}/5A_cellpose_input",
             input_dir=args.input_dir,
             aux_ch_names=args.aux_views,
             mRNA_dir=args.decoded_dir,
@@ -168,6 +170,7 @@ if __name__ == "__main__":
         )
     else:
         filter_cellpose(
+            output_dir=f"tmp/{args.tmp_prefix}/5C_cellpose_filtered",
             input_dir=args.input_dir,
             border_buffer=args.border_buffer,
             label_exp_size=args.label_exp_size,

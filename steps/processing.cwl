@@ -101,6 +101,11 @@ outputs:
 
 steps:
 
+  tmpname:
+    run: tmpdir.cwl
+    in: []
+    out: [tmp]
+
   read_schema:
     run:
       class: CommandLineTool
@@ -143,6 +148,11 @@ steps:
             dockerPull: hubmap/starfish-custom:latest
 
       inputs:
+        tmp_prefix:
+          type: string
+          inputBinding:
+            prefix: --tmp-prefix
+
         input_dir:
           type: Directory
           inputBinding:
@@ -266,8 +276,9 @@ steps:
         processed_exp:
           type: Directory
           outputBinding:
-            glob: "3_processed"
+            glob: $("tmp/" + inputs.tmp_prefix + "/3_processed/")
     in:
+      tmp_prefix: tmpname/tmp
       input_dir: input_dir
       selected_fovs:
         source: [stage_processing/selected_fovs, selected_fovs]

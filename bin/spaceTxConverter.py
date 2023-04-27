@@ -854,6 +854,7 @@ def blank_codebook(real_codebook, num_blanks):
 
 if __name__ == "__main__":
     p = ArgumentParser()
+    p.add_argument("--tmp-prefix", type=str)
     p.add_argument("--input-dir", type=Path)
     p.add_argument("--codebook-csv", type=Path)
     p.add_argument("--codebook-json", type=Path)
@@ -914,7 +915,7 @@ if __name__ == "__main__":
         print(aux_lens)
         raise Exception("Dimensions of all aux parameters must match.")
 
-    output_dir = "2_tx_converted/"
+    output_dir = f"tmp/{args.tmp_prefix}/2_tx_converted/"
 
     # parse loc info
     locs = []
