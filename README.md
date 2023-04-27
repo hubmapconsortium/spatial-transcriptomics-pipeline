@@ -31,6 +31,8 @@ A [CWL](https://www.commonwl.org/) pipeline for processing spatial transcriptomi
       * [Image Decoding](#image-decoding-1)
       * [Segmentation](#segmentation-2)
       * [QC](#qc-1)
+* [Troubleshooting](#troubleshooting)
+   * [Common Errors](#common-errors)
 * [Development](#development)
    * [Building Docker images](#building-docker-images)
    * [Release process](#release-process)
@@ -410,6 +412,33 @@ Depending on pre-existing segmentation data, one of five methods can be used. If
 - `save_pdf` *boolean?*
   If true, all QC metrics will save plots to pdf. If false, only `yml` output will be provided. Defaults to True.
 Note: Some values from earlier stages are optionally read in to provide select metrics. If not using singular `json` file as input, refer to `input_schemas/qc.json` for values that can be passed for more precise results.
+
+## Troubleshooting
+
+If the pipeline encounters a fatal error, the final status from cwltool will be displayed as `permanentFail`. Full text describing the error can be found in one of two places:
+ 1. It will be in stdout of cwltool if the error was due to invalid input parameters or the error occurred early in the script for that stage.
+
+    Because stdout can be very long, it is recommended to capture output with `tee` when troubleshooting. As cwltool does not respect the difference between stdout and stderror, this should be invoked as `cwltool [parameters and inputs] 2>&1 | tee output.log`.
+
+    The error text will be immediately before the first occurence of `permanentFail`.
+ 2. It will be in the output folder of the last pipeline stage, named something like `[timestamp]_[stagename].log`. This occurs if there was an error during the PIPEFISH python scripts.
+
+    The error text will be the last line in the file.
+
+### Common Errors
+
+#### ```PermissionError: [Errno 13] Permission denied: 'tmp'```
+This is usually due to using Docker Desktop as the Docker Engine. To avoid this issue, use the `--no-match-user` flag when running cwltool.
+
+#### Out of Disk Space
+- If a larger drive is available on the computer running PIPEFISH, alternate locations for intermediate and final files can be specified with [`--tmpdir-prefix`](https://cwltool.readthedocs.io/en/latest/cli.html#cmdoption-cwltool-tmpdir-prefix) and [`--tmp-outdir-prefix`](https://cwltool.readthedocs.io/en/latest/cli.html#cmdoption-cwltool-tmp-outdir-prefix), respectively.
+- If there is enough space for `2_tx_converted` but not all the subsequent steps, the [`selected_fovs`](#parameters-applied-over-multiple-stages) parameter can be used to batch process parts of the dataset independently. Retain the files in `4_Decoded` and `5_Segmented` and discard `3_Processed` to save the most space while retaining data relevant to final output.
+- If Docker Desktop is being used, more storage space can be allocated in the dashboard GUI under `Settings > Resources > Advanced`.
+
+#### Out of Memory
+This is most likely to occur during the decoding step, particularly when using the `CheckAll` decoder. There is not much that can be done to reduce memory footprint if this is the most suitable decoding method, outside dividing the FOVs to be smaller prior to using PIPEFISH.
+
+If Docker Desktop is being used, more memory can be allocated in the dashborad GUI under `Settings > Resources > Advanced`.
 
 ## Development
 Code in this repository is formatted with [black](https://github.com/psf/black) and
