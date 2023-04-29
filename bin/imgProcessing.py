@@ -471,7 +471,6 @@ def cli(
 
 
 if __name__ == "__main__":
-
     p = ArgumentParser()
 
     p.add_argument("--tmp-prefix", type=str)

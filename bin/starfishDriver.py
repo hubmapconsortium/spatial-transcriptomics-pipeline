@@ -929,7 +929,6 @@ def addKwarg(parser, kwargdict, var):
 
 
 if __name__ == "__main__":
-
     p = ArgumentParser()
 
     # inputs

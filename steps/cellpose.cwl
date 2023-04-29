@@ -236,9 +236,6 @@ steps:
               writable: true
 
       inputs:
-        tmp_prefix:
-          type: string
-
         verbose:
           type: boolean?
           inputBinding:
@@ -296,6 +293,7 @@ steps:
           type: string?
           inputBinding:
             prefix: --savedir
+          default: "5B_cellpose_output"
           doc: Name of directory to save to.
 
         pretrained_model_str:
@@ -348,16 +346,9 @@ steps:
         cellpose_output:
           type: Directory
           outputBinding:
-            glob: $("tmp/" + inputs.tmp_prefix + "/5B_cellpose_output")
+            glob: "5B_cellpose_output"
 
     in:
-      tmp_prefix: tmpname/tmp
-      save_dir:
-        source: [tmpname/tmp]
-        valueFrom: |
-          ${
-            return "tmp/" + self[0] + "/5B_cellpose_output";
-          }
       use_gpu:
         source: [stage_cellpose/use_gpu, use_gpu]
         valueFrom: |
