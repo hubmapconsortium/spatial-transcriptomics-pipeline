@@ -42,21 +42,25 @@ A [CWL](https://www.commonwl.org/) pipeline for processing spatial transcriptomi
 This pipeline is natively compatible with Linux systems, and M1/2 Mac support is currently in the works. Windows users can run the pipeline by installing [WSL2](https://learn.microsoft.com/en-us/windows/wsl/install) and taking [extra steps](https://docs.docker.com/desktop/windows/wsl/) to configure Docker Engine.
 
 ### Method 1: Local Python Install
-1. Prerequisites: [Docker Engine](https://docs.docker.com/engine/install/) and Python > 3.7.
+1. Prerequisites: >20GB disk space, [Docker Engine](https://docs.docker.com/engine/install/) or [Singularity](https://docs.sylabs.io/guides/2.6/user-guide/singularity_and_docker.html), and Python > 3.7.
 2. Clone this repo with `git clone -b release https://github.com/hubmapconsortium/spatial-transcriptomics-pipeline.git`.
 3. Install `cwltool` with `pip install cwltool`.
-4. You can now run `pipeline.cwl` and the step files included in `/steps` by using `cwltool [file].cwl [inputs]`. *Note: A long list of warnings is expected due to the way the pipeline fails with an explanation if incorrect inputs are provided. The tool ran successfully if the final output is `Final process status is success`.*
+4. You can now run `pipeline.cwl` and the step files included in `/steps` by using `cwltool [file].cwl [inputs]`, or `cwltool --singularity [file].cwl [inputs]` if using Singularity in place of Docker Engine. 
+
+  *Note: A long list of warnings is expected due to the way the pipeline fails with an explanation if incorrect inputs are provided. The tool ran successfully if the final output is `Final process status is success`.*
 
 ### Method 2: Running in a Docker container
 This method is not recommended due to creating additional computational overhead, but can be useful in situations where the pipeline is deployed as a job on a cloud computer, such as kubernetes. The exact steps to run remotely will vary depending on infrastructure.
-1. Prerequisites: Install [Docker Engine](https://docs.docker.com/engine/install/).
+1. Prerequisites: >20GB disk space, [Docker Engine](https://docs.docker.com/engine/install/).
 2. Obtain the runner image with `docker pull hubmap/starfish-docker-runner:latest`.
 3. Refer to [Docker mount documentation](https://docs.docker.com/storage/bind-mounts/) for directions on how to make input/output directories accessible to the docker image. Run the docker image as `docker run --name PIPEFISH --mount [your mount string] hubmap/starfish-docker-runner:latest`.
-4. Run PIPEFISH inside the docker image the same as you would in **Method 1** with `docker exec -d PIPEFISH cwltool --singularity --outdir [defined in prior step] [step].cwl [input parameters]`. *Note: A long list of warnings is expected due to the way the pipeline fails with an explanation if incorrect inputs are provided.*
+4. Run PIPEFISH inside the docker image the same as you would in **Method 1** with `docker exec -d PIPEFISH cwltool --singularity --outdir [defined in prior step] [step].cwl [input parameters]`.
+
+  *Note: A long list of warnings is expected due to the way the pipeline fails with an explanation if incorrect inputs are provided. The tool ran successfully if the final output is `Final process status is success`*
 ## Example PIPEFISH Run
 1. Download and extract one of our [pre-formatted, open-access datasets](https://zenodo.org/record/7647746). *The mouse brain ISS data is recommended as a first choice due to filesize and short run time.*
 2. From inside the extracted directory, run the provided `prep_input.py` script. This will generate a `pipeline.yml` file with absolute paths to the downloaded data.
-3. The pipeline can now be run with `cwltool {path to cloned repo}/pipeline.cwl {path to downloaded data}/pipeline.yml`. *Note: A long list of warnings is expected due to the way the pipeline fails with an explanation if incorrect inputs are provided.*
+3. The pipeline can now be run with `cwltool {path to cloned repo}/pipeline.cwl {path to downloaded data}/pipeline.yml`.
 
 The two provided input text files for the pipeline, `pipeline.yml` and `*metadata.json`, can be used as a template for user-defined datasets.
 
