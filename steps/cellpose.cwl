@@ -191,7 +191,7 @@ steps:
         valueFrom: |
           ${
             if(self[1] || self[2]){
-              self[0];
+              return self[0];
             } else {
               return null;
             }
@@ -438,9 +438,12 @@ steps:
             }
           }
       stitch_threshold:
-        source: [stage_cellpose/stitch_threshold, stitch_threshold]
+        source: [stage_cellpose/stitch_threshold, stitch_threshold, stage_cellpose/zplane_count, zplane_count]
         valueFrom: |
           ${
+            if(self[2] == 1 || self[3] == 1){
+              return null;
+            }
             if(self[0]){
               return self[0];
             } else if(self[1]) {
