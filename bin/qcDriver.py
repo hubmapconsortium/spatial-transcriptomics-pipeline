@@ -774,7 +774,6 @@ def getFPR(segmentation=None, results=None, pdf=False):
         if (segmentation is not None and "corrected_rounds" in segmentation.keys()) or (
             results is not None and "reals_full" in results.keys()
         ):
-
             plt.plot(
                 [0, len(real_per_cell_all)],
                 [np.median(real_per_cell_all), np.median(real_per_cell_all)],
@@ -903,7 +902,6 @@ def plotBarcodeAbundance(pdf, decoded=None, results=None):
     if (decoded is not None and "corrected_rounds" not in decoded.coords) or (
         results is not None and "reals_full" not in results.keys()
     ):
-
         plt.bar(
             range(len(all_counts)), height=all_counts, color=full_colors, width=1, align="edge"
         )
@@ -931,7 +929,6 @@ def plotBarcodeAbundance(pdf, decoded=None, results=None):
     elif (decoded is not None and "corrected_rounds" in decoded.coords) or (
         results is not None and "reals_full" in results.keys()
     ):
-
         # Plot bars, upper 95% CI line, and text for EC+NC
         plt.bar(range(len(all_counts)), height=all_counts, color=all_colors, width=1, align="edge")
         plt.axhline(all_conf, color="black", label="Upper 95% CI EC+NC")
