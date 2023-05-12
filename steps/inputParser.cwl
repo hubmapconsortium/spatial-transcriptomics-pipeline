@@ -48,7 +48,9 @@ outputs:
   fov_positioning_z_shape: int
   fov_positioning_z_voxel: float
   add_blanks: boolean
+  skip_formatting: boolean
   skip_processing: boolean
+  selected_fovs: int[]
   clip_min: float
   clip_max: float
   level_method: string
@@ -95,6 +97,19 @@ outputs:
   decoding_composite_decode: boolean
   decoding_composite_pmin: float
   decoding_composite_pmax: float
+  run_cellpose: boolean
+  use_mrna: boolean
+  use_gpu: boolean
+  pretrained_model_str: string
+  diameter: float
+  flow_threshold: float
+  stitch_threshold: float
+  cellprob_threshold: float
+  border_buffer: int
+  label_exp_size: int
+  min_allowed_size: int
+  max_allowed_size: int
+  aux_views: string[]
   aux_name: string
   binary_mask_img_threshold: float
   binary_mask_min_dist: int
@@ -110,6 +125,7 @@ outputs:
   binary_mask_watershed_footprint_size: int
   binary_mask_label_exp_size: int
   run_baysor: boolean
+  skip_qc: boolean
   find_ripley: boolean
   save_pdf: boolean
 

@@ -1,0 +1,173 @@
+[
+	"//TODO": "Baysor folders, cellpose folders.",
+	{
+		"pattern": "1_pseudosort/PseudoCycle(?P<round>)/MMStack_Pos(?P<FOV>)_(?P<view>)ch(?P<channel>).ome.tif",
+		"description": "Input images, rearranged into consistent round and channel counts.",
+		"edam_ontology_term": "EDAM_1.24.format_3591"
+	},
+	{
+		"pattern": "1_pseudosort/(?P<timestamp>)_psorting.log",
+		"description": "Log of completed operations while round sorting.",
+		"edam_ontology_term": "EDAM_1.24.data_3671"
+	},
+	{
+		"pattern": "1_pseudosort/codebook.json",
+		"description": "Codebook that represents the truerounds and truechannels for barcodes.",
+		"edam_ontology_term": "EDAM_1.24.format_3464"
+	},
+	{
+		"pattern": "1_pseudosort/pround_codebook.json",
+		"description": "Codebook that represents the pseudorounds and pseudochannels that will be used for decoding.",
+		"edam_ontology_term": "EDAM_1.24.format_3464"
+	},
+	{
+		"pattern": "2_tx_converted/(?P<view>)-fov_(?P<FOV>)-c(?P<channel>)-r(?P<round>)-z(?P<zslice>).tiff",
+		"description": "Images saved in spacetx format.",
+		"edam_ontology_term": "EDAM_1.24.format_3591"
+	},
+	{
+		"pattern": "2_tx_converted/(?P<view>)-fov_(?P<FOV>).json",
+		"description": "spacetx metadata files describing each fov, view combination.",
+		"edam_ontology_term": "EDAM_1.24.format_3591"
+	},
+	{
+		"pattern": "2_tx_converted/(?P<view>).json",
+		"description": "spacetx metadata files describing each view.",
+		"edam_ontology_term": "EDAM_1.24.format_3591"
+	},
+	{
+		"pattern": "2_tx_converted/codebook.json",
+		"description": "Codebook that contains round and channel information for barcodes.",
+		"edam_ontology_term": "EDAM_1.24.format_3591"
+	},
+	{
+		"pattern": "2_tx_converted/experiment.json",
+		"description": "spacetx metadata files describing the entirety of the experiment.",
+		"edam_ontology_term": "EDAM_1.24.format_3591"
+	},
+	{
+		"pattern": "2_tx_converted/(?P<timestamp>)_img_processing.log",
+		"description": "Log of completed operations while converting images.",
+		"edam_ontology_term": "EDAM_1.24.data_3671"
+	},
+	{
+		"pattern": "3_processed/(?P<view>)-fov_(?P<FOV>)-c(?P<channel>)-r(?P<round>)-z(?P<zslice>).tiff",
+		"description": "Images saved in spacetx format.",
+		"edam_ontology_term": "EDAM_1.24.format_3591"
+	},
+	{
+		"pattern": "3_processed/(?P<view>)-fov_(?P<FOV>).json",
+		"description": "spacetx metadata files describing each fov, view combination.",
+		"edam_ontology_term": "EDAM_1.24.format_3591"
+	},
+	{
+		"pattern": "3_processed/(?P<view>).json",
+		"description": "spacetx metadata files describing each view.",
+		"edam_ontology_term": "EDAM_1.24.format_3591"
+	},
+	{
+		"pattern": "3_processed/codebook.json",
+		"description": "Codebook that contains round and channel information for barcodes.",
+		"edam_ontology_term": "EDAM_1.24.format_3591"
+	},
+	{
+		"pattern": "3_processed/experiment.json",
+		"description": "spacetx metadata files describing the entirety of the experiment.",
+		"edam_ontology_term": "EDAM_1.24.format_3591"
+	},
+	{
+		"pattern": "3_processed/(?P<timestamp>)_TXconversion.log",
+		"description": "Log of completed operations while modifying images.",
+		"edam_ontology_term": "EDAM_1.24.data_3671"
+	},
+	{
+		"pattern": "4_Decoded/cdf/fov_(?P<FOV>)_decoded.cdf",
+		"description": "netCDF formatted gene table with transcript locations.",
+		"edam_ontology_term": "EDAM_1.24.format_3650"
+	},
+	{
+		"pattern": "4_Decoded/csv/fov_(?P<FOV>)_decoded.csv",
+		"description": "csv formatted gene table with transcript locations.",
+		"edam_ontology_term": "EDAM_1.24.format_3752"
+	},
+	{
+		"pattern": "4_Decoded/spots/fov_(?P<FOV>)_coords_(?P<dimension>).nc",
+		"description": "FOV positioning information for decoded spots.",
+		"edam_ontology_term": "EDAM_1.24.format_3650"
+	},
+	{
+		"pattern": "4_Decoded/spots/fov_(?P<FOV>)_SpotFindingResults.json",
+		"description": "Metadata for saved spots.",
+		"edam_ontology_term": "EDAM_1.24.format_3591"
+	},
+	{
+		"pattern": "4_Decoded/spots/fov_(?P<FOV>)_log.arr",
+		"description": "Log of operation history for this FOV's spots.",
+		"edam_ontology_term": "EDAM_1.24.format_3591"
+	},
+	{
+		"pattern": "4_Decoded/spots/fov_(?P<FOV>)_spots_(?P<round>)_(?P<channel>).nc",
+		"description": "Spot data for one round, channel combination.",
+		"edam_ontology_term": "EDAM_1.24.format_3650"
+	},
+	{
+		"pattern": "4_Decoded/(?p<timestamp>)_starfish_runner.log",
+		"description": "log of completed operations while decoding the experiment.",
+		"edam_ontology_term": "edam_1.24.data_3671"
+	},
+	{
+		"pattern": "5_Segmented/fov_(?P<FOV>)/segmentation.csv",
+		"description": "CSV table of transcripts, annotated with location and cell IDs.",
+		"edam_ontology_term": "EDAM_1.24.format_3752"
+	},
+	{
+		"pattern": "5_Segmented/fov_(?P<FOV>)/df_segmented.cdf",
+		"description": "NetCDF table of transcripts, annotated with location and cell IDs.",
+		"edam_ontology_term": "EDAM_1.24.format_3650"
+	},
+	{
+		"pattern": "5_Segmented/fov_(?P<FOV>)/exp_segmented.cdf",
+		"description": "NetCDF Cell x Gene table.",
+		"edam_ontology_term": "EDAM_1.24.format_3650"
+	},
+	{
+		"pattern": "5_Segmented/fov_(?P<FOV>)/exp_segmented.csv",
+		"description": "CSV Cell x Gene table.",
+		"edam_ontology_term": "EDAM_1.24.format_3752"
+	},
+	{
+		"pattern": "5_Segmented/fov_(?P<FOV>)/exp_segmented.h5ad",
+		"description": "Anndata Cell x Gene table.",
+		"edam_ontology_term": "FIXME"
+	},
+	{
+		"pattern": "5_Segmented/fov_(?P<FOV>)/mask.tiff",
+		"description": "A copy of the segmentation mask applied to this FOV",
+		"edam_ontology_term": "EDAM_1.24.format_3591"
+	},
+	{
+		"pattern": "5_Segmented/(?p<timestamp>)_starfish_segmenter.log",
+		"description": "log of completed operations while segmenting the experiment.",
+		"edam_ontology_term": "edam_1.24.data_3671"
+	},
+	{
+		"pattern": "7_QC/(?p<timestamp>)_QC_metrics.log",
+		"description": "log of completed operations while calculating QC values.",
+		"edam_ontology_term": "edam_1.24.data_3671"
+	},
+	{
+		"pattern": "7_QC/QC_results.yml",
+		"description": "Complete human-readable set of QC values.",
+		"edam_ontology_term": "edam_1.24.data_3750"
+	},
+	{
+		"pattern": "7_QC/fov_(?P<FOV>)_graph_output.pdf",
+		"description": "Visual plots of QC metrics.",
+		"edam_ontology_term": "edam_1.24.data_3508"
+	},
+	{
+		"pattern": "7_QC/fov_combined_graph_output.pdf",
+		"description": "Visual plots of QC metrics, combined across all FOVs.",
+		"edam_ontology_term": "edam_1.24.data_3508"
+	}
+]

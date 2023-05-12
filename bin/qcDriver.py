@@ -606,7 +606,6 @@ def getFPR(segmentation=None, results=None, pdf=False):
     if (segmentation is not None and "corrected_rounds" in segmentation.keys()) or (
         results is not None and "reals_full" in results.keys()
     ):
-
         if segmentation is not None:
             # Get counts per cell
             full_counts = segmentation[segmentation["corrected_rounds"] == 0]
@@ -775,7 +774,6 @@ def getFPR(segmentation=None, results=None, pdf=False):
             [0, len(real_per_cell_all)],
             [np.median(real_per_cell_all), np.median(real_per_cell_all)],
             color="black",
-            linewidth=3,
         )
         if (segmentation is not None and "corrected_rounds" in segmentation.keys()) or (
             results is not None and "reals_full" in results.keys()
@@ -785,7 +783,6 @@ def getFPR(segmentation=None, results=None, pdf=False):
                 [np.median(real_per_cell_full), np.median(real_per_cell_full)],
                 color="black",
                 linestyle="dashed",
-                linewidth=3,
             )
 
         # Create and plot legend
@@ -1059,7 +1056,6 @@ def runFOV(
     doRipley=False,
     savePdf=False,
 ):
-
     t0 = time()
 
     # print("transcripts {}\ncodebook {}\nspots {}\nsegmented {}".format(transcripts, codebook, spots, segmentation))
@@ -1179,6 +1175,7 @@ def runFOV(
 
 
 def run(
+    output_dir,
     transcripts,
     codebook,
     size,
@@ -1190,10 +1187,8 @@ def run(
     doRipley=False,
     savePdf=False,
 ):
-
     t0 = time()
 
-    output_dir = "7_QC/"
     if not path.isdir(output_dir):
         makedirs(output_dir)
 
@@ -1432,14 +1427,15 @@ def run(
 
 
 if __name__ == "__main__":
-
     # disabling tdqm for pipeline runs
     tqdm.__init__ = partialmethod(tqdm.__init__, disable=True)
 
     p = ArgumentParser()
 
+    p.add_argument("--tmp-prefix", type=str)
     p.add_argument("--codebook-exp", type=Path)
     p.add_argument("--exp-output", type=Path)
+    p.add_argument("--selected-fovs", nargs="+", const=None)
     p.add_argument("--has-spots", dest="has_spots", action="store_true")
 
     p.add_argument("--codebook-pkl", type=Path)
@@ -1458,6 +1454,7 @@ if __name__ == "__main__":
 
     print(args)
 
+    output_dir = f"tmp/{args.tmp_prefix}/7_QC/"
     codebook = False
     roi = False
 
@@ -1532,12 +1529,16 @@ if __name__ == "__main__":
         size[2] = args.z_size
 
     fovs = False
-    if args.exp_output:
+    if args.selected_fovs is not None:
+        # manually specified FOVs override anything else
+        fovs = ["fov_{:03}".format(int(f)) for f in args.selected_fovs]
+    elif args.exp_output:
         # reading in from experiment can have multiple FOVs
         fovs = [k for k in transcripts.keys()]
     if not args.exp_output or len(transcripts.keys()) > 0:
         # only run QC if we actually have input.
         run(
+            output_dir=output_dir,
             transcripts=transcripts,
             codebook=codebook,
             size=size,

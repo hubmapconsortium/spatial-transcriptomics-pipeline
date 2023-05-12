@@ -119,11 +119,11 @@ class FISHTile(FetchedTile):
                     (self.locs[Axes.Y] + self.img_shape[Axes.Y]) * self.voxel[Axes.Y]
                     - self.voxel[Axes.Y],
                 ),
+                # Note that each tile is a unique (r,ch,z) combination--
+                # The Z coordinate needs to pull from THIS tile, unlike x and y
                 Coordinates.Z: (
-                    self.locs[Axes.ZPLANE] * self.voxel[Axes.ZPLANE],
-                    (self.locs[Axes.ZPLANE] + self.img_shape[Axes.ZPLANE])
-                    * self.voxel[Axes.ZPLANE]
-                    - self.voxel[Axes.ZPLANE],
+                    (self.locs[Axes.ZPLANE] + self._zplane) * self.voxel[Axes.ZPLANE],
+                    (self.locs[Axes.ZPLANE] + self._zplane + 1) * self.voxel[Axes.ZPLANE],
                 ),
             }
         else:
@@ -754,7 +754,6 @@ def blank_codebook(real_codebook, num_blanks):
 
     # if hamming distance is 2, need to drop real codes and those with hamming distance equal to 1
     elif hamming_distance == 2:
-
         # Remove codes that have hamming distance <= 1 to any code in the real codebook
         cb_codes = real_codebook.argmax(Axes.CH.value)
         drop_cb_codes = {}
@@ -855,6 +854,7 @@ def blank_codebook(real_codebook, num_blanks):
 
 if __name__ == "__main__":
     p = ArgumentParser()
+    p.add_argument("--tmp-prefix", type=str)
     p.add_argument("--input-dir", type=Path)
     p.add_argument("--codebook-csv", type=Path)
     p.add_argument("--codebook-json", type=Path)
@@ -915,7 +915,7 @@ if __name__ == "__main__":
         print(aux_lens)
         raise Exception("Dimensions of all aux parameters must match.")
 
-    output_dir = "2_tx_converted/"
+    output_dir = f"tmp/{args.tmp_prefix}/2_tx_converted/"
 
     # parse loc info
     locs = []

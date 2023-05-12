@@ -80,7 +80,6 @@ def reformatter(
     aux_channel_slope: List[float] = [],
     aux_channel_intercept: List[int] = [],
 ):
-
     reportFile = path.join(output_dir, datetime.now().strftime("%Y%d%m_%H%M_psorting.log"))
     sys.stdout = open(reportFile, "w")
 
@@ -164,6 +163,7 @@ def reformatter(
 
 if __name__ == "__main__":
     p = ArgumentParser()
+    p.add_argument("--tmp-prefix", type=str)
     p.add_argument("--input-dir", type=Path)
     p.add_argument("--codebook-csv", type=Path, nargs="?")
     p.add_argument("--codebook-json", type=Path, nargs="?")
@@ -213,7 +213,7 @@ if __name__ == "__main__":
         print(aux_lens)
         raise Exception("Dimensions of all aux parameters must match.")
 
-    output_dir = "1_pseudosort/"
+    output_dir = f"tmp/{args.tmp_prefix}/1_pseudosort/"
     output_format = "PseudoCycle{}/MMStack_Pos{}_{}ch{}.ome.tif"
     output_vars = ["round", "fov", "aux_name", "channel"]
 

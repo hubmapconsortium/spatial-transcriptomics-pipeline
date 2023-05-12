@@ -14,8 +14,17 @@ inputs:
     type: Directory
     doc: The root directory containing all images.
 
+  codebook_csv:
+    type: File?
+    doc: Flattened csv input, refer to record entry.
+
+  codebook_json:
+    type: File?
+    doc: Flattened json input, refer to record entry.
+
   codebook:
     type:
+      - 'null'
       - type: record
         name: csv
         fields:
@@ -135,6 +144,11 @@ steps:
         valueFrom: "/opt/sorter.json"
     out: [data]
 
+  tmpname:
+    run: tmpdir.cwl
+    in: []
+    out: [tmp]
+
   stage_sort:
     run: inputParser.cwl
     in:
@@ -152,6 +166,12 @@ steps:
           dockerPull: hubmap/starfish-custom:latest
 
       inputs:
+
+        tmp_prefix:
+          type: string
+          inputBinding: 
+            prefix: --tmp-prefix
+
         input_dir:
           type: Directory
           inputBinding:
@@ -262,13 +282,26 @@ steps:
         pseudosorted_dir:
           type: Directory
           outputBinding:
-            glob: "1_pseudosort/"
+            glob: $("tmp/" + inputs.tmp_prefix + "/1_pseudosort/")
 
         log:
           type: stdout
     in:
+      tmp_prefix: tmpname/tmp
       input_dir: input_dir
-      codebook: codebook
+      codebook:
+        source: [codebook, codebook_csv, codebook_json]
+        linkMerge: merge_flattened
+        valueFrom: |
+          ${
+            if(self[0]){
+              return self[0];
+            } else if(self[1]){
+              return {csv: self[1]};
+            } else {
+              return {json: self[2]};
+            }
+          }
       channel_yml: channel_yml
       cycle_yml: cycle_yml
       file_format:

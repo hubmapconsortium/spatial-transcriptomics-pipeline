@@ -10,6 +10,10 @@ requirements:
 
 inputs:
 
+  skip_formatting:
+    type: boolean?
+    doc: If true, will skip first two stages and start at processing.
+
 # pseudochannel sorting vars, if present then it will be assumed that sorting must be performed.
 
   channel_yml:
@@ -21,11 +25,15 @@ inputs:
     doc: PyYML-formatted dictionary outlining how the truerounds in imaging relate to the pseudorounds in the decoding codebook. The keys are truerounds and the values are the corresponding pseudorounds.
 
 
+  selected_fovs:
+    type: int[]?
+    doc: If provided, steps after conversion will only be run on FOVs with these indices.
+
 # format of input vars
 # can be read into converter or sorter, followed by string literal input will be used for conversion
 
   tiffs:
-    type: Directory
+    type: Directory?
     doc: The directory containing all .tiff files
 
   codebook_csv:
@@ -184,6 +192,10 @@ inputs:
 
 # image processing
 
+  input_dir:
+    type: Directory?
+    doc: Root directory containing space_tx formatted experiment. Only used if skip_formatting is true.
+
   skip_processing:
     type: boolean?
     doc: If true, image processing step will be skipped.
@@ -246,6 +258,10 @@ inputs:
     doc: Radius for white top hat filter. Should be slightly larger than the expected spot radius. Will not be run if not provided.
 
 # starfishRunner
+
+  exp_loc:
+    type: Directory?
+    doc: Location of directory containing starfish experiment.json file. Only used when both skip_formatting and skip_processing are true.
 
   use_ref_img:
     type: boolean?
@@ -399,6 +415,66 @@ inputs:
 
 # segmentation
 
+## cellpose-specific vars
+
+  run_cellpose:
+    type: boolean?
+    doc: If true, cellpose will be run.
+
+  use_mrna:
+    type: boolean?
+    doc: If true, mrna data will be used in cellpose calculations.
+
+  aux_views:
+    type: string[]?
+    doc: The views to use for cellpose segmentation.
+
+  use_gpu:
+    type: boolean?
+    doc: if set, uses GPU instead of CPU
+
+  pretrained_model_str:
+    type: string?
+    doc: Cellpose-provided model to use.
+
+  pretrained_model_dir:
+    type: File?
+    doc: Manually trained cellpose model to use.
+
+  diameter:
+    type: float?
+    doc: Expected diameter of cells. Should be 0 if a custom model is used.
+
+  flow_threshold:
+    type: float?
+    doc: threshold for filtering cell segmentations (increasing this will filter out lower confidence segmentations), range is 0 to infinity
+
+  stitch_threshold:
+    type: float?
+    doc: threshold for stitching together segmentations that occur at the same xy location but in adjacent z slices, range is 0 to 1. This should only be used when the image is 3D.
+
+  cellprob_threshold:
+    type: float?
+    doc: determines the extent of the segmentations (0 is the default more negative values result in larger cells, more positive values result in smaller cells), range is -6 to 6.
+
+  border_buffer:
+    type: int?
+    doc: If not None, removes cytoplasms whose nuclei lie within the given distance from the border.
+
+  label_exp_size:
+    type: int?
+    doc: Pixel size labels are dilated by in final step. Helpful for closing small holes that are common from thresholding but can also cause cell boundaries to exceed their true boundaries if set too high. Label dilation respects label borders and does not mix labels.
+
+  min_allowed_size:
+    type: int?
+    doc: minimum size for a cell (in pixels)
+
+  max_allowed_size:
+    type: int?
+    doc: maximum size for a cell (in pixels)
+
+## built-in segmentation methods
+
   aux_name:
     type: string?
     doc: The name of the aux view to look at in the experiment file for image segmentation.
@@ -473,7 +549,12 @@ inputs:
   run_baysor:
     type: boolean?
     doc: If true, the baysor step will be run.
-    default: false
+    default: False
+
+  skip_qc:
+    type: boolean?
+    doc: If true, QC will not be run.
+    default: False
 
   find_ripley:
     type: boolean?
@@ -498,6 +579,15 @@ outputs:
   4_Decoded:
     type: Directory
     outputSource: starfishRunner/decoded
+  5A_cellpose_input:
+    type: Directory
+    outputSource: cellpose/cellpose_input
+  5B_cellpose_output:
+    type: Directory
+    outputSource: cellpose/cellpose_output
+  5C_cellpose_filtered:
+    type: Directory
+    outputSource: cellpose/cellpose_filtered
   5_Segmented:
     type: Directory
     outputSource: segmentation/segmented
@@ -539,7 +629,7 @@ steps:
     in:
       datafile: parameter_json
       schema: read_schema/data
-    out: [run_baysor, skip_processing, register_aux_view, fov_positioning_x_locs, fov_positioning_x_shape, fov_positioning_x_voxel, fov_positioning_y_locs, fov_positioning_y_shape, fov_positioning_y_voxel, fov_positioning_z_locs, fov_positioning_z_shape, fov_positioning_z_voxel, add_blanks]
+    out: [run_baysor, aux_views, skip_formatting, skip_processing, register_aux_view, fov_positioning_x_locs, fov_positioning_x_shape, fov_positioning_x_voxel, fov_positioning_y_locs, fov_positioning_y_shape, fov_positioning_y_voxel, fov_positioning_z_locs, fov_positioning_z_shape, fov_positioning_z_voxel, run_cellpose, add_blanks, skip_qc]
     when: $(inputs.datafile != null)
 
   sorter:
@@ -571,7 +661,17 @@ steps:
       file_vars: file_vars
       cache_read_order: cache_read_order
       aux_tilesets: aux_tilesets
-    when: $(inputs.channel_yml != null)
+      skip_formatting:
+        source: [stage/skip_formatting, skip_formatting]
+        valueFrom: |
+          ${
+            if(self[0] || self[1]){
+              return true;
+            } else {
+              return false;
+            };
+          }
+    when: $(inputs.channel_yml != null && !inputs.skip_formatting)
     out: [pseudosorted_dir]
 
   stagedSorted:
@@ -602,7 +702,17 @@ steps:
                 return null;
             }
           }
-    when: $(inputs.channel_yml != null)
+      skip_formatting:
+        source: [stage/skip_formatting, skip_formatting]
+        valueFrom: |
+          ${
+            if(self[0] || self[1]){
+              return true;
+            } else {
+              return false;
+            };
+          }
+    when: $(inputs.channel_yml != null && !inputs.skip_formatting)
     out: [codebook, round_count, fov_count, channel_count, zplane_count, round_offset, fov_offset, channel_offset, zplane_offset, file_format, file_vars, cache_read_order, aux_names, aux_file_formats, aux_file_vars, aux_cache_read_order, aux_channel_count, aux_channel_slope, aux_channel_intercept]
 
   spaceTxConversion:
@@ -610,7 +720,16 @@ steps:
     in:
       tiffs:
         source: [sorter/pseudosorted_dir, tiffs]
-        pickValue: first_non_null
+        valueFrom: |
+          ${
+            if(self[0]){
+              return self[0];
+            } else if (self[1]){
+              return self[1];
+            } else {
+              return null;
+            }
+          }
       codebook:
         source: [stagedSorted/codebook, codebook, codebook_csv, codebook_json]
         linkMerge: merge_flattened
@@ -822,6 +941,17 @@ steps:
               return false;
             }
           }
+      skip_formatting:
+        source: [stage/skip_formatting, skip_formatting]
+        valueFrom: |
+          ${
+            if(self[0] || self[1]){
+              return true;
+            } else {
+              return false;
+            };
+          }
+    when: $(inputs.skip_formatting == false)
     out: [spaceTx_converted]
 
   processing:
@@ -837,8 +967,20 @@ steps:
               return false;
             };
           }
-      input_dir: spaceTxConversion/spaceTx_converted
+      input_dir:
+        source: [spaceTxConversion/spaceTx_converted, input_dir]
+        valueFrom: |
+          ${
+            if(self[0]){
+              return self[0];
+            } else if(self[1]) {
+              return self[1];
+            } else {
+              return null;
+            };
+          }
       parameter_json: parameter_json
+      selected_fovs: selected_fovs
       clip_min: clip_min
       clip_max: clip_max
       level_method: level_method
@@ -881,9 +1023,10 @@ steps:
     run: steps/starfishRunner.cwl
     in:
       exp_loc:
-        source: [processing/processed_exp, spaceTxConversion/spaceTx_converted]
+        source: [processing/processed_exp, spaceTxConversion/spaceTx_converted, exp_loc]
         pickValue: first_non_null
       parameter_json: parameter_json
+      selected_fovs: selected_fovs
       level_method: level_method
       use_ref_img: use_ref_img
       anchor_view: anchor_view
@@ -896,31 +1039,89 @@ steps:
     out:
       [decoded]
 
+  cellpose:
+    run: steps/cellpose.cwl
+    in:
+      exp_loc:
+        source: [processing/processed_exp, spaceTxConversion/spaceTx_converted, exp_loc]
+        pickValue: first_non_null
+      decoded_loc: starfishRunner/decoded
+      parameter_json: parameter_json
+      selected_fovs: selected_fovs
+      use_mrna: use_mrna
+      zplane_count: zplane_count
+      aux_views: aux_views
+      use_gpu: use_gpu
+      pretrained_model_str: pretrained_model_str
+      pretrained_model_dir: pretrained_model_dir
+      diameter: diameter
+      flow_threshold: flow_threshold
+      stitch_threshold: stitch_threshold
+      cellprob_threshold: cellprob_threshold
+      border_buffer: border_buffer
+      label_exp_size: label_exp_size
+      min_allowed_size: min_allowed_size
+      max_allowed_size: max_allowed_size
+      run_cellpose:
+        source: [stage/run_cellpose, run_cellpose]
+        valueFrom: |
+          ${
+            if(self[0] || self[1]){
+              return true;
+            } else {
+              return false;
+            }
+          }
+    when: $(inputs.run_cellpose == true)
+    out:
+      [cellpose_input, cellpose_output, cellpose_filtered]
+
   segmentation:
     run: steps/segmentation.cwl
     in:
       decoded_loc: starfishRunner/decoded
-      exp_loc: spaceTxConversion/spaceTx_converted
+      exp_loc:
+        source: [processing/processed_exp, spaceTxConversion/spaceTx_converted, exp_loc]
+        pickValue: first_non_null
       parameter_json: parameter_json
-      aux_name: aux_name
-      binary_mask:
-        source: [binary_mask, mask_roi_files, mask_roi_formats, mask_labeled_files, mask_labeled_formats]
+      selected_fovs: selected_fovs
+      aux_name:
+        source: [aux_name, aux_views, stage/aux_views]
         valueFrom: |
           ${
-            if(self[0]){
-              return self[0];
-            } else if(self[1] && self[2]){
-              return {
-                "roi_set": self[1],
-                "file_formats": self[2]
-              };
-            } else if(self[3] && self[4]){
-              return {
-                "labeled_image": self[3],
-                "file_formats_labeled": self[4]
-              };
+            if(self[1]){
+              return self[1][0];
+            } else if(self[2]){
+              return self[2][0];
             } else {
-              return null;
+              return self[0];
+            }
+          }
+      binary_mask:
+        source: [binary_mask, mask_roi_files, mask_roi_formats, mask_labeled_files, mask_labeled_formats, cellpose/cellpose_filtered]
+        valueFrom: |
+          ${
+            if(self[5]){
+              return {
+                "labeled_image": self[5],
+                "file_formats_labeled": "fov_{:03d}_masks.tiff"
+              }
+            } else {
+              if(self[0]){
+                return self[0];
+              } else if(self[1] && self[2]){
+                return {
+                  "roi_set": self[1],
+                  "file_formats": self[2]
+                };
+              } else if(self[3] && self[4]){
+                return {
+                  "labeled_image": self[3],
+                  "file_formats_labeled": self[4]
+                };
+              } else {
+                return null;
+              }
             }
           }
     out:
@@ -947,8 +1148,18 @@ steps:
   qc:
     run: steps/qc.cwl
     in:
+      skip_qc:
+        source: [stage/skip_qc, skip_qc]
+        valueFrom: |
+          ${
+            if(self[0] || self[1]){
+              return true;
+            } else {
+              return false;
+            }
+          }
       codebook:
-        source: [sorter/pseudosorted_dir, spaceTxConversion/spaceTx_converted]
+        source: [sorter/pseudosorted_dir, spaceTxConversion/spaceTx_converted, processing/processed_exp, exp_loc]
         pickValue: first_non_null
         valueFrom: |
           ${
@@ -975,6 +1186,7 @@ steps:
               return null;
             }
           }
+      selected_fovs: selected_fovs
       has_spots:
         source: decoding_blob
         valueFrom: |
@@ -1007,5 +1219,6 @@ steps:
               "exp": self
             };
           }
+    when: $(inputs.skip_qc == false)
     out:
       [qc_metrics]

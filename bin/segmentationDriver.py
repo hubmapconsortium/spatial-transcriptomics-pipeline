@@ -8,6 +8,7 @@ from functools import partialmethod
 from glob import glob
 from os import makedirs, path
 from pathlib import Path
+from typing import List
 
 import cv2
 import numpy as np
@@ -133,12 +134,10 @@ def _clip_percentile_to_zero(image, p_min, p_max, min_coeff=1, max_coeff=1):
 def segment_nuclei(
     nuclei, border_buffer=None, area_thresh=1.05, thresh_block_size=51, wtshd_ftprnt_size=100
 ):
-
     good_nuclei_all_z = np.zeros(nuclei.xarray.data[0, 0].shape, dtype="int32")
     all_nuclei_all_z = np.zeros(nuclei.xarray.data[0, 0].shape, dtype="int32")
     og_nuclei = deepcopy(nuclei)
     for z in range(nuclei.num_zplanes):
-
         nuclei = deepcopy(og_nuclei)
 
         # Even out background of nuclei image using large morphological opening
@@ -202,7 +201,6 @@ def segment_nuclei(
         props = skimage.measure.regionprops(good_nuclei)
         deformed_border = []
         for x in range(1, len(props) + 1):
-
             object_area = props[x - 1].area
             con_hull_area = props[x - 1].convex_area
 
@@ -278,9 +276,7 @@ def segment_nuclei(
             merge_count = 0
             removed_labels = []
             for pair in neighbor_pairs:
-
                 if pair[0] not in removed_labels and pair[1] not in removed_labels:
-
                     pair_image1 = np.zeros((ymax, xmax))
                     bbox = props[pair[0] - 1].bbox
                     pair_image1[bbox[0] : bbox[2], bbox[1] : bbox[3]] = props[
@@ -327,7 +323,6 @@ def segment_nuclei(
 def segment_cytoplasm(
     good_nuclei, all_nuclei, decoded_targets, border_buffer=None, label_exp_size=None
 ):
-
     # Convert transcripts to dataframe
     data = deepcopy(decoded_targets.to_features_dataframe())
 
@@ -336,7 +331,6 @@ def segment_cytoplasm(
     all_cyto_all_z = np.zeros(all_nuclei.shape, dtype="int32")
 
     for z in range(all_nuclei.shape[0]):
-
         # Subset data for current z slice
         data = data[data["z"] == z]
 
@@ -468,7 +462,6 @@ def segmentByDensity(
     label_exp_size=20,
     nuclei_view="",
 ):
-
     """
     Parameters
         nuclei: Nuclei images.
@@ -537,7 +530,6 @@ def segmentByDensity(
             return good_nuclei
         # All nuclei
         else:
-
             # Had to put this here because I need border nuclei for cytoplasm segmentation.
             if border_buffer is not None:
                 for z in range(nuclei.num_zplanes):
@@ -559,6 +551,7 @@ def run(
     exp_loc: Path,
     output_loc: str,
     aux_name: str,
+    selected_fovs: List[int],
     roiKwargs: dict,
     labeledKwargs: dict,
     watershedKwargs: dict,
@@ -577,6 +570,8 @@ def run(
         Path to directory where output will be saved.
     aux_name: str
         The name of the auxillary view to look at for image segmentation.
+    selected_fovs: List[int]
+        If provided, FOVs with the selected indices will be processed.
     roiKwargs: dict
         Dictionary with arguments for reading in masks from an RoiSet. See masksFromRoi.
     labeledKwargs: dict
@@ -624,14 +619,24 @@ def run(
                 makedirs(output_dir + name)
                 print("made " + output_dir + name)
 
+    if len(results) == 0:
+        print("No prior results found! Quitting segmentation.")
+        sys.stdout = sys.__stdout__
+        return
+
     # load in the images we want to look at
     exp = starfish.core.experiment.experiment.Experiment.from_json(
         str(exp_loc / "experiment.json")
     )
     print("loaded " + str(exp_loc / "experiment.json"))
 
-    # IF WE'RE DOING DENSITY BASED, THAT's DIFFERENT'
-    for key in results.keys():
+    # IF WE'RE DOING DENSITY BASED, THAT's DIFFERENT
+    if selected_fovs is not None:
+        fovs = ["fov_{:03}".format(int(f)) for f in selected_fovs]
+    else:
+        fovs = results.keys()
+
+    for key in fovs:
         if "nuclei_view" in densityKwargs:
             nuclei_img = exp[key].get_image(densityKwargs["nuclei_view"])
             print(f"Segmenting {key}")
@@ -671,9 +676,13 @@ def run(
         # labeled = labeled[labeled.cell_id != "nan"]
         labeled.to_features_dataframe().to_csv(output_dir + key + "/segmentation.csv")
         labeled.to_netcdf(output_dir + key + "/df_segmented.cdf")
-        labeled.to_expression_matrix().to_pandas().to_csv(output_dir + key + "/exp_segmented.csv")
-        labeled.to_expression_matrix().save(output_dir + key + "/exp_segmented.cdf")
-        labeled.to_expression_matrix().save_anndata(output_dir + key + "/exp_segmented.h5ad")
+
+        labeled_exp = labeled.to_expression_matrix()
+        labeled_exp.to_pandas().set_index(labeled_exp["cell_id"].values).to_csv(
+            output_dir + key + "/exp_segmented.csv"
+        )
+        labeled_exp.save(output_dir + key + "/exp_segmented.cdf")
+        labeled_exp.save_anndata(output_dir + key + "/exp_segmented.h5ad")
         print("saved fov key: {}".format(key))
 
     if len(results) == 0:
@@ -689,12 +698,13 @@ def addKwarg(parser, kwargdict, var):
 
 
 if __name__ == "__main__":
-    output_dir = "5_Segmented/"
     p = ArgumentParser()
 
     p.add_argument("--decoded-loc", type=Path)
+    p.add_argument("--tmp-prefix", type=str)
     p.add_argument("--exp-loc", type=Path)
     p.add_argument("--aux-name", type=str, nargs="?")
+    p.add_argument("--selected-fovs", nargs="+", const=None)
 
     # for importing roi set
     p.add_argument("--roi-set", type=Path, nargs="?")
@@ -752,11 +762,14 @@ if __name__ == "__main__":
     addKwarg(args, densityKwargs, "watershed_footprint_size")
     addKwarg(args, densityKwargs, "label_exp_size")
 
+    output_dir = f"tmp/{args.tmp_prefix}/5_Segmented/"
+
     run(
         input_dir,
         exp_dir,
         output_dir,
         aux_name,
+        args.selected_fovs,
         roiKwargs,
         labeledKwargs,
         watershedKwargs,

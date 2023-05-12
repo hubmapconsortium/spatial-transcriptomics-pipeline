@@ -13,7 +13,7 @@ from datetime import datetime
 from functools import partialmethod, reduce
 from os import makedirs, path
 from pathlib import Path
-from typing import Callable, Tuple, Union
+from typing import Callable, List, Tuple, Union
 
 import numpy as np
 import starfish
@@ -305,7 +305,6 @@ def scale_img(
     mod_mean = 1
     iters = 0
     while mod_mean > 0.01:
-
         scaling_mods = optimize_scale(
             cropped_img, scaling_factors, codebook, pixelRunnerKwargs, is_volume
         )
@@ -464,7 +463,6 @@ def getCoords(exploc: str):
     y_min_all = np.inf
     y_max_all = 0
     for pos in range(fov_count):
-
         with open(img_jsons[pos], "r") as file:
             metadata = json.load(file)
 
@@ -580,7 +578,7 @@ def createComposite(
         combined_starfish_anchor = ImageStack.from_numpy(combined_anchor)
         del combined_anchor
     else:
-        combined_starfish_anchor = combined_starfish_img.reduce({Axes.CH})
+        combined_starfish_anchor = combined_starfish_img.reduce({Axes.CH}, func="max")
 
     # Scale composite images
     clip = starfish.image.Filter.ClipPercentileToZero(
@@ -601,7 +599,6 @@ def createComposite(
 
 
 def saveCompositeResults(spots, decoded, exploc, output_name):
-
     # Splits large spots object into lots of smaller ones
     spot_items = dict(spots.items())
     for rch in spot_items:
@@ -611,7 +608,7 @@ def saveCompositeResults(spots, decoded, exploc, output_name):
 
     # Create a new SpotFindingResults object with only spots from each position and save separately
     for pos in range(len(composite_coords)):
-        fov = "fov_" + "0" * (3 - len(str(pos))) + str(pos)
+        fov = "fov_{:03}".format(pos)
         spot_attrs = {}
         x_min = composite_coords[pos]["x_min"]
         x_max = composite_coords[pos]["x_max"]
@@ -682,7 +679,7 @@ def saveCompositeResults(spots, decoded, exploc, output_name):
 
         if fov_spots.count_total_spots() > 0:
             if output_name:
-                fov_spots.save(f"{output_name}spots/fov_")
+                fov_spots.save(f"{output_name}spots/{fov}_")
     print("spots saved.")
 
     # Save decoded transcripts
@@ -732,6 +729,7 @@ def saveCompositeResults(spots, decoded, exploc, output_name):
 
 def run(
     output_dir: str,
+    input_dir: Path,
     experiment: Experiment,
     blob_based: bool,
     use_ref: bool,
@@ -741,6 +739,7 @@ def run(
     is_volume: bool,
     is_composite: bool,
     not_filtered_results: bool,
+    selected_fovs: List[int],
     blobRunnerKwargs: dict,
     decodeRunnerKwargs: dict,
     pixelRunnerKwargs: dict,
@@ -770,6 +769,8 @@ def run(
         If true, all fovs will be composited into one image. Only used for postcode decoding.
     not_filtered_results: bool
         If true, rows with no target or that do not pass thresholds will not be removed.
+    selected_fovs: List[int]
+        If provided, FOVs with the selected indices will be processed.
     blobRunnerKwargs: dict
         Dictionary with arguments for blob detection. Refer to blobRunner.
     decodeRunnerKwargs: dict
@@ -817,7 +818,7 @@ def run(
 
         # Creates the big images. If not given an anchor_name then it takes the max projection of the primary image
         composite_img, composite_anchor = createComposite(
-            experiment, exploc, anchor_name, is_volume, level_method, **compositeKwargs
+            experiment, input_dir, anchor_name, is_volume, level_method, **compositeKwargs
         )
 
         # Find spots and decode the composite image
@@ -837,14 +838,19 @@ def run(
             decoded.to_netcdf(output_dir + "cdf/composite_decoded.cdf")
             print(f"Saved cdf file {output_dir}cdf/composite_decoded.cdf")
         else:
-            print(f"No transcripts found for composite! Not saving a DecodedIntensityTable file.")
+            print("No transcripts found for composite! Not saving a DecodedIntensityTable file.")
 
         # Saves per FOV spots and decoded results
-        saveCompositeResults(blobs, decoded, exploc, output_name=f"{output_dir}")
+        saveCompositeResults(blobs, decoded, input_dir, output_name=f"{output_dir}")
 
     # Otherwise run on a per FOV basis
     else:
-        for fov in experiment.keys():
+        if selected_fovs is not None:
+            fovs = ["fov_{:03}".format(int(f)) for f in selected_fovs]
+        else:
+            fovs = experiment.keys()
+
+        for fov in fovs:
             start0 = time.time()
             print("fov", fov)
 
@@ -923,18 +929,17 @@ def addKwarg(parser, kwargdict, var):
 
 
 if __name__ == "__main__":
-
-    output_dir = "4_Decoded/"
-
     p = ArgumentParser()
 
     # inputs
     p.add_argument("--exp-loc", type=Path)
+    p.add_argument("--tmp-prefix", type=str)
     p.add_argument("--is-volume", dest="is_volume", action="store_true")
     p.add_argument("--rescale", dest="rescale", action="store_true")
     p.add_argument("--level-method", type=str, nargs="?")
     p.add_argument("--anchor-view", type=str, nargs="?")
     p.add_argument("--not-filtered-results", dest="not_filtered_results", action="store_true")
+    p.add_argument("--selected-fovs", nargs="+", const=None)
 
     # blobRunner kwargs
     p.add_argument("--min-sigma", type=float, nargs="*")
@@ -986,6 +991,8 @@ if __name__ == "__main__":
     # for item in vars(args):
     #    print(item, ':', vars(args)[item])
 
+    output_dir = f"tmp/{args.tmp_prefix}/4_Decoded/"
+
     exploc = args.exp_loc / "experiment.json"
     experiment = starfish.core.experiment.experiment.Experiment.from_json(str(exploc))
 
@@ -1022,7 +1029,6 @@ if __name__ == "__main__":
     blob_based = args.decode_spots_method is not None
     vol = False
     if blob_based:
-
         # checking dims on sigma, because scipy throws an unhelpful error
         # in the event of a mismatch.
         if args.min_sigma:
@@ -1119,6 +1125,7 @@ if __name__ == "__main__":
 
     run(
         output_dir,
+        exploc,
         experiment,
         blob_based,
         use_ref,
@@ -1128,6 +1135,7 @@ if __name__ == "__main__":
         vol,
         composite,
         not_filtered_results,
+        args.selected_fovs,
         blobRunnerKwargs,
         decodeRunnerKwargs,
         pixelRunnerKwargs,
