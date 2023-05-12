@@ -708,7 +708,7 @@ def getFPR(segmentation=None, results=None, pdf=False):
                     [sorted_reals_all[ind], sorted_blanks_all[ind]], index=["all_on", "all_off"]
                 )
                 sorted_values = values.sort_values(ascending=False)
-                colors = pd.Series([all_on_color, all_off_color], index=["all_on", "all_off"])[
+                colors = pd.Series([full_on_color, full_off_color], index=["all_on", "all_off"])[
                     sorted_values.index
                 ]
                 counter = collections.Counter(sorted_values)
@@ -770,19 +770,28 @@ def getFPR(segmentation=None, results=None, pdf=False):
                 align="edge",
                 color=bars4_colors,
             )
-        plt.plot(
-            [0, len(real_per_cell_all)],
-            [np.median(real_per_cell_all), np.median(real_per_cell_all)],
-            color="black",
-        )
+            
         if (segmentation is not None and "corrected_rounds" in segmentation.keys()) or (
             results is not None and "reals_full" in results.keys()
         ):
+            
+            plt.plot(
+                [0, len(real_per_cell_all)],
+                [np.median(real_per_cell_all), np.median(real_per_cell_all)],
+                color="black",
+            )
+
             plt.plot(
                 [0, len(real_per_cell_full)],
                 [np.median(real_per_cell_full), np.median(real_per_cell_full)],
                 color="black",
                 linestyle="dashed",
+            )
+        else:
+            plt.plot(
+                [0, len(real_per_cell_all)],
+                [np.median(real_per_cell_all), np.median(real_per_cell_all)],
+                color="black", linestyle="dashed",
             )
 
         # Create and plot legend
@@ -804,12 +813,12 @@ def getFPR(segmentation=None, results=None, pdf=False):
                 dashed_line,
             ]
         else:
-            proxy_on = mpatches.Patch(color=all_on_color, label="On-target")
-            proxy_off = mpatches.Patch(color=all_off_color, label="Off-target")
-            solid_line = Line2D(
-                [0], [0], color="black", linestyle="solid", label="On-target Median"
+            proxy_on = mpatches.Patch(color=full_on_color, label="On-target")
+            proxy_off = mpatches.Patch(color=full_off_color, label="Off-target")
+            dashed_line = Line2D(
+                [0], [0], color="black", linestyle="dashed", label="On-target Median"
             )
-            handles = [proxy_on, proxy_off, solid_line]
+            handles = [proxy_on, proxy_off, dashed_line]
         plt.legend(handles=handles)
 
         plt.xlabel("Cells")
@@ -864,6 +873,13 @@ def plotBarcodeAbundance(pdf, decoded=None, results=None):
         all_on_color if "blank" not in target.lower() else all_off_color
         for target in all_counts.index
     ]
+    
+    full_on_color = (0 / 256, 119 / 256, 187 / 256)
+    full_off_color = (204 / 256, 51 / 256, 17 / 256)
+    full_colors = [
+        full_on_color if "blank" not in target.lower() else full_off_color
+        for target in all_counts.index
+    ]
 
     # Calculate upper 95% CI for blank codes and what proportion of real codes are above this value
     if decoded is not None:
@@ -881,33 +897,62 @@ def plotBarcodeAbundance(pdf, decoded=None, results=None):
     all_std_bl = max(1, np.std(all_blank_counts))
     all_conf = norm.interval(0.95, loc=all_avg_bl, scale=all_std_bl)[1]
     good_codes_all = sum(all_real_counts > all_conf) / len(all_real_counts)
+    
+    # Plot bars, upper 95% CI line, and text when there are not corrected barcodes
+    if (decoded is not None and "corrected_rounds" not in decoded.coords) or (
+        results is not None and "reals_full" not in results.keys()
+    ):
+        
+        plt.bar(range(len(all_counts)), height=all_counts, color=full_colors, width=1, align="edge")
+        plt.axhline(all_conf, color="black", label="Upper 95% CI EC+NC")
+        plt.plot(
+            [len(all_counts) * 0.4, len(all_counts) * 0.4],
+            [all_conf, get_y_offset(all_conf, disp_range / 4.35, ax)],
+            color="black",
+        )
+        top_txt_y = get_y_offset(all_conf, disp_range / 3.95, ax)
+        plt.text(
+            len(all_counts) * 0.4,
+            top_txt_y,
+            f"{good_codes_all*100:.2f}% barcodes above {all_conf:.2f} threshold",
+            horizontalalignment="center",
+            fontsize=8,
+        )
 
-    # Plot bars, upper 95% CI line, and text
-    plt.bar(range(len(all_counts)), height=all_counts, color=all_colors, width=1, align="edge")
-    plt.axhline(all_conf, color="black", label="Upper 95% CI EC+NC")
-    plt.plot(
-        [len(all_counts) * 0.4, len(all_counts) * 0.4],
-        [all_conf, get_y_offset(all_conf, disp_range / 4.35, ax)],
-        color="black",
-    )
-    top_txt_y = get_y_offset(all_conf, disp_range / 3.95, ax)
-    plt.text(
-        len(all_counts) * 0.4,
-        top_txt_y,
-        f"{good_codes_all*100:.2f}% barcodes above {all_conf:.2f} threshold",
-        horizontalalignment="center",
-        fontsize=8,
-    )
+        final_results = {
+            "reals_all": dict(all_real_counts_raw),
+            "blanks_all": dict(all_blank_counts_raw),
+        }
 
-    final_results = {
-        "reals_all": dict(all_real_counts_raw),
-        "blanks_all": dict(all_blank_counts_raw),
-    }
+    
 
-    # Do all the same for only non-corrected barcodes if error-corrected barcodes are present
-    if (decoded is not None and "corrected_rounds" in decoded.coords) or (
+    # Plot bars, upper 95% CI line, and text when there are corrected barcodes
+    elif (decoded is not None and "corrected_rounds" in decoded.coords) or (
         results is not None and "reals_full" in results.keys()
     ):
+        
+        # Plot bars, upper 95% CI line, and text for EC+NC
+        plt.bar(range(len(all_counts)), height=all_counts, color=all_colors, width=1, align="edge")
+        plt.axhline(all_conf, color="black", label="Upper 95% CI EC+NC")
+        plt.plot(
+            [len(all_counts) * 0.4, len(all_counts) * 0.4],
+            [all_conf, get_y_offset(all_conf, disp_range / 4.35, ax)],
+            color="black",
+        )
+        top_txt_y = get_y_offset(all_conf, disp_range / 3.95, ax)
+        plt.text(
+            len(all_counts) * 0.4,
+            top_txt_y,
+            f"{good_codes_all*100:.2f}% barcodes above {all_conf:.2f} threshold",
+            horizontalalignment="center",
+            fontsize=8,
+        )
+
+        final_results = {
+            "reals_all": dict(all_real_counts_raw),
+            "blanks_all": dict(all_blank_counts_raw),
+        }
+        
         if decoded is not None:
             targets = decoded[decoded["corrected_rounds"] == 0]["target"].data.tolist()
             full_counts = pd.Series(collections.Counter(targets)).sort_values(ascending=False)
@@ -942,7 +987,8 @@ def plotBarcodeAbundance(pdf, decoded=None, results=None):
         std_bl = max(1, np.std(full_blank_counts))
         full_conf = norm.interval(0.95, loc=avg_bl, scale=std_bl)[1]
         good_codes_full = sum(full_real_counts > full_conf) / len(full_real_counts)
-
+        
+        # Plot bars, upper 95% CI line, and text for just NC
         plt.bar(
             range(len(full_counts)), height=full_counts, color=full_colors, width=1, align="edge"
         )
@@ -986,8 +1032,8 @@ def plotBarcodeAbundance(pdf, decoded=None, results=None):
             dashed_line,
         ]
     else:
-        proxy_positive = mpatches.Patch(color=all_on_color, label="On-target")
-        proxy_blank = mpatches.Patch(color=all_off_color, label="Off-target")
+        proxy_positive = mpatches.Patch(color=full_on_color, label="On-target")
+        proxy_blank = mpatches.Patch(color=full_off_color, label="Off-target")
         handles = [proxy_positive, proxy_blank]
     lgd = ax.legend(handles=handles, loc=(1.02, 0.5))
 
