@@ -770,11 +770,11 @@ def getFPR(segmentation=None, results=None, pdf=False):
                 align="edge",
                 color=bars4_colors,
             )
-            
+
         if (segmentation is not None and "corrected_rounds" in segmentation.keys()) or (
             results is not None and "reals_full" in results.keys()
         ):
-            
+
             plt.plot(
                 [0, len(real_per_cell_all)],
                 [np.median(real_per_cell_all), np.median(real_per_cell_all)],
@@ -791,7 +791,8 @@ def getFPR(segmentation=None, results=None, pdf=False):
             plt.plot(
                 [0, len(real_per_cell_all)],
                 [np.median(real_per_cell_all), np.median(real_per_cell_all)],
-                color="black", linestyle="dashed",
+                color="black",
+                linestyle="dashed",
             )
 
         # Create and plot legend
@@ -873,7 +874,7 @@ def plotBarcodeAbundance(pdf, decoded=None, results=None):
         all_on_color if "blank" not in target.lower() else all_off_color
         for target in all_counts.index
     ]
-    
+
     full_on_color = (0 / 256, 119 / 256, 187 / 256)
     full_off_color = (204 / 256, 51 / 256, 17 / 256)
     full_colors = [
@@ -897,13 +898,15 @@ def plotBarcodeAbundance(pdf, decoded=None, results=None):
     all_std_bl = max(1, np.std(all_blank_counts))
     all_conf = norm.interval(0.95, loc=all_avg_bl, scale=all_std_bl)[1]
     good_codes_all = sum(all_real_counts > all_conf) / len(all_real_counts)
-    
+
     # Plot bars, upper 95% CI line, and text when there are not corrected barcodes
     if (decoded is not None and "corrected_rounds" not in decoded.coords) or (
         results is not None and "reals_full" not in results.keys()
     ):
-        
-        plt.bar(range(len(all_counts)), height=all_counts, color=full_colors, width=1, align="edge")
+
+        plt.bar(
+            range(len(all_counts)), height=all_counts, color=full_colors, width=1, align="edge"
+        )
         plt.axhline(all_conf, color="black", label="Upper 95% CI EC+NC")
         plt.plot(
             [len(all_counts) * 0.4, len(all_counts) * 0.4],
@@ -924,13 +927,11 @@ def plotBarcodeAbundance(pdf, decoded=None, results=None):
             "blanks_all": dict(all_blank_counts_raw),
         }
 
-    
-
     # Plot bars, upper 95% CI line, and text when there are corrected barcodes
     elif (decoded is not None and "corrected_rounds" in decoded.coords) or (
         results is not None and "reals_full" in results.keys()
     ):
-        
+
         # Plot bars, upper 95% CI line, and text for EC+NC
         plt.bar(range(len(all_counts)), height=all_counts, color=all_colors, width=1, align="edge")
         plt.axhline(all_conf, color="black", label="Upper 95% CI EC+NC")
@@ -952,7 +953,7 @@ def plotBarcodeAbundance(pdf, decoded=None, results=None):
             "reals_all": dict(all_real_counts_raw),
             "blanks_all": dict(all_blank_counts_raw),
         }
-        
+
         if decoded is not None:
             targets = decoded[decoded["corrected_rounds"] == 0]["target"].data.tolist()
             full_counts = pd.Series(collections.Counter(targets)).sort_values(ascending=False)
@@ -987,7 +988,7 @@ def plotBarcodeAbundance(pdf, decoded=None, results=None):
         std_bl = max(1, np.std(full_blank_counts))
         full_conf = norm.interval(0.95, loc=avg_bl, scale=std_bl)[1]
         good_codes_full = sum(full_real_counts > full_conf) / len(full_real_counts)
-        
+
         # Plot bars, upper 95% CI line, and text for just NC
         plt.bar(
             range(len(full_counts)), height=full_counts, color=full_colors, width=1, align="edge"
