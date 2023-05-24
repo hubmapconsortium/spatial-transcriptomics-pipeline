@@ -95,6 +95,11 @@ outputs:
 
 steps:
 
+  tmpname:
+    run: tmpdir.cwl
+    in: []
+    out: [tmp]
+
   read_schema:
     run:
       class: CommandLineTool
@@ -102,7 +107,7 @@ steps:
 
       requirements:
         DockerRequirement:
-          dockerPull: hubmap/starfish-custom:2.5
+          dockerPull: hubmap/starfish-custom:latest
 
       inputs:
         schema:
@@ -134,9 +139,14 @@ steps:
 
       requirements:
         DockerRequirement:
-            dockerPull: hubmap/starfish-custom:2.5
+            dockerPull: hubmap/starfish-custom:latest
 
       inputs:
+        tmp_prefix:
+          type: string
+          inputBinding:
+            prefix: --tmp-prefix
+
         exp_loc:
           type: Directory
           doc: Root directory containing space_tx formatted experiment
@@ -172,15 +182,16 @@ steps:
         cellpose_input:
           type: Directory
           outputBinding:
-            glob: "5A_cellpose_input"
+            glob: $("tmp/" + inputs.tmp_prefix + "/5A_cellpose_input/")
     in:
+      tmp_prefix: tmpname/tmp
       exp_loc: exp_loc
       decoded_loc:
         source: [decoded_loc, stage_cellpose/use_mrna, use_mrna]
         valueFrom: |
           ${
             if(self[1] || self[2]){
-              self[0];
+              return self[0];
             } else {
               return null;
             }
@@ -218,7 +229,7 @@ steps:
 
       requirements:
         DockerRequirement:
-          dockerPull: hubmap/cellpose:2.5
+          dockerPull: hubmap/cellpose:latest
         InitialWorkDirRequirement:
           listing:
             - entry: $(inputs.input_dir)
@@ -282,7 +293,7 @@ steps:
           type: string?
           inputBinding:
             prefix: --savedir
-          default: 5B_cellpose_output
+          default: "5B_cellpose_output"
           doc: Name of directory to save to.
 
         pretrained_model_str:
@@ -332,15 +343,6 @@ steps:
       outputs:
         log:
           type: stdout
-        log_file:
-          type: Directory
-          outputBinding:
-            glob: .
-            outputEval: |
-              ${
-                self[0].basename = "5B_cellpose_output";
-                return self[0];
-              }
         cellpose_output:
           type: Directory
           outputBinding:
@@ -436,9 +438,12 @@ steps:
             }
           }
       stitch_threshold:
-        source: [stage_cellpose/stitch_threshold, stitch_threshold]
+        source: [stage_cellpose/stitch_threshold, stitch_threshold, stage_cellpose/zplane_count, zplane_count]
         valueFrom: |
           ${
+            if(self[2] == 1 || self[3] == 1){
+              return null;
+            }
             if(self[0]){
               return self[0];
             } else if(self[1]) {
@@ -468,9 +473,14 @@ steps:
 
       requirements:
         DockerRequirement:
-            dockerPull: hubmap/starfish-custom:2.5
+            dockerPull: hubmap/starfish-custom:latest
 
       inputs:
+        tmp_prefix:
+          type: string
+          inputBinding:
+            prefix: --tmp-prefix
+
         input_loc:
           type: Directory
           doc: Output from cellpose.
@@ -518,9 +528,10 @@ steps:
         cellpose_filtered:
           type: Directory
           outputBinding:
-            glob: "5C_cellpose_filtered"
+            glob: $("tmp/" + inputs.tmp_prefix + "/5C_cellpose_filtered")
 
     in:
+      tmp_prefix: tmpname/tmp
       input_loc: execute_cellpose/cellpose_output
       selected_fovs:
         source: [stage_cellpose/selected_fovs, selected_fovs]

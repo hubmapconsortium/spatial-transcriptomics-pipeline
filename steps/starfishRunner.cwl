@@ -148,7 +148,7 @@ inputs:
                   doc: Accuracy mode to run in.  Can be 'high', 'med', or 'low'.
                 physical_coords:
                   type: boolean?
-                  doc: Whether to use physical coordinates or pixel coordinates
+                  doc: Whether to use physical coordinates or pixel coordinates 
 
 
   decoding_pixel:
@@ -188,6 +188,11 @@ outputs:
 
 steps:
 
+  tmpname:
+    run: tmpdir.cwl
+    in: []
+    out: [tmp]
+
   read_schema:
     run:
       class: CommandLineTool
@@ -195,7 +200,7 @@ steps:
 
       requirements:
         DockerRequirement:
-          dockerPull: hubmap/starfish-custom:2.5
+          dockerPull: hubmap/starfish-custom:latest
 
       inputs:
         schema:
@@ -223,14 +228,18 @@ steps:
   execute_runner:
     run:
       class: CommandLineTool
-      #baseCommand: [sudo /opt/mountDriver.sh]
       baseCommand: /opt/starfishDriver.py
 
       requirements:
         DockerRequirement:
-          dockerPull: hubmap/starfish-custom:2.5
+          dockerPull: hubmap/starfish-custom:latest
 
       inputs:
+        tmp_prefix:
+          type: string
+          inputBinding:
+            prefix: --tmp-prefix
+
         exp_loc:
           type: Directory
           inputBinding:
@@ -428,9 +437,10 @@ steps:
         decoded:
           type: Directory
           outputBinding:
-            glob: "4_Decoded/"
+            glob: $("tmp/" + inputs.tmp_prefix + "/4_Decoded/")
 
     in:
+      tmp_prefix: tmpname/tmp
       exp_loc: exp_loc
       selected_fovs:
         source: [stage_runner/selected_fovs, selected_fovs]

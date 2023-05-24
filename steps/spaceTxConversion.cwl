@@ -168,6 +168,11 @@ outputs:
 
 steps:
 
+  tmpname:
+    run: tmpdir.cwl
+    in: []
+    out: [tmp]
+
   read_schema:
     run:
       class: CommandLineTool
@@ -175,7 +180,7 @@ steps:
 
       requirements:
         DockerRequirement:
-          dockerPull: hubmap/starfish-custom:2.5
+          dockerPull: hubmap/starfish-custom:latest
 
       inputs:
         schema:
@@ -207,172 +212,178 @@ steps:
 
       requirements:
         DockerRequirement:
-            dockerPull: hubmap/starfish-custom:2.5
+            dockerPull: hubmap/starfish-custom:latest
       inputs:
-          tiffs:
-            type: Directory
-            inputBinding:
-              prefix: --input-dir
+        tmp_prefix:
+          type: string
+          inputBinding:
+            prefix: --tmp-prefix
 
-          codebook:
-            type:
-              - type: record
-                name: csv
-                fields:
-                  csv:
-                    type: File
-                    inputBinding:
-                      prefix: --codebook-csv
-              - type: record
-                name: json
-                fields:
-                  json:
-                    type: File
-                    inputBinding:
-                      prefix: --codebook-json
+        tiffs:
+          type: Directory
+          inputBinding:
+            prefix: --input-dir
 
-          round_count:
-            type: int
-            inputBinding:
-              prefix: --round-count
-
-          zplane_count:
-            type: int
-            inputBinding:
-              prefix: --zplane-count
-
-          channel_count:
-            type: int
-            inputBinding:
-              prefix: --channel-count
-
-          fov_count:
-            type: int
-            inputBinding:
-              prefix: --fov-count
-
-          round_offset:
-            type: int?
-            inputBinding:
-              prefix: --round-offset
-
-          fov_offset:
-            type: int?
-            inputBinding:
-              prefix: --fov-offset
-
-          channel_offset:
-            type: int?
-            inputBinding:
-              prefix: --channel-offset
-
-          zplane_offset:
-            type: int?
-            inputBinding:
-              prefix: --zplane-offset
-
-          file_format:
-            type: string
-            inputBinding:
-              prefix: --file-format
-
-          file_vars:
-            type: string[]
-            inputBinding:
-              prefix: --file-vars
-
-          cache_read_order:
-            type: string[]
-            inputBinding:
-              prefix: --cache-read-order
-
-          aux_tilesets:
-            type:
-              type: record
-              name: aux_tilesets
-              fields:
-                aux_names:
-                  type: string[]?
-                  inputBinding:
-                    prefix: --aux-names
-                aux_file_formats:
-                  type: string[]?
-                  inputBinding:
-                    prefix: --aux-file-formats
-                aux_file_vars:
-                  type: string[]?
-                  inputBinding:
-                    prefix: --aux-file-vars
-                aux_cache_read_order:
-                  type: string[]?
-                  inputBinding:
-                    prefix: --aux-cache-read-order
-                aux_channel_count:
-                  type: int[]?
-                  inputBinding:
-                    prefix: --aux-channel-count
-                aux_channel_slope:
-                  type: float[]?
-                  inputBinding:
-                    prefix: --aux-channel-slope
-                aux_channel_intercept:
-                  type: int[]?
-                  inputBinding:
-                    prefix: --aux-channel-intercept
-
-          fov_positioning:
-            - 'null'
+        codebook:
+          type:
             - type: record
-              name: fov_positioning
+              name: csv
               fields:
-                - name: x_locs
-                  type: string
+                csv:
+                  type: File
                   inputBinding:
-                    prefix: --x-pos-locs
-                - name: x_shape
-                  type: int
+                    prefix: --codebook-csv
+            - type: record
+              name: json
+              fields:
+                json:
+                  type: File
                   inputBinding:
-                    prefix: --x-pos-shape
-                - name: x_voxel
-                  type: float
-                  inputBinding:
-                    prefix: --x-pos-voxel
-                - name: y_locs
-                  type: string
-                  inputBinding:
-                    prefix: --y-pos-locs
-                - name: y_shape
-                  type: int
-                  inputBinding:
-                    prefix: --y-pos-shape
-                - name: y_voxel
-                  type: float
-                  inputBinding:
-                    prefix: --y-pos-voxel
-                - name: z_locs
-                  type: string
-                  inputBinding:
-                    prefix: --z-pos-locs
-                - name: z_shape
-                  type: int
-                  inputBinding:
-                    prefix: --z-pos-shape
-                - name: z_voxel
-                  type: float
-                  inputBinding:
-                    prefix: --z-pos-voxel
+                    prefix: --codebook-json
 
-          add_blanks:
-            type: boolean
-            inputBinding:
-              prefix: --add-blanks
+        round_count:
+          type: int
+          inputBinding:
+            prefix: --round-count
+
+        zplane_count:
+          type: int
+          inputBinding:
+            prefix: --zplane-count
+
+        channel_count:
+          type: int
+          inputBinding:
+            prefix: --channel-count
+
+        fov_count:
+          type: int
+          inputBinding:
+            prefix: --fov-count
+
+        round_offset:
+          type: int?
+          inputBinding:
+            prefix: --round-offset
+
+        fov_offset:
+          type: int?
+          inputBinding:
+            prefix: --fov-offset
+
+        channel_offset:
+          type: int?
+          inputBinding:
+            prefix: --channel-offset
+
+        zplane_offset:
+          type: int?
+          inputBinding:
+            prefix: --zplane-offset
+
+        file_format:
+          type: string
+          inputBinding:
+            prefix: --file-format
+
+        file_vars:
+          type: string[]
+          inputBinding:
+            prefix: --file-vars
+
+        cache_read_order:
+          type: string[]
+          inputBinding:
+            prefix: --cache-read-order
+
+        aux_tilesets:
+          type:
+            type: record
+            name: aux_tilesets
+            fields:
+              aux_names:
+                type: string[]?
+                inputBinding:
+                  prefix: --aux-names
+              aux_file_formats:
+                type: string[]?
+                inputBinding:
+                  prefix: --aux-file-formats
+              aux_file_vars:
+                type: string[]?
+                inputBinding:
+                  prefix: --aux-file-vars
+              aux_cache_read_order:
+                type: string[]?
+                inputBinding:
+                  prefix: --aux-cache-read-order
+              aux_channel_count:
+                type: int[]?
+                inputBinding:
+                  prefix: --aux-channel-count
+              aux_channel_slope:
+                type: float[]?
+                inputBinding:
+                  prefix: --aux-channel-slope
+              aux_channel_intercept:
+                type: int[]?
+                inputBinding:
+                  prefix: --aux-channel-intercept
+
+        fov_positioning:
+          - 'null'
+          - type: record
+            name: fov_positioning
+            fields:
+              - name: x_locs
+                type: string
+                inputBinding:
+                  prefix: --x-pos-locs
+              - name: x_shape
+                type: int
+                inputBinding:
+                  prefix: --x-pos-shape
+              - name: x_voxel
+                type: float
+                inputBinding:
+                  prefix: --x-pos-voxel
+              - name: y_locs
+                type: string
+                inputBinding:
+                  prefix: --y-pos-locs
+              - name: y_shape
+                type: int
+                inputBinding:
+                  prefix: --y-pos-shape
+              - name: y_voxel
+                type: float
+                inputBinding:
+                  prefix: --y-pos-voxel
+              - name: z_locs
+                type: string
+                inputBinding:
+                  prefix: --z-pos-locs
+              - name: z_shape
+                type: int
+                inputBinding:
+                  prefix: --z-pos-shape
+              - name: z_voxel
+                type: float
+                inputBinding:
+                  prefix: --z-pos-voxel
+
+        add_blanks:
+          type: boolean
+          inputBinding:
+            prefix: --add-blanks
 
       outputs:
         spaceTx_converted:
           type: Directory
           outputBinding:
-            glob: "2_tx_converted/"
+            glob: $("tmp/" + inputs.tmp_prefix + "/2_tx_converted/")
     in:
+      tmp_prefix: tmpname/tmp
       tiffs: tiffs
       codebook:
         source: [codebook, codebook_csv, codebook_json]

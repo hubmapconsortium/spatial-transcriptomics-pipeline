@@ -127,7 +127,7 @@ steps:
 
       requirements:
         DockerRequirement:
-          dockerPull: hubmap/starfish-custom:2.5
+          dockerPull: hubmap/starfish-custom:latest
 
       inputs:
         schema:
@@ -144,6 +144,11 @@ steps:
         valueFrom: "/opt/sorter.json"
     out: [data]
 
+  tmpname:
+    run: tmpdir.cwl
+    in: []
+    out: [tmp]
+
   stage_sort:
     run: inputParser.cwl
     in:
@@ -158,9 +163,15 @@ steps:
 
       requirements:
         DockerRequirement:
-          dockerPull: hubmap/starfish-custom:2.5
+          dockerPull: hubmap/starfish-custom:latest
 
       inputs:
+
+        tmp_prefix:
+          type: string
+          inputBinding: 
+            prefix: --tmp-prefix
+
         input_dir:
           type: Directory
           inputBinding:
@@ -271,11 +282,12 @@ steps:
         pseudosorted_dir:
           type: Directory
           outputBinding:
-            glob: "1_pseudosort/"
+            glob: $("tmp/" + inputs.tmp_prefix + "/1_pseudosort/")
 
         log:
           type: stdout
     in:
+      tmp_prefix: tmpname/tmp
       input_dir: input_dir
       codebook:
         source: [codebook, codebook_csv, codebook_json]

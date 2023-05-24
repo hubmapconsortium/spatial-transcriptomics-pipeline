@@ -118,6 +118,12 @@ outputs:
     outputSource: execute_segmentation/segmented
 
 steps:
+
+  tmpname:
+    run: tmpdir.cwl
+    in: []
+    out: [tmp]
+
   read_schema:
     run:
       class: CommandLineTool
@@ -125,7 +131,7 @@ steps:
 
       requirements:
         DockerRequirement:
-          dockerPull: hubmap/starfish-custom:2.5
+          dockerPull: hubmap/starfish-custom:latest
 
       inputs:
         schema:
@@ -156,9 +162,14 @@ steps:
 
       requirements:
         DockerRequirement:
-          dockerPull: hubmap/starfish-custom:2.5
+          dockerPull: hubmap/starfish-custom:latest
 
       inputs:
+        tmp_prefix:
+          type: string
+          inputBinding:
+            prefix: --tmp-prefix
+
         decoded_loc:
           type: Directory
           inputBinding:
@@ -267,9 +278,10 @@ steps:
         segmented:
           type: Directory
           outputBinding:
-            glob: "5_Segmented/"
+            glob: $("tmp/" + inputs.tmp_prefix + "/5_Segmented/")
 
     in:
+      tmp_prefix: tmpname/tmp
       decoded_loc: decoded_loc
       exp_loc: exp_loc
       selected_fovs:

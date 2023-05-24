@@ -929,12 +929,11 @@ def addKwarg(parser, kwargdict, var):
 
 
 if __name__ == "__main__":
-    output_dir = "4_Decoded/"
-
     p = ArgumentParser()
 
     # inputs
     p.add_argument("--exp-loc", type=Path)
+    p.add_argument("--tmp-prefix", type=str)
     p.add_argument("--is-volume", dest="is_volume", action="store_true")
     p.add_argument("--rescale", dest="rescale", action="store_true")
     p.add_argument("--level-method", type=str, nargs="?")
@@ -991,6 +990,8 @@ if __name__ == "__main__":
 
     # for item in vars(args):
     #    print(item, ':', vars(args)[item])
+
+    output_dir = f"tmp/{args.tmp_prefix}/4_Decoded/"
 
     exploc = args.exp_loc / "experiment.json"
     experiment = starfish.core.experiment.experiment.Experiment.from_json(str(exploc))

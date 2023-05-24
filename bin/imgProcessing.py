@@ -471,10 +471,9 @@ def cli(
 
 
 if __name__ == "__main__":
-    output_dir = "3_processed/"
-
     p = ArgumentParser()
 
+    p.add_argument("--tmp-prefix", type=str)
     p.add_argument("--input-dir", type=Path)
     p.add_argument("--clip-min", type=float, default=0)
     p.add_argument("--clip-max", type=float, default=99.9)
@@ -497,6 +496,8 @@ if __name__ == "__main__":
     p.add_argument("--selected-fovs", nargs="+", const=None)
 
     args = p.parse_args()
+
+    output_dir = f"tmp/{args.tmp_prefix}/3_processed/"
 
     if args.n_processes:
         n_processes = args.n_processes
