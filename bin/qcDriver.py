@@ -984,7 +984,10 @@ def plotBarcodeAbundance(pdf, decoded=None, results=None):
         avg_bl = np.average(full_blank_counts)
         std_bl = max(1, np.std(full_blank_counts))
         full_conf = norm.interval(0.95, loc=avg_bl, scale=std_bl)[1]
-        good_codes_full = sum(full_real_counts > full_conf) / len(full_real_counts)
+        if len(full_real_counts) > 0:
+            good_codes_full = sum(full_real_counts > full_conf) / len(full_real_counts)
+        else:
+            good_codes_full = 0
 
         # Plot bars, upper 95% CI line, and text for just NC
         plt.bar(
@@ -1289,10 +1292,11 @@ def run(
             if "round_noblank_dist" in results[fovs[0]]["transcripts"].keys():
                 dims.extend([["transcripts", "round_noblank"], ["transcripts", "channel_noblank"]])
 
-            if "omit_round_dist" in results[fovs[0]]["transcripts"].keys():
-                dims.extend([["transcripts", "omit_round"]])
-                if "round_noblank_dist" in results[fovs[0]]["transcripts"].keys():
-                    dims.extend([["transcripts", "omit_round_noblank"]])
+            # the following isn't working as expected for whatever
+            # if "omit_round_dist" in results[fovs[0]]["transcripts"].keys():
+            #    dims.extend([["transcripts", "omit_round"]])
+            #    if "round_noblank_dist" in results[fovs[0]]["transcripts"].keys():
+            #        dims.extend([["transcripts", "omit_round_noblank"]])
 
             if spots:
                 # these must be after the transcript dims
@@ -1392,7 +1396,10 @@ def run(
                     [results[f]["transcripts"]["per_cell"]["counts"] for f in fovs]
                 )
                 trRes["per_cell"] = getTranscriptsPerCell(results=cell_counts, pdf=pdf)
-                if "FPR" in results[fovs[0]]["transcripts"].keys():
+                if (
+                    "FPR" in results[fovs[0]]["transcripts"].keys()
+                    and "tally" in results[fovs[0]]["transcripts"]["FPR"].keys()
+                ):
                     FPR_raw = {}
                     for k in results[fovs[0]]["transcripts"]["FPR"]["tally"].keys():
                         FPR_raw[k] = flatten(

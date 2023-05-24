@@ -19,16 +19,15 @@ RUN julia -e 'using Pkg; Pkg.add("IJulia"); Pkg.build(); using IJulia;'
 ### jupyter notebook --no-browser --port=8989 --ip=0.0.0.0 --allow-root ./
 
 ## Julia Baysor envitonment
+### Ignore cache (https://stackoverflow.com/questions/35134713/disable-cache-for-specific-run-commands)
+ARG CACHEBUST=1
+RUN julia -e 'using Pkg; Pkg.add(PackageSpec(url="https://github.com/kharchenkolab/Baysor.git"));'
 
-RUN julia -e 'using Pkg; Pkg.add(Pkg.PackageSpec(;name="PackageCompiler", version="2.0.6"))'
-RUN julia -e 'using Pkg; Pkg.add(PackageSpec(url="https://github.com/hms-dbmi/Baysor.git")); Pkg.build();'
+ENV LazyModules_lazyload false
 
-RUN julia -e 'import Baysor, Pkg; Pkg.activate(dirname(dirname(pathof(Baysor)))); Pkg.instantiate();'
-RUN julia -e 'using PackageCompiler; import Baysor, Pkg; Pkg.activate(dirname(dirname(pathof(Baysor)))); \
-    create_sysimage(:Baysor; precompile_execution_file="$(dirname(pathof(Baysor)))/../bin/precompile.jl", sysimage_path="/root/BaysorSysimage.so")'
-
-RUN \
-      printf "#!/usr/local/julia/bin/julia --sysimage=/root/BaysorSysimage.so\n\nimport Baysor\nBaysor.run_cli()" >> /bin/baysor && \
-    chmod +x /bin/baysor
+RUN julia -e 'import Baysor, Pkg; Pkg.activate(dirname(dirname(pathof(Baysor)))); Pkg.instantiate(); Pkg.build();'
+RUN echo "export PATH=/root/.julia/bin/:$PATH" >> ~/.bashrc
+RUN echo "alias julia='/usr/local/julia/bin/julia --sysimage=/root/.julia/scratchspaces/cc9f9468-1fbe-11e9-0acf-e9460511877c/sysimg/libbaysor.so'" >> ~/.bashrc
+RUN ln -s /root/.julia/bin/baysor /usr/local/bin/baysor && chmod +x /root/.julia/bin/baysor
 
 CMD ["/bin/bash"]
