@@ -107,7 +107,7 @@ steps:
 
       requirements:
         DockerRequirement:
-          dockerPull: hubmap/starfish-custom:latest
+          dockerPull: hubmap/starfish-custom:2.6
 
       inputs:
         schema:
@@ -139,7 +139,7 @@ steps:
 
       requirements:
         DockerRequirement:
-            dockerPull: hubmap/starfish-custom:latest
+            dockerPull: hubmap/starfish-custom:2.6
 
       inputs:
         tmp_prefix:
@@ -229,7 +229,7 @@ steps:
 
       requirements:
         DockerRequirement:
-          dockerPull: hubmap/cellpose:latest
+          dockerPull: hubmap/cellpose:2.6
         InitialWorkDirRequirement:
           listing:
             - entry: $(inputs.input_dir)
@@ -473,7 +473,7 @@ steps:
 
       requirements:
         DockerRequirement:
-            dockerPull: hubmap/starfish-custom:latest
+            dockerPull: hubmap/starfish-custom:2.6
 
       inputs:
         tmp_prefix:
