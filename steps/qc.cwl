@@ -235,7 +235,7 @@ steps:
 
         roi:
           type: File?
-          inputBinding:
+          inputBinding: 
             prefix: --roi
 
         imagesize:

@@ -169,7 +169,7 @@ steps:
 
         tmp_prefix:
           type: string
-          inputBinding:
+          inputBinding: 
             prefix: --tmp-prefix
 
         input_dir:

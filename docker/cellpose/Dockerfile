@@ -12,14 +12,6 @@ RUN pip install --upgrade pip
 RUN pip install wheel cython numpy
 RUN pip install torch cuda-python==11.7
 
-# alt installs needed for ARM build
-ARG TARGETPLATFORM
-RUN if [ "$TARGETPLATFORM" = "linux/arm64" ]; then \
-		RUN pip install pyqt imagecodecs; \
-	else \
-		echo "Using pip install."; \
-	fi
-
 RUN pip install git+https://www.github.com/nickeener/cellpose.git
 
 CMD ["/bin/bash"]
