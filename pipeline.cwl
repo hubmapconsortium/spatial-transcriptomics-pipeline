@@ -429,10 +429,6 @@ inputs:
     type: string[]?
     doc: The views to use for cellpose segmentation.
 
-  use_gpu:
-    type: boolean?
-    doc: if set, uses GPU instead of CPU
-
   pretrained_model_str:
     type: string?
     doc: Cellpose-provided model to use.
@@ -1051,7 +1047,6 @@ steps:
       use_mrna: use_mrna
       zplane_count: zplane_count
       aux_views: aux_views
-      use_gpu: use_gpu
       pretrained_model_str: pretrained_model_str
       pretrained_model_dir: pretrained_model_dir
       diameter: diameter

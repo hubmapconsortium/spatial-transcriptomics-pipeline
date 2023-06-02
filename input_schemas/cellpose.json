@@ -2,7 +2,6 @@
     "zplane_count?",
     "selected_fovs?",
     "use_mrna?",
-    "use_gpu?",
     "pretrained_model_str?",
     "diameter?",
     "flow_threshold?",

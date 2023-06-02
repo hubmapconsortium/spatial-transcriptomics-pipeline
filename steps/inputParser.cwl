@@ -99,7 +99,6 @@ outputs:
   decoding_composite_pmax: float
   run_cellpose: boolean
   use_mrna: boolean
-  use_gpu: boolean
   pretrained_model_str: string
   diameter: float
   flow_threshold: float
