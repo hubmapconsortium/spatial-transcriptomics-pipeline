@@ -791,7 +791,6 @@ def getFPR(segmentation=None, results=None, pdf=False):
                 [0, len(real_per_cell_all)],
                 [np.median(real_per_cell_all), np.median(real_per_cell_all)],
                 color="black",
-                linestyle="dashed",
             )
 
         # Create and plot legend
@@ -815,10 +814,10 @@ def getFPR(segmentation=None, results=None, pdf=False):
         else:
             proxy_on = mpatches.Patch(color=full_on_color, label="On-target")
             proxy_off = mpatches.Patch(color=full_off_color, label="Off-target")
-            dashed_line = Line2D(
-                [0], [0], color="black", linestyle="dashed", label="On-target Median"
+            solid_line = Line2D(
+                [0], [0], color="black", linestyle="solid", label="On-target Median"
             )
-            handles = [proxy_on, proxy_off, dashed_line]
+            handles = [proxy_on, proxy_off, solid_line]
         plt.legend(handles=handles)
 
         plt.xlabel("Cells")

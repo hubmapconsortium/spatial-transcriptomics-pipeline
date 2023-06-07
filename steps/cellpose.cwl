@@ -38,10 +38,6 @@ inputs:
     type: string[]?
     doc: The views to use for cellpose segmentation.
 
-  use_gpu:
-    type: boolean?
-    doc: if set, uses GPU instead of CPU
-
   pretrained_model_str:
     type: string?
     doc: Cellpose-provided model to use.
@@ -107,7 +103,7 @@ steps:
 
       requirements:
         DockerRequirement:
-          dockerPull: hubmap/starfish-custom:2.6
+          dockerPull: hubmap/starfish-custom:latest
 
       inputs:
         schema:
@@ -129,7 +125,7 @@ steps:
     in:
       datafile: parameter_json
       schema: read_schema/data
-    out: [use_mrna, zplane_count, selected_fovs, use_gpu, pretrained_model_str, diameter, flow_threshold, stitch_threshold, cellprob_threshold,  border_buffer, label_exp_size, min_allowed_size, max_allowed_size, aux_views]
+    out: [use_mrna, zplane_count, selected_fovs, pretrained_model_str, diameter, flow_threshold, stitch_threshold, cellprob_threshold,  border_buffer, label_exp_size, min_allowed_size, max_allowed_size, aux_views]
     when: $(inputs.datafile != null)
 
   execute_cellpose_prep:
@@ -139,7 +135,7 @@ steps:
 
       requirements:
         DockerRequirement:
-            dockerPull: hubmap/starfish-custom:2.6
+            dockerPull: hubmap/starfish-custom:latest
 
       inputs:
         tmp_prefix:
@@ -229,7 +225,7 @@ steps:
 
       requirements:
         DockerRequirement:
-          dockerPull: hubmap/cellpose:2.6
+          dockerPull: hubmap/cellpose:latest
         InitialWorkDirRequirement:
           listing:
             - entry: $(inputs.input_dir)
@@ -242,12 +238,6 @@ steps:
             prefix: --verbose
           default: true
           doc: Enables verbose output
-
-        use_gpu:
-          type: boolean?
-          inputBinding:
-            prefix: --use_gpu
-          doc: if set, uses GPU instead of CPU
 
         input_dir:
           type: Directory
@@ -349,18 +339,6 @@ steps:
             glob: "5B_cellpose_output"
 
     in:
-      use_gpu:
-        source: [stage_cellpose/use_gpu, use_gpu]
-        valueFrom: |
-          ${
-            if(self[0]){
-              return self[0];
-            } else if(self[1]) {
-              return self[1];
-            } else {
-              return null;
-            }
-          }
       input_dir: execute_cellpose_prep/cellpose_input
       z_axis:
         source: [stage_cellpose/zplane_count, zplane_count]
@@ -473,7 +451,7 @@ steps:
 
       requirements:
         DockerRequirement:
-            dockerPull: hubmap/starfish-custom:2.6
+            dockerPull: hubmap/starfish-custom:latest
 
       inputs:
         tmp_prefix:
