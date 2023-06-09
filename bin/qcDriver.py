@@ -954,7 +954,7 @@ def plotBarcodeAbundance(pdf, decoded=None, results=None):
             targets = decoded[decoded["corrected_rounds"] == 0]["target"].data.tolist()
             full_counts = pd.Series(collections.Counter(targets)).sort_values(ascending=False)
         else:
-            fulldict = results["reals_full"]
+            fulldict = results["reals_full"].copy()
             fulldict.update(results["blanks_full"])
             full_counts = pd.Series(fulldict.values()).sort_values(ascending=False)
 
