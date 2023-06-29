@@ -58,7 +58,14 @@ This method is not recommended due to creating additional computational overhead
 
   *Note: A long list of warnings is expected due to the way the pipeline fails with an explanation if incorrect inputs are provided. The tool ran successfully if the final output is `Final process status is success`*
 ## Example PIPEFISH Run
-1. Download and extract one of our [pre-formatted, open-access datasets](https://zenodo.org/record/7647746). *The mouse brain ISS data is recommended as a first choice due to filesize and short run time.*
+1. Download and extract one of our [pre-formatted, open-access datasets](https://zenodo.org/record/7647746). 
+    - The mouse brain ISS data is recommended as a first choice due to filesize, memory footprint, and short run time.
+    - Expected memory needed to run datasets:
+      - *iss_mouse_brain*: 2.8GB
+      - *merfish_human_u2os*: 6.9GB
+      - *seqfish_mouse_embryo*: 38.5GB
+
+    The seqfish dataset is particularly memory and time intensive because it uses the CheckAll decoder; this is fairly typical for images of this size (6 x 2048 x 2048) using this decoding method.
 2. From inside the extracted directory, run the provided `prep_input.py` script. This will generate a `pipeline.yml` file with absolute paths to the downloaded data.
 3. The pipeline can now be run with `cwltool {path to cloned repo}/pipeline.cwl {path to downloaded data}/pipeline.yml`.
 
