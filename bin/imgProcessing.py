@@ -147,15 +147,16 @@ def subtract_background(img, background):
     return img
 
 
-def morph_open(rchs, image, size):
+def morph_open(images):
     """
     Multiprocessing helper function to run morphological openings in parallel.
     """
+    size = 100
     morphed = []
-    for r, ch in rchs:
-        background = np.zeros_like(image[r, ch])
-        for z in range(image.shape[2]):
-            background[z] = cv2.morphologyEx(image[r, ch, z], cv2.MORPH_OPEN, disk(size))
+    for image in images:
+        background = np.zeros_like(image)
+        for z in range(image.shape[0]):
+            background[z] = cv2.morphologyEx(image[z], cv2.MORPH_OPEN, disk(size))
         morphed.append(background)
     return morphed
 
@@ -173,14 +174,20 @@ def subtract_background_estimate(img, num_threads):
         ranges.append(int((len(rchs) / num_threads) * i))
     chunked_rchs = [rchs[ranges[i] : ranges[i + 1]] for i in range(len(ranges[:-1]))]
 
+    # Create list of lists of images corresponding to the above chunking
+    chunked_imgs = []
+    for rch_chunk in chunked_rchs:
+        chunk = []
+        for rch in rch_chunk:
+            chunk.append(img.xarray.data[rch[0], rch[1]])
+        chunked_imgs.append(chunk)
+
     # Run morph open in parallel
-    size = 100
     with ProcessPoolExecutor() as pool:
-        part = partial(morph_open, image=img.xarray.data, size=size)
-        poolMap = pool.map(part, [rch_chunk for rch_chunk in chunked_rchs])
+        poolMap = pool.map(morph_open, [img_chunk for img_chunk in chunked_imgs])
         results = [x for x in poolMap]
 
-    # Replace values in img
+    # Subtract background estimates from img
     for i in range(len(chunked_rchs)):
         for j in range(len(chunked_rchs[i])):
             r, ch = chunked_rchs[i][j]
@@ -197,12 +204,12 @@ def rolling_ball(img, rolling_rad=3, num_threads=1):
     for r in range(img.num_rounds):
         for ch in range(img.num_chs):
             for z in range(img.num_zplanes):
-                data = np.rint(img.xarray.data[r, ch, z] * 2**16)
+                data = np.rint(img.xarray.data[r, ch, z] * 2 ** 16)
                 background = restoration.rolling_ball(
                     data, radius=rolling_rad, num_threads=num_threads
                 )
                 data -= background
-                data /= 2**16
+                data /= 2 ** 16
                 img.xarray.data[r, ch, z] = deepcopy(data)
     return img
 
@@ -220,12 +227,12 @@ def match_hist_2_min(img):
     min_rch = sorted(meds.items(), key=lambda item: item[1])[0][0]
 
     # Use min image as reference for histogram matching (need to convert to ints or it takes a VERY long time)
-    reference = np.rint(img.xarray.data[min_rch[0], min_rch[1]] * 2**16)
+    reference = np.rint(img.xarray.data[min_rch[0], min_rch[1]] * 2 ** 16)
     for r in range(img.num_rounds):
         for ch in range(img.num_chs):
-            data = np.rint(img.xarray.data[r, ch] * 2**16)
+            data = np.rint(img.xarray.data[r, ch] * 2 ** 16)
             matched = exposure.match_histograms(data, reference)
-            matched /= 2**16
+            matched /= 2 ** 16
             img.xarray.data[r, ch] = deepcopy(matched)
     return img
 
