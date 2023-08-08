@@ -204,12 +204,12 @@ def rolling_ball(img, rolling_rad=3, num_threads=1):
     for r in range(img.num_rounds):
         for ch in range(img.num_chs):
             for z in range(img.num_zplanes):
-                data = np.rint(img.xarray.data[r, ch, z] * 2 ** 16)
+                data = np.rint(img.xarray.data[r, ch, z] * 2**16)
                 background = restoration.rolling_ball(
                     data, radius=rolling_rad, num_threads=num_threads
                 )
                 data -= background
-                data /= 2 ** 16
+                data /= 2**16
                 img.xarray.data[r, ch, z] = deepcopy(data)
     return img
 
@@ -227,12 +227,12 @@ def match_hist_2_min(img):
     min_rch = sorted(meds.items(), key=lambda item: item[1])[0][0]
 
     # Use min image as reference for histogram matching (need to convert to ints or it takes a VERY long time)
-    reference = np.rint(img.xarray.data[min_rch[0], min_rch[1]] * 2 ** 16)
+    reference = np.rint(img.xarray.data[min_rch[0], min_rch[1]] * 2**16)
     for r in range(img.num_rounds):
         for ch in range(img.num_chs):
-            data = np.rint(img.xarray.data[r, ch] * 2 ** 16)
+            data = np.rint(img.xarray.data[r, ch] * 2**16)
             matched = exposure.match_histograms(data, reference)
-            matched /= 2 ** 16
+            matched /= 2**16
             img.xarray.data[r, ch] = deepcopy(matched)
     return img
 
