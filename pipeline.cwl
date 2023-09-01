@@ -220,6 +220,10 @@ inputs:
     type: string?
     doc: The name of the auxillary view to be used for image registration.
 
+  register_to_primary:
+    type: boolean?
+    doc: If true, registration will be performed between the first round of register_aux_view and the primary view.
+
   background_view:
     type: string?
     doc: The name of the auxillary view to be used for background subtraction.  Background will be estimated if not provided.
@@ -989,6 +993,7 @@ steps:
       level_method: level_method
       is_volume: is_volume
       register_aux_view: register_aux_view
+      register_to_primary: register_to_primary
       channels_per_reg:
         source: [stagedSorted/aux_names, stagedSorted/aux_channel_count, stagedSorted/channel_count, register_aux_view, stage/register_aux_view]
         valueFrom: |

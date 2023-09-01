@@ -56,6 +56,7 @@ outputs:
   clip_max: float
   level_method: string
   register_aux_view: string
+  register_to_primary: boolean
   channels_per_reg: int
   background_view: string
   register_background: boolean

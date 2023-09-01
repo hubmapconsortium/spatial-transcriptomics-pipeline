@@ -301,7 +301,7 @@ def cli(
     level_method: str = "",
     is_volume: bool = False,
     register_aux_view: str = None,
-    register_primary_view: str = None,
+    register_to_primary: bool = False,
     ch_per_reg: int = 1,
     background_name: str = None,
     register_background: bool = False,
@@ -475,8 +475,19 @@ def cli(
                 print("\tapplying histogram matching to anchor image...")
                 anchor = match_hist_2_min(anchor)
 
-        if register_aux_view:
-            # If register_aux_view calculate registration shifts between specified aux images and apply to primary images
+        if register_to_primary:
+            # If register_to_primary calculate registration shifts between primary images and the single aux image and
+            # apply to primary images
+            register = exp[fov].get_image(register_aux_view)
+            if register.shape["r"] != 1:
+                raise Exception(
+                    "If --register-primary-view is used, auxillary images must have only a single round/channel (use the --aux-single-round option)"
+                )
+            else:
+                print("\taligning to " + register_aux_view)
+                img = register_primary_primary(img, register)
+        elif register_aux_view:
+            # If not register_to_primary but still registering, calculate registration shifts between specified aux images and apply to primary images
             register = exp[fov].get_image(register_aux_view)
             if register.shape["r"] != img.shape["r"]:
                 raise Exception(
@@ -485,18 +496,6 @@ def cli(
             else:
                 print("\taligning to " + register_aux_view)
                 img = register_primary_aux(img, register, ch_per_reg)
-
-        if register_primary_view:
-            # If register_primary_view calculate registration shifts between primary images and the single aux image and
-            # apply to primary images
-            register = exp[fov].get_image(register_primary_view)
-            if register.shape["r"] != 1:
-                raise Exception(
-                    "If --register-primary-view is used, auxillary images must have only a single round/channel (use the --aux-single-round option)"
-                )
-            else:
-                print("\taligning to " + register_primary_view)
-                img = register_primary_primary(img, register)
 
         if not rescale and not (clip_min == 0 and clip_max == 0):
             print("\tclip and scaling...")
@@ -550,7 +549,7 @@ if __name__ == "__main__":
     p.add_argument("--level-method", type=str, nargs="?")
     p.add_argument("--is-volume", dest="is_volume", action="store_true")
     p.add_argument("--register-aux-view", type=str, nargs="?")
-    p.add_argument("--register-primary-view", type=str, nargs="?")
+    p.add_argument("--register-to-primary", dest="register_to_primary", action="store_true")
     p.add_argument("--ch-per-reg", type=int, nargs="?")
     p.add_argument("--background-view", type=str, nargs="?")
     p.add_argument("--register-background", dest="register_background", action="store_true")
@@ -593,7 +592,7 @@ if __name__ == "__main__":
         level_method=args.level_method,
         is_volume=args.is_volume,
         register_aux_view=args.register_aux_view,
-        register_primary_view=args.register_primary_view,
+        register_to_primary=args.register_to_primary,
         ch_per_reg=args.ch_per_reg,
         background_name=args.background_view,
         register_background=args.register_background,
