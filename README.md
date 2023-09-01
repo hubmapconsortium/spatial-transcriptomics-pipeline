@@ -230,14 +230,16 @@ The following variables describe the structure of auxiliary views, if any are pr
     The same as “file_vars”, for each auxiliary view.
   - `aux_cache_read_order` *string[]*
     The same as “cache_read_order”, for each auxiliary view.
+  - `aux_single_round` *boolean[]?*
+    If provided and True, specified aux views will only have one round.
   - `aux_channel_count` *int[]*
     The number of channels in each aux view.
   - `aux_channel_slope` *float[]*
-    Used to convert 0-indexed channel IDs to the channel within the image, in the case that aux views use higher-indexed channels in an image already used in another view.  Defaults to 1.
+    Used to convert 0-indexed channel IDs to the channel within the image, in the case that aux views use higher-indexed channels in an image already used in another view.  If channels are 1:1 to the primary view, use 1.
     Calculated as :
       `Image index = int(index * channel_slope) + channel_intercept`
   - `aux_channel_intercept` *int[]*
-    Used to convert 0-indexed channel IDs to the channel within the image, in the case that aux views use higher-indexed channels in an image already used in another view.  See above calculation. Defaults to 0.
+    Used to convert 0-indexed channel IDs to the channel within the image, in the case that aux views use higher-indexed channels in an image already used in another view.  See above calculation. If channels are 1:1 to the primary view, use 0.
 
 #### Image Processing
 The following are used in `processing.cwl` for basic image formatting.
