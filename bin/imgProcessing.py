@@ -91,11 +91,14 @@ def saveExp(
                 print(f"\tcopied {file}")
 
 
-def register_primary(img, reg_img, chs_per_reg):
+def register_primary_aux(img, reg_img, chs_per_reg):
     """
     Register primary images using provided registration images.
     chs_per_reg is number of primary image channels
     associated with each registration image.
+
+    Calculates shifts between auxillary images using the first
+    auxillary image as a reference, then applies shifts to primary images.
     """
     # Calculate registration shifts from registration images
     shifts = {}
@@ -124,6 +127,44 @@ def register_primary(img, reg_img, chs_per_reg):
             img.xarray.data[r, ch] = ndimage.affine_transform(
                 img.xarray.data[r, ch],
                 np.linalg.inv(tforms[(r, ch // chs_per_reg)]),
+                output_shape=shape[2:],
+            )
+    return img
+
+
+def register_primary_primary(img, reg_img):
+    """
+    Register primary images using provided registration images.
+
+    Calculates shifts between primary images and the single auxillary image
+    and then applies shifts to primary images.
+    """
+
+    # Calculate shifts from each primary image to the registration image
+    shifts = {}
+    for r in range(img.num_rounds):
+        for ch in range(img.num_chs):
+            shift, error, diffphase = phase_cross_correlation(
+                reg_img.xarray.data[0, 0], img.xarray.data[r, ch], upsample_factor=100
+            )
+            shifts[(r, ch)] = shift
+
+    # Create transformation matrices
+    shape = img.raw_shape
+    tforms = {}
+    for r, ch in shifts:
+        tform = np.diag([1.0] * 4)
+        # Start from 1 because we don't want to shift in the z direction (if there is one)
+        for i in range(1, 3):
+            tform[i, 3] = shifts[(r, ch)][i]
+        tforms[(r, ch)] = tform
+
+    # Register primary images
+    for r in range(img.num_rounds):
+        for ch in range(img.num_chs):
+            img.xarray.data[r, ch] = ndimage.affine_transform(
+                img.xarray.data[r, ch],
+                np.linalg.inv(tforms[(r, ch)]),
                 output_shape=shape[2:],
             )
     return img
@@ -259,7 +300,8 @@ def cli(
     clip_max: float = 99.9,
     level_method: str = "",
     is_volume: bool = False,
-    aux_name: str = None,
+    register_aux_view: str = None,
+    register_to_primary: bool = False,
     ch_per_reg: int = 1,
     background_name: str = None,
     register_background: bool = False,
@@ -345,7 +387,6 @@ def cli(
         level_method = Levels.SCALE_BY_IMAGE
 
     t0 = time()
-
     exp = starfish.core.experiment.experiment.Experiment.from_json(
         str(input_dir / "experiment.json")
     )
@@ -434,16 +475,27 @@ def cli(
                 print("\tapplying histogram matching to anchor image...")
                 anchor = match_hist_2_min(anchor)
 
-        if aux_name:
-            # If registration image is given calculate registration shifts for each image and apply them
-            register = exp[fov].get_image(aux_name)
-            if register.shape["r"] != img.shape["r"]:
+        if register_to_primary:
+            # If register_to_primary calculate registration shifts between primary images and the single aux image and
+            # apply to primary images
+            register = exp[fov].get_image(register_aux_view)
+            if register.shape["r"] != 1:
                 raise Exception(
-                    "In order to register auxillary images to each other, auxillary images must have same dimension as primary image"
+                    "If --register-primary-view is used, auxillary images must have only a single round/channel (use the --aux-single-round option)"
                 )
             else:
-                print("\taligning to " + aux_name)
-                img = register_primary(img, register, ch_per_reg)
+                print("\taligning to " + register_aux_view)
+                img = register_primary_primary(img, register)
+        elif register_aux_view:
+            # If not register_to_primary but still registering, calculate registration shifts between specified aux images and apply to primary images
+            register = exp[fov].get_image(register_aux_view)
+            if register.shape["r"] != img.shape["r"]:
+                raise Exception(
+                    "If --register-aux-view is used, auxillary image dimensions must match primary image dimensions"
+                )
+            else:
+                print("\taligning to " + register_aux_view)
+                img = register_primary_aux(img, register, ch_per_reg)
 
         if not rescale and not (clip_min == 0 and clip_max == 0):
             print("\tclip and scaling...")
@@ -461,6 +513,11 @@ def cli(
 
         else:
             print("\tskipping clip and scale.")
+            # Clip values below 0 and greater than 1 (prevents errors in decoding)
+            clip = starfish.image.Filter.ClipPercentileToZero(
+                p_min=0, p_max=100, is_volume=is_volume, level_method=Levels.CLIP
+            )
+            clip.run(img, in_place=True)
 
         print(f"\tView {fov} complete")
         # save modified image
@@ -492,6 +549,7 @@ if __name__ == "__main__":
     p.add_argument("--level-method", type=str, nargs="?")
     p.add_argument("--is-volume", dest="is_volume", action="store_true")
     p.add_argument("--register-aux-view", type=str, nargs="?")
+    p.add_argument("--register-to-primary", dest="register_to_primary", action="store_true")
     p.add_argument("--ch-per-reg", type=int, nargs="?")
     p.add_argument("--background-view", type=str, nargs="?")
     p.add_argument("--register-background", dest="register_background", action="store_true")
@@ -520,6 +578,12 @@ if __name__ == "__main__":
         except Exception:
             n_processes = 1
 
+    # Raise exception if both register-aux-view and register-primary-view are used
+    if args.register_aux_view and args.register_primary_view:
+        raise Exception(
+            "register-aux-view and register-primary-view options are mutually exclusive. Choose one."
+        )
+
     cli(
         input_dir=args.input_dir,
         output_dir=output_dir,
@@ -527,7 +591,8 @@ if __name__ == "__main__":
         clip_max=args.clip_max,
         level_method=args.level_method,
         is_volume=args.is_volume,
-        aux_name=args.register_aux_view,
+        register_aux_view=args.register_aux_view,
+        register_to_primary=args.register_to_primary,
         ch_per_reg=args.ch_per_reg,
         background_name=args.background_view,
         register_background=args.register_background,

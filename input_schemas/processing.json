@@ -6,6 +6,7 @@
 	"rescale?",
 	"is_volume?",
 	"register_aux_view?",
+	"register_to_primary?",
 	"channels_per_reg?",
 	"background_view?",
 	"register_background?",

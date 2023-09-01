@@ -42,6 +42,10 @@ inputs:
     type: string?
     doc: The name of the auxillary view to be used for image registration.
 
+  register_to_primary:
+    type: boolean?
+    doc: If true, registration will be performed between the first round of register_aux_view and the primary images.
+
   channels_per_reg:
     type: int?
     doc: The number of images associated with each channel in the registration image.  Will be calculated from aux view if provided through parameter_json, otherwise defaults to one.
@@ -135,7 +139,7 @@ steps:
     in:
       datafile: parameter_json
       schema: read_schema/data
-    out: [selected_fovs, clip_min, clip_max, level_method, rescale, register_aux_view, channels_per_reg, background_view, register_background, anchor_view, high_sigma, deconvolve_iter, deconvolve_sigma, low_sigma, rolling_radius, match_histogram, tophat_radius, channel_count, aux_tilesets_aux_names, aux_tilesets_aux_channel_count, is_volume, n_processes]
+    out: [selected_fovs, clip_min, clip_max, level_method, rescale, register_aux_view, register_to_primary, channels_per_reg, background_view, register_background, anchor_view, high_sigma, deconvolve_iter, deconvolve_sigma, low_sigma, rolling_radius, match_histogram, tophat_radius, channel_count, aux_tilesets_aux_names, aux_tilesets_aux_channel_count, is_volume, n_processes]
     when: $(inputs.datafile != null)
 
   execute_processing:
@@ -199,6 +203,11 @@ steps:
           inputBinding:
             prefix: --register-aux-view
           doc: The name of the auxillary view to be used for image registration. Registration will not be performed if not provided.
+
+        register_to_primary:
+          type: boolean?
+          inputBinding:
+            prefix: --register-to-primary
 
         channels_per_reg:
           type: int?
@@ -354,6 +363,18 @@ steps:
           }
       register_aux_view:
         source: [stage_processing/register_aux_view, register_aux_view]
+        valueFrom: |
+          ${
+            if(self[0]){
+              return self[0];
+            } else if(self[1]) {
+              return self[1];
+            } else {
+              return null;
+            }
+          }
+      register_to_primary:
+        source: [stage_processing/register_to_primary, register_to_primary]
         valueFrom: |
           ${
             if(self[0]){
