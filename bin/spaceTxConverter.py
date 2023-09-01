@@ -510,10 +510,10 @@ def cli(
     aux_file_formats: List[str] = [],
     aux_file_vars: List[List[str]] = [],
     aux_cache_read_order: List[str] = [],
+    aux_single_round: List[bool] = [],
     aux_channel_count: List[int] = [],
     aux_channel_slope: List[float] = [],
     aux_channel_intercept: List[int] = [],
-    single_round_aux: bool = True,
     locs: List[Mapping[Axes, float]] = None,
     shape: Mapping[Axes, int] = None,
     voxel: Mapping[Axes, float] = None,
@@ -552,14 +552,14 @@ def cli(
         The same as file_vars, but for each individual aux view. Items within each list entry are semicolon (;) delimited.
     aux_cache_read_order: list
         The same as cache_read_order, but for each individual aux view. Items within each list entry are semicolon (;) delimited.
+    aux_single_round: bool
+        If true, aux view i will only have one channel.
     aux_channel_count: list
         The total number of channels per aux view.
     aux_channel_slope: list
         The slope for converting 0-indexed channel IDs to the channel ID within the image.
     aux_channel_intercept: list
         The intercept for converting 0-index channel IDs to the channel ID within the image.
-    single_round_aux: bool
-        False if there is an aux image for each round/channel, true if there is only a single aux image per FOV.
     locs: List[Mapping[Axes, float]]
         Each list item refers to the fov of the same index. The start location of the image, mapped to the corresponding Axes object (X, Y, or ZPLANE)
     shape: Mapping[Axes, int]
@@ -615,8 +615,8 @@ def cli(
         for i in range(len(aux_names)):
             name = aux_names[i]
             aux_image_dimensions: Mapping[Union[str, Axes], int] = {
-                Axes.ROUND: counts["rounds"] if not single_round_aux else 1,
-                Axes.CH: int(aux_channel_count[i]) if not single_round_aux else 1,
+                Axes.ROUND: counts["rounds"] if not aux_single_round[i] else 1,
+                Axes.CH: int(aux_channel_count[i]),
                 Axes.ZPLANE: counts["zplanes"],
             }
             aux_name_to_dimensions[name] = aux_image_dimensions
@@ -876,8 +876,7 @@ if __name__ == "__main__":
     p.add_argument("--aux-file-formats", nargs="+", const=None)
     p.add_argument("--aux-file-vars", nargs="+", const=None)
     p.add_argument("--aux-cache-read-order", nargs="+", const=None)
-    p.add_argument("--single-round-aux", dest="single_round_aux", action="store_true")
-    p.set_defaults(single_round_aux=False)
+    p.add_argument("--aux-single-round", nargs="+", const=None)
     p.add_argument("--aux-channel-count", nargs="+", const=None)
     p.add_argument("--aux-channel-slope", nargs="+", const=None)
     p.add_argument("--aux-channel-intercept", nargs="+", const=None)
@@ -895,16 +894,6 @@ if __name__ == "__main__":
 
     args = p.parse_args()
 
-    # Sub in default values for aux_channel_count, aux_channel_slope, and aux_channel_intercept
-    # if they are not specified in the input (only if single_round_aux is specified)
-    if args.single_round_aux:
-        if not args.aux_channel_count:
-            args.aux_channel_count = [0] * len(args.aux_names)
-        if not args.aux_channel_slope:
-            args.aux_channel_slope = [1] * len(args.aux_names)
-        if not args.aux_channel_intercept:
-            args.aux_channel_intercept = [1] * len(args.aux_names)
-
     aux_lens = []
     aux_vars = [
         args.aux_file_formats,
@@ -912,6 +901,7 @@ if __name__ == "__main__":
         args.aux_file_vars,
         args.aux_names,
         args.aux_cache_read_order,
+        # args.aux_single_round,  # omitting this one to avoid breaking reverse compatibility
         args.aux_channel_count,
         args.aux_channel_slope,
         args.aux_channel_intercept,
@@ -929,6 +919,19 @@ if __name__ == "__main__":
         print(aux_vars)
         print(aux_lens)
         raise Exception("Dimensions of all aux parameters must match.")
+
+    aux_single_round = []
+    if len(aux_lens) > 0:  # parse aux_single_round
+        if len(args.aux_single_round) != 0 and aux_lens[0] != len(args.aux_single_round):
+            raise Exception("If specified, len of args.aux_single_round must match other aux vars")
+        if len(args.aux_single_round) == 0:
+            aux_single_round = [False] * aux_lens[0]
+        else:
+            for single in args.aux_single_round:
+                if single.lower() in ["true", "1", "yes"]:
+                    aux_single_round.append(True)
+                else:
+                    aux_single_round.append(False)
 
     output_dir = f"tmp/{args.tmp_prefix}/2_tx_converted/"
 
@@ -988,10 +991,10 @@ if __name__ == "__main__":
         args.aux_file_formats,
         args.aux_file_vars,
         args.aux_cache_read_order,
+        aux_single_round,
         args.aux_channel_count,
         args.aux_channel_slope,
         args.aux_channel_intercept,
-        args.single_round_aux,
         locs,
         shape,
         voxel,
