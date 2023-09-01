@@ -35,6 +35,7 @@ outputs:
   aux_tilesets_aux_file_formats: string[]
   aux_tilesets_aux_file_vars: string[]
   aux_tilesets_aux_cache_read_order: string[]
+  aux_tilesets_aux_single_round: string[]
   aux_tilesets_aux_channel_count: float[]
   aux_tilesets_aux_channel_slope: float[]
   aux_tilesets_aux_channel_intercept: int[]

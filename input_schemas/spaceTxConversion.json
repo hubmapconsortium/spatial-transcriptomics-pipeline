@@ -17,6 +17,7 @@
 				"aux_file_formats?",
 				"aux_file_vars?",
 				"aux_cache_read_order?",
+				"aux_single_round?",
 				"aux_channel_count?",
 				"aux_channel_slope?",
 				"aux_channel_intercept?"

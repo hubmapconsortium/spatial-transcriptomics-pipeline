@@ -137,6 +137,9 @@ inputs:
         aux_cache_read_order:
           type: string[]?
           doc: Order of non x,y dimensions within each image. One entry per aux_name, with semicolon-delimited vars.
+        aux_single_round:
+          type: string[]?
+          doc: If True, the specified aux view will only have one round.
         aux_channel_count:
           type: float[]?
           doc: Count of channels in each aux image.
