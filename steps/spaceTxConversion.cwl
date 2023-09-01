@@ -450,7 +450,7 @@ steps:
                 aux_file_formats: self[2],
                 aux_file_vars: self[3],
                 aux_cache_read_order: self[4],
-                aux_single_round: self[5]
+                aux_single_round: self[5],
                 aux_channel_count: self[6],
                 aux_channel_slope: self[7],
                 aux_channel_intercept: self[8]
