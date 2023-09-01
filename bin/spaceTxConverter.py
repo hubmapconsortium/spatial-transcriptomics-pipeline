@@ -577,8 +577,8 @@ def cli(
 
     os.makedirs(output_dir, exist_ok=True)
 
-    #reportFile = os.path.join(output_dir, datetime.now().strftime("%Y%m%d_%H%M_TXconversion.log"))
-    #sys.stdout = open(reportFile, "w")
+    reportFile = os.path.join(output_dir, datetime.now().strftime("%Y%m%d_%H%M_TXconversion.log"))
+    sys.stdout = open(reportFile, "w")
 
     image_dimensions: Mapping[Union[str, Axes], int] = {
         Axes.ROUND: counts["rounds"],
@@ -673,7 +673,7 @@ def cli(
     print("Elapsed time for .json manipulation", t2 - t1)
     print("Operation complete, total elapsed time", t2 - t0)
 
-    #sys.stdout = sys.__stdout__
+    sys.stdout = sys.__stdout__
     return 0
 
 
@@ -892,7 +892,6 @@ if __name__ == "__main__":
     p.add_argument("--z-pos-voxel", type=float, nargs="?")
     p.add_argument("--add-blanks", dest="add_blanks", action="store_true")
     p.set_defaults(add_blanks=False)
-
 
     args = p.parse_args()
 
