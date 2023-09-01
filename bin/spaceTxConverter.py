@@ -514,6 +514,7 @@ def cli(
     aux_file_formats: List[str] = [],
     aux_file_vars: List[List[str]] = [],
     aux_cache_read_order: List[str] = [],
+    aux_single_round: List[bool] = [],
     aux_channel_count: List[int] = [],
     aux_channel_slope: List[float] = [],
     aux_channel_intercept: List[int] = [],
@@ -555,6 +556,8 @@ def cli(
         The same as file_vars, but for each individual aux view. Items within each list entry are semicolon (;) delimited.
     aux_cache_read_order: list
         The same as cache_read_order, but for each individual aux view. Items within each list entry are semicolon (;) delimited.
+    aux_single_round: bool
+        If true, aux view i will only have one channel.
     aux_channel_count: list
         The total number of channels per aux view.
     aux_channel_slope: list
@@ -618,7 +621,7 @@ def cli(
         for i in range(len(aux_names)):
             name = aux_names[i]
             aux_image_dimensions: Mapping[Union[str, Axes], int] = {
-                Axes.ROUND: counts["rounds"],
+                Axes.ROUND: counts["rounds"] if not aux_single_round[i] else 1,
                 Axes.CH: int(aux_channel_count[i]),
                 Axes.ZPLANE: counts["zplanes"],
             }
@@ -881,6 +884,7 @@ if __name__ == "__main__":
     p.add_argument("--aux-file-formats", nargs="+", const=None)
     p.add_argument("--aux-file-vars", nargs="+", const=None)
     p.add_argument("--aux-cache-read-order", nargs="+", const=None)
+    p.add_argument("--aux-single-round", nargs="+", const=None)
     p.add_argument("--aux-channel-count", nargs="+", const=None)
     p.add_argument("--aux-channel-slope", nargs="+", const=None)
     p.add_argument("--aux-channel-intercept", nargs="+", const=None)
@@ -905,6 +909,7 @@ if __name__ == "__main__":
         args.aux_file_vars,
         args.aux_names,
         args.aux_cache_read_order,
+        # args.aux_single_round,  # omitting this one to avoid breaking reverse compatibility
         args.aux_channel_count,
         args.aux_channel_slope,
         args.aux_channel_intercept,
@@ -922,6 +927,19 @@ if __name__ == "__main__":
         print(aux_vars)
         print(aux_lens)
         raise Exception("Dimensions of all aux parameters must match.")
+
+    aux_single_round = []
+    if len(aux_lens) > 0:  # parse aux_single_round
+        if len(args.aux_single_round) != 0 and aux_lens[0] != len(args.aux_single_round):
+            raise Exception("If specified, len of args.aux_single_round must match other aux vars")
+        if len(args.aux_single_round) == 0:
+            aux_single_round = [False] * aux_lens[0]
+        else:
+            for single in args.aux_single_round:
+                if single.lower() in ["true", "1", "yes"]:
+                    aux_single_round.append(True)
+                else:
+                    aux_single_round.append(False)
 
     output_dir = f"tmp/{args.tmp_prefix}/2_tx_converted/"
 
@@ -981,6 +999,7 @@ if __name__ == "__main__":
         args.aux_file_formats,
         args.aux_file_vars,
         args.aux_cache_read_order,
+        aux_single_round,
         args.aux_channel_count,
         args.aux_channel_slope,
         args.aux_channel_intercept,
