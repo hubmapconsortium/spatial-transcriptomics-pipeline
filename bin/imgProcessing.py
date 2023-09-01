@@ -26,7 +26,6 @@ from skimage.registration import phase_cross_correlation
 from starfish import Experiment, ImageStack
 from starfish.types import Levels
 from tqdm import tqdm
-import pdb
 
 
 def saveImg(loc: str, prefix: str, img: ImageStack):
@@ -488,11 +487,12 @@ def cli(
                 img = register_primary_aux(img, register, ch_per_reg)
 
         if register_primary_view:
-            # If register_primary_view calculate registration shifts between primary images and the single aux image and apply to primary images
+            # If register_primary_view calculate registration shifts between primary images and the single aux image and
+            # apply to primary images
             register = exp[fov].get_image(register_primary_view)
             if register.shape["r"] != 1:
                 raise Exception(
-                    "If --register-primary-view is used, auxillary images must have only a single round/channel (use the --single-round-aux option)"
+                    "If --register-primary-view is used, auxillary images must have only a single round/channel (use the --aux-single-round option)"
                 )
             else:
                 print("\taligning to " + register_primary_view)
