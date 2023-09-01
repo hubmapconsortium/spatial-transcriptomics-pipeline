@@ -189,7 +189,7 @@ If these fields were not specified for `sorter.cwl`, they must be satisfied for 
 - `channel_count` *int*
   The number of total channels per imaging round.
 - `cache_read_order` *string[]*
-  Describes the order of the axes within each individual image file.  Accepted values are CH, X, Y, Z.
+  Describes the order of the axes within each individual image file.  Accepted values are CH, X, Y, Z, R.
 
 Optional variables that describe the real-world locations of each fov and size of each voxel.  These must be all unspecified or all specified.  Required for QC to run.
 - `x_locs`, `y_locs`, `z_locs` *float[]*

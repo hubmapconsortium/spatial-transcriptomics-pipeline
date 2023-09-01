@@ -160,6 +160,8 @@ class FISHTile(FetchedTile):
                     slices.append(self._zplane)
                 elif axis == Axes.CH:
                     slices.append(self._ch)
+                elif axis == Axes.ROUND:
+                    slices.append(self._rnd)
                 else:
                     slices.append(slice(0, img.shape[i]))
             slices = tuple(slices)
@@ -169,12 +171,13 @@ class FISHTile(FetchedTile):
             return img
         except IndexError as e:
             print(
-                "\t{}\nshape: {}\tcache read: {}\nzpl: {} ch: {}\nwith error {}".format(
+                "\t{}\nshape: {}\tcache read: {}\nzpl: {} ch: {} rnd: {}\nwith error {}".format(
                     self._file_path,
                     img.shape,
                     self.cache_read_order,
                     self._zplane,
                     self._ch,
+                    self._rnd,
                     e,
                 )
             )
@@ -360,6 +363,7 @@ class AuxTileFetcher(TileFetcher):
             The following strings will be converted to Axes objects and will be parsed based on the instance variables of the tile:
                 -Z -> Axes.ZPLANE
                 -CH -> Axes.CH
+                -R -> Axes.ROUND
             All ofther values will be treated as an axis where the full contents will be read for each individual tile. (in pratice, this should only be Axes.X and Axes.Y)
         channel_slope: float
             The slope for converting 0-indexed channel IDs to the channel ID within the image. Combined with the below variable with the following formula:
@@ -589,6 +593,8 @@ def cli(
             cache_read_order_formatted.append(Axes.ZPLANE)
         elif item.lower() == "ch":
             cache_read_order_formatted.append(Axes.CH)
+        elif item.lower() == "r":
+            cache_read_order_formatted.append(Axes.ROUND)
         else:
             cache_read_order_formatted.append("other")
 
@@ -624,6 +630,8 @@ def cli(
                     aux_cache_read_order_formatted.append(Axes.ZPLANE)
                 elif item.lower() == "ch":
                     aux_cache_read_order_formatted.append(Axes.CH)
+                elif item.lower() == "r":
+                    aux_cache_read_order_formatted.append(Axes.ROUND)
                 else:
                     aux_cache_read_order_formatted.append("other")
 
