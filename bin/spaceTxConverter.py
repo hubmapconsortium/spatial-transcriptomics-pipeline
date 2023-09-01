@@ -896,13 +896,14 @@ if __name__ == "__main__":
     args = p.parse_args()
 
     # Sub in default values for aux_channel_count, aux_channel_slope, and aux_channel_intercept
-    # if they are not specified in the input
-    if not args.aux_channel_count:
-        args.aux_channel_count = [0] * len(args.aux_names)
-    if not args.aux_channel_slope:
-        args.aux_channel_slope = [1] * len(args.aux_names)
-    if not args.aux_channel_intercept:
-        args.aux_channel_intercept = [1] * len(args.aux_names)
+    # if they are not specified in the input (only if single_round_aux is specified)
+    if args.single_round_aux:
+        if not args.aux_channel_count:
+            args.aux_channel_count = [0] * len(args.aux_names)
+        if not args.aux_channel_slope:
+            args.aux_channel_slope = [1] * len(args.aux_names)
+        if not args.aux_channel_intercept:
+            args.aux_channel_intercept = [1] * len(args.aux_names)
 
     aux_lens = []
     aux_vars = [
