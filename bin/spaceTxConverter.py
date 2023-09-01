@@ -513,6 +513,7 @@ def cli(
     aux_channel_count: List[int] = [],
     aux_channel_slope: List[float] = [],
     aux_channel_intercept: List[int] = [],
+    single_round_aux: bool = True,
     locs: List[Mapping[Axes, float]] = None,
     shape: Mapping[Axes, int] = None,
     voxel: Mapping[Axes, float] = None,
@@ -557,6 +558,8 @@ def cli(
         The slope for converting 0-indexed channel IDs to the channel ID within the image.
     aux_channel_intercept: list
         The intercept for converting 0-index channel IDs to the channel ID within the image.
+    single_round_aux: bool
+        False if there is an aux image for each round/channel, true if there is only a single aux image per FOV.
     locs: List[Mapping[Axes, float]]
         Each list item refers to the fov of the same index. The start location of the image, mapped to the corresponding Axes object (X, Y, or ZPLANE)
     shape: Mapping[Axes, int]
@@ -574,8 +577,8 @@ def cli(
 
     os.makedirs(output_dir, exist_ok=True)
 
-    reportFile = os.path.join(output_dir, datetime.now().strftime("%Y%m%d_%H%M_TXconversion.log"))
-    sys.stdout = open(reportFile, "w")
+    #reportFile = os.path.join(output_dir, datetime.now().strftime("%Y%m%d_%H%M_TXconversion.log"))
+    #sys.stdout = open(reportFile, "w")
 
     image_dimensions: Mapping[Union[str, Axes], int] = {
         Axes.ROUND: counts["rounds"],
@@ -612,8 +615,8 @@ def cli(
         for i in range(len(aux_names)):
             name = aux_names[i]
             aux_image_dimensions: Mapping[Union[str, Axes], int] = {
-                Axes.ROUND: counts["rounds"],
-                Axes.CH: int(aux_channel_count[i]),
+                Axes.ROUND: counts["rounds"] if not single_round_aux else 1,
+                Axes.CH: int(aux_channel_count[i]) if not single_round_aux else 1,
                 Axes.ZPLANE: counts["zplanes"],
             }
             aux_name_to_dimensions[name] = aux_image_dimensions
@@ -670,7 +673,7 @@ def cli(
     print("Elapsed time for .json manipulation", t2 - t1)
     print("Operation complete, total elapsed time", t2 - t0)
 
-    sys.stdout = sys.__stdout__
+    #sys.stdout = sys.__stdout__
     return 0
 
 
@@ -873,6 +876,8 @@ if __name__ == "__main__":
     p.add_argument("--aux-file-formats", nargs="+", const=None)
     p.add_argument("--aux-file-vars", nargs="+", const=None)
     p.add_argument("--aux-cache-read-order", nargs="+", const=None)
+    p.add_argument("--single-round-aux", dest="single_round_aux", action="store_true")
+    p.set_defaults(single_round_aux=False)
     p.add_argument("--aux-channel-count", nargs="+", const=None)
     p.add_argument("--aux-channel-slope", nargs="+", const=None)
     p.add_argument("--aux-channel-intercept", nargs="+", const=None)
@@ -888,7 +893,17 @@ if __name__ == "__main__":
     p.add_argument("--add-blanks", dest="add_blanks", action="store_true")
     p.set_defaults(add_blanks=False)
 
+
     args = p.parse_args()
+
+    # Sub in default values for aux_channel_count, aux_channel_slope, and aux_channel_intercept
+    # if they are not specified in the input
+    if not args.aux_channel_count:
+        args.aux_channel_count = [0] * len(args.aux_names)
+    if not args.aux_channel_slope:
+        args.aux_channel_slope = [1] * len(args.aux_names)
+    if not args.aux_channel_intercept:
+        args.aux_channel_intercept = [1] * len(args.aux_names)
 
     aux_lens = []
     aux_vars = [
@@ -976,6 +991,7 @@ if __name__ == "__main__":
         args.aux_channel_count,
         args.aux_channel_slope,
         args.aux_channel_intercept,
+        args.single_round_aux,
         locs,
         shape,
         voxel,
