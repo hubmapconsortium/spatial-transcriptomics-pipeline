@@ -437,8 +437,10 @@ def cli(
         if aux_name:
             # If registration image is given calculate registration shifts for each image and apply them
             register = exp[fov].get_image(aux_name)
-            if register.shape['r'] != img.shape['r']:
-                raise Exception('In order to register auxillary images to each other, auxillary images must have same dimension as primary image')
+            if register.shape["r"] != img.shape["r"]:
+                raise Exception(
+                    "In order to register auxillary images to each other, auxillary images must have same dimension as primary image"
+                )
             else:
                 print("\taligning to " + aux_name)
                 img = register_primary(img, register, ch_per_reg)
