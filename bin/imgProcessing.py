@@ -578,12 +578,6 @@ if __name__ == "__main__":
         except Exception:
             n_processes = 1
 
-    # Raise exception if both register-aux-view and register-primary-view are used
-    if args.register_aux_view and args.register_primary_view:
-        raise Exception(
-            "register-aux-view and register-primary-view options are mutually exclusive. Choose one."
-        )
-
     cli(
         input_dir=args.input_dir,
         output_dir=output_dir,
