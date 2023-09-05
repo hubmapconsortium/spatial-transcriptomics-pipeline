@@ -251,33 +251,37 @@ def optimize_scale(
     decoded_targets, prop_results = pixelDriver(img, codebook, **pixelRunnerKwargs)
     decoded_targets = decoded_targets.loc[decoded_targets[Features.PASSES_THRESHOLDS]]
 
-    # Calculate on-bit scaling factors for each bit
-    local_pixel_vector = []
-    for barcode in range(1, len(codebook) + 1):
-        idx = np.where(prop_results.decoded_image == barcode)
-        coords = [(idx[0][i], idx[1][i], idx[2][i]) for i in range(len(idx[0]))]
-        if len(coords) > 0:
-            local_traces = np.array([img.xarray.data[:, :, c[0], c[1], c[2]] for c in coords])
-            local_mean = np.mean(local_traces, axis=0)
-            local_pixel_vector.append(local_mean / np.linalg.norm(local_mean))
-            local_pixel_vector[-1] /= len(coords)
-    pixel_traces = np.array(local_pixel_vector)
+    # Only calculate scaling factors if more than 10 transcripts, else return None
+    if len(decoded_targets) >= 10:
+        # Calculate on-bit scaling factors for each bit
+        local_pixel_vector = []
+        for barcode in range(1, len(codebook) + 1):
+            idx = np.where(prop_results.decoded_image == barcode)
+            coords = [(idx[0][i], idx[1][i], idx[2][i]) for i in range(len(idx[0]))]
+            if len(coords) > 0:
+                local_traces = np.array([img.xarray.data[:, :, c[0], c[1], c[2]] for c in coords])
+                local_mean = np.mean(local_traces, axis=0)
+                local_pixel_vector.append(local_mean / np.linalg.norm(local_mean))
+                local_pixel_vector[-1] /= len(coords)
+        pixel_traces = np.array(local_pixel_vector)
 
-    # Normalize pixel traces by l2 norm
-    norms = np.linalg.norm(np.asarray(pixel_traces), axis=(1, 2))
-    for i in range(len(norms)):
-        pixel_traces[i] = pixel_traces[i] / norms[i]
+        # Normalize pixel traces by l2 norm
+        norms = np.linalg.norm(np.asarray(pixel_traces), axis=(1, 2))
+        for i in range(len(norms)):
+            pixel_traces[i] = pixel_traces[i] / norms[i]
 
-    # Calculate average pixel trace for each barcode and normalize
-    one_bit_int = np.mean(pixel_traces, axis=0)
-    one_bit_int = one_bit_int / np.mean(one_bit_int)
+        # Calculate average pixel trace for each barcode and normalize
+        one_bit_int = np.mean(pixel_traces, axis=0)
+        one_bit_int = one_bit_int / np.mean(one_bit_int)
 
-    # Convert into dictionary with same keys as scaling_factors
-    scaling_mods = {}
-    for i in range(one_bit_int.shape[0]):
-        for j in range(one_bit_int.shape[1]):
-            scaling_mods[(i, j)] = one_bit_int[i, j]
-    return scaling_mods
+        # Convert into dictionary with same keys as scaling_factors
+        scaling_mods = {}
+        for i in range(one_bit_int.shape[0]):
+            for j in range(one_bit_int.shape[1]):
+                scaling_mods[(i, j)] = one_bit_int[i, j]
+        return scaling_mods
+    else:
+        return None
 
 
 def scale_img(
@@ -309,23 +313,31 @@ def scale_img(
             cropped_img, scaling_factors, codebook, pixelRunnerKwargs, is_volume
         )
 
-        # Apply modifications to scaling_factors
-        for key in sorted(scaling_factors):
-            scaling_factors[key] = scaling_factors[key] * scaling_mods[key]
-
-        # Replace image with unscaled version
-        cropped_img = deepcopy(og_img)
-
-        # Update mod_mean and add to iteration number. If iters reaches 20 return current scaling factors
-        # and print message
-        mod_mean = np.mean(abs(np.array([x for x in scaling_mods.values()]) - 1))
-        iters += 1
-        if iters >= 20:
+        # If scaling_mods == None, less than 10 transcripts were decodable and scaling_factors are all set to 1
+        if scaling_mods is None:
+            scaling_factors = {key: 1 for key in scaling_factors}
             print(
-                "Scaling factors did not converge after 20 iterations. Returning initial estimate."
+                "Need at least 10 decodable transcripts to perform scaling. Try adjusting processing parameters"
             )
-            scaling_factors = deepcopy(local_scale)
             break
+        else:
+            # Apply modifications to scaling_factors
+            for key in sorted(scaling_factors):
+                scaling_factors[key] = scaling_factors[key] * scaling_mods[key]
+
+            # Replace image with unscaled version
+            cropped_img = deepcopy(og_img)
+
+            # Update mod_mean and add to iteration number. If iters reaches 20 return current scaling factors
+            # and print message
+            mod_mean = np.mean(abs(np.array([x for x in scaling_mods.values()]) - 1))
+            iters += 1
+            if iters >= 20:
+                print(
+                    "Scaling factors did not converge after 20 iterations. Returning initial estimate."
+                )
+                scaling_factors = deepcopy(local_scale)
+                break
 
     # Scale with final factors
     for r in range(img.num_rounds):
@@ -341,7 +353,8 @@ def scale_img(
     )
     clip.run(img, in_place=True)
 
-    print(f"Rescaled image in {iters} iterations, final mod_mean: {mod_mean}")
+    if scaling_mods is not None:
+        print(f"Rescaled image in {iters} iterations, final mod_mean: {mod_mean}")
 
     return img
 
