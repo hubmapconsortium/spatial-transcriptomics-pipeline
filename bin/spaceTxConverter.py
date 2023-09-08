@@ -930,9 +930,9 @@ if __name__ == "__main__":
 
     aux_single_round = []
     if len(aux_lens) > 0:  # parse aux_single_round
-        if len(args.aux_single_round) != 0 and aux_lens[0] != len(args.aux_single_round):
+        if args.aux_single_round is not None and aux_lens[0] != len(args.aux_single_round):
             raise Exception("If specified, len of args.aux_single_round must match other aux vars")
-        if len(args.aux_single_round) == 0:
+        if args.aux_single_round is None:
             aux_single_round = [False] * aux_lens[0]
         else:
             for single in args.aux_single_round:
