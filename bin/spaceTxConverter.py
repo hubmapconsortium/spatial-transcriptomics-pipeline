@@ -993,7 +993,6 @@ if __name__ == "__main__":
         if any(['blank' in target.lower() for target in codebook['target'].data]):
             raise ValueError("Error: codebook already contains blank codes, set add_blanks to False.")
 
-
     cli(
         args.input_dir,
         output_dir,
