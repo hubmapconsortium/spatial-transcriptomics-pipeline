@@ -994,8 +994,10 @@ if __name__ == "__main__":
                     "Error: blank code generation only built for one-hot codebooks (codebooks where\
                                   each round has exactly one active channel)."
                 )
-        if any(['blank' in target.lower() for target in codebook['target'].data]):
-            raise ValueError("Error: codebook already contains blank codes, set add_blanks to False.")
+        if any(["blank" in target.lower() for target in codebook["target"].data]):
+            raise ValueError(
+                "Error: codebook already contains blank codes, set add_blanks to False."
+            )
 
     cli(
         args.input_dir,

@@ -459,8 +459,7 @@ def add_corrected_rounds(codebook, decoded, ham_dist):
     return decoded.assign_coords(corrected_rounds=("features", corrected_rounds))
 
 
-def getCoords(exploc: str,
-              selected_fovs: List[int]):
+def getCoords(exploc: str, selected_fovs: List[int]):
     """
     Extracts physical coordinates of each FOV from the primary-fov_*.json files. Used in creating composite images.
     """
@@ -471,7 +470,11 @@ def getCoords(exploc: str,
     # Filter by selcted_fovs (if set)
     if selected_fovs is not None:
         fovs = ["fov_{:05}".format(int(f)) for f in selected_fovs]
-        img_jsons = [img_json for img_json in img_jsons if img_json.split('/')[-1].split('-')[-1].split('.')[0] in fovs]
+        img_jsons = [
+            img_json
+            for img_json in img_jsons
+            if img_json.split("/")[-1].split("-")[-1].split(".")[0] in fovs
+        ]
 
     # Get x_min, x_max, y_min, and y_max values for all FOVs and keep track of the absolute x_min and y_min
     composite_coords = defaultdict(dict)
@@ -481,7 +484,7 @@ def getCoords(exploc: str,
     y_min_all = np.inf
     y_max_all = 0
     for img_json in img_jsons:
-        pos = img_json.split('/')[-1].split('_')[-1].split('.')[0]
+        pos = img_json.split("/")[-1].split("_")[-1].split(".")[0]
         with open(img_json, "r") as file:
             metadata = json.load(file)
 
@@ -530,7 +533,7 @@ def getCoords(exploc: str,
 
     # Subtract minimum coord values from xs and ys (ensures (0,0) is the top left corner)
     for img_json in img_jsons:
-        pos = img_json.split('/')[-1].split('_')[-1].split('.')[0]
+        pos = img_json.split("/")[-1].split("_")[-1].split(".")[0]
         composite_coords[pos]["x_min"] = composite_coords[pos]["x_min"] - x_min_all
         composite_coords[pos]["x_max"] = composite_coords[pos]["x_max"] - x_min_all
         composite_coords[pos]["y_min"] = composite_coords[pos]["y_min"] - y_min_all
@@ -560,7 +563,9 @@ def createComposite(
     """
 
     # Get physical coordinates
-    composite_coords, physical_coords, y_max_all, x_max_all, shape = getCoords(exploc, selected_fovs)
+    composite_coords, physical_coords, y_max_all, x_max_all, shape = getCoords(
+        exploc, selected_fovs
+    )
     fov_count = len(composite_coords)
 
     # Create empty combined images
@@ -578,11 +583,15 @@ def createComposite(
     # Filter by selcted_fovs (if set)
     if selected_fovs is not None:
         fovs = ["fov_{:05}".format(int(f)) for f in selected_fovs]
-        img_jsons = [img_json for img_json in img_jsons if img_json.split('/')[-1].split('-')[-1].split('.')[0] in fovs]
+        img_jsons = [
+            img_json
+            for img_json in img_jsons
+            if img_json.split("/")[-1].split("-")[-1].split(".")[0] in fovs
+        ]
 
     # Fill in image
     for img_json in img_jsons:
-        pos = img_json.split('/')[-1].split('_')[-1].split('.')[0]
+        pos = img_json.split("/")[-1].split("_")[-1].split(".")[0]
 
         fov = "fov_" + "0" * (5 - len(str(pos))) + str(pos)
         img = experiment[fov].get_image("primary")
@@ -628,13 +637,14 @@ def createComposite(
 
 
 def saveCompositeResults(spots, decoded, exploc, selected_fovs, output_name):
-
     # Splits large spots object into lots of smaller ones
     spot_items = dict(spots.items())
     for rch in spot_items:
         spot_items[rch] = spot_items[rch].spot_attrs.data
 
-    composite_coords, physical_coords, y_max_all, x_max_all, shape = getCoords(exploc, selected_fovs)
+    composite_coords, physical_coords, y_max_all, x_max_all, shape = getCoords(
+        exploc, selected_fovs
+    )
 
     # Get json file names
     img_jsons = sorted(glob.glob(f"{str(exploc)[:-15]}/primary-fov_*.json"))
@@ -642,11 +652,15 @@ def saveCompositeResults(spots, decoded, exploc, selected_fovs, output_name):
     # Filter by selcted_fovs (if set)
     if selected_fovs is not None:
         fovs = ["fov_{:05}".format(int(f)) for f in selected_fovs]
-        img_jsons = [img_json for img_json in img_jsons if img_json.split('/')[-1].split('-')[-1].split('.')[0] in fovs]
+        img_jsons = [
+            img_json
+            for img_json in img_jsons
+            if img_json.split("/")[-1].split("-")[-1].split(".")[0] in fovs
+        ]
 
     # Create a new SpotFindingResults object with only spots from each position and save separately
     for img_json in img_jsons:
-        pos = img_json.split('/')[-1].split('_')[-1].split('.')[0]
+        pos = img_json.split("/")[-1].split("_")[-1].split(".")[0]
         fov = "fov_{:0>5}".format(pos)
         spot_attrs = {}
         x_min = composite_coords[pos]["x_min"]
@@ -857,7 +871,13 @@ def run(
 
         # Creates the big images. If not given an anchor_name then it takes the max projection of the primary image
         composite_img, composite_anchor = createComposite(
-            experiment, input_dir, anchor_name, is_volume, level_method, selected_fovs, **compositeKwargs
+            experiment,
+            input_dir,
+            anchor_name,
+            is_volume,
+            level_method,
+            selected_fovs,
+            **compositeKwargs,
         )
 
         # Find spots and decode the composite image
@@ -1096,11 +1116,15 @@ if __name__ == "__main__":
             method = starfish.spots.DecodeSpots.postcodeDecode
             # Check that codebook is compatible with postcode
             codebook = experiment.codebook
-            codebook_no_blanks = codebook[['blank' not in target.lower() for target in codebook['target'].data]]
-            if len(codebook_no_blanks) >= len(codebook['c']) ** len(codebook['r']):
-                raise Exception("PoSTcode decoder requires some unused barcode space or some blank codes in \
+            codebook_no_blanks = codebook[
+                ["blank" not in target.lower() for target in codebook["target"].data]
+            ]
+            if len(codebook_no_blanks) >= len(codebook["c"]) ** len(codebook["r"]):
+                raise Exception(
+                    "PoSTcode decoder requires some unused barcode space or some blank codes in \
                                  the codebook. If you have used 100% of the barcode space for real codes, \
-                                 then PoSTcode is not a valid decoding option.")
+                                 then PoSTcode is not a valid decoding option."
+                )
         else:
             raise Exception("DecodeSpots method " + str(method) + " is not a valid method.")
 
