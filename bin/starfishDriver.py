@@ -1068,6 +1068,13 @@ if __name__ == "__main__":
             method = starfish.spots.DecodeSpots.CheckAll
         elif method == "postcodeDecode":
             method = starfish.spots.DecodeSpots.postcodeDecode
+            # Check that codebook is compatible with postcode
+            codebook = experiment.codebook
+            codebook_no_blanks = codebook[['blank' not in target.lower() for target in codebook['target'].data]]
+            if len(codebook_no_blanks) >= len(codebook['c']) ** len(codebook['r']):
+                raise Exception("PoSTcode decoder requires some unused barcode space or some blank codes in \
+                                 the codebook. If you have used 100% of the barcode space for real codes, \
+                                 then PoSTcode is not a valid decoding option.")
         else:
             raise Exception("DecodeSpots method " + str(method) + " is not a valid method.")
 
