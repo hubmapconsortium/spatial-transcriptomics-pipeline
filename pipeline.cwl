@@ -610,7 +610,7 @@ steps:
 
       requirements:
         DockerRequirement:
-          dockerPull: pipefish-custom:latest
+          dockerPull: hubmap/starfish-custom:latest
 
       inputs:
         schema:

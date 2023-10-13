@@ -77,7 +77,6 @@ def maskFromLabeledImages(
     """
     i = int(fov[-5:])
     label_name = ("{}/" + file_formats_labeled).format(labeled_image, i)
-    print(fov, i, labeled_image, label_name, file_formats_labeled)
     return BinaryMaskCollection.from_external_labeled_image(label_name, img)
 
 
