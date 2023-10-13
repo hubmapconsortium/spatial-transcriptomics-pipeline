@@ -135,7 +135,7 @@ def filter_cellpose(
             mask = skimage.segmentation.relabel_sequential(mask)[0]
 
         # Save result
-        tifffile.imsave(f'{output_dir}/fov_{file.split("fov_")[-1][:3]}_masks.tiff', mask)
+        tifffile.imsave(f'{output_dir}/fov_{file.split("fov_")[-1][:5]}_masks.tiff', mask)
 
 
 if __name__ == "__main__":

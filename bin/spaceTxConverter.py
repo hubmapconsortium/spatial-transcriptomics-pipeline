@@ -981,6 +981,10 @@ if __name__ == "__main__":
 
     # If adding blanks, check that codebook is compatible before beginning conversion (otherwise it will
     # cause an error after wasting time converting images)
+    if args.codebook_csv:
+        codebook = parse_codebook(args.codebook_csv)
+    if args.codebook_json:
+        codebook = Codebook.open_json(str(args.codebook_json))
     if args.add_blanks:
         channelsN = len(codebook["c"])
         for row in codebook[0].data:

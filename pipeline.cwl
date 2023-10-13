@@ -610,7 +610,7 @@ steps:
 
       requirements:
         DockerRequirement:
-          dockerPull: hubmap/starfish-custom:latest
+          dockerPull: pipefish-custom:latest
 
       inputs:
         schema:
@@ -1107,7 +1107,7 @@ steps:
             if(self[5]){
               return {
                 "labeled_image": self[5],
-                "file_formats_labeled": "fov_{:03d}_masks.tiff"
+                "file_formats_labeled": "fov_{:05d}_masks.tiff"
               }
             } else {
               if(self[0]){
