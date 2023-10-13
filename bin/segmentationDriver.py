@@ -48,7 +48,7 @@ def maskFromRoi(
     list[BinaryMaskCollection]:
         Binary masks for each FOV.
     """
-    i = int(fov[-3:])
+    i = int(fov[-5:])
     mask_name = ("{}/" + file_formats).format(roi_set, i)
     return BinaryMaskCollection.from_fiji_roi_set(mask_name, img)
 
@@ -75,7 +75,7 @@ def maskFromLabeledImages(
     BinaryMaskCollection:
         Binary mask.
     """
-    i = int(fov[-3:])
+    i = int(fov[-5:])
     label_name = ("{}/" + file_formats_labeled).format(labeled_image, i)
     return BinaryMaskCollection.from_external_labeled_image(label_name, img)
 
