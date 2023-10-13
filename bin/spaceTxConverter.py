@@ -724,15 +724,6 @@ def blank_codebook(real_codebook, num_blanks):
         )
     )
 
-    # Check that codebook is one-hot
-    for row in real_codebook[0].data:
-        row_sum = sum(row == 0)
-        if row_sum == channelsN or row_sum == 0:
-            raise ValueError(
-                "Error: blank code generation only built for one-hot codebooks (codebooks where\
-                              each round has exactly one active channel)."
-            )
-
     # Calculate hamming distance rule in codebook
     codes = real_codebook.argmax(Axes.CH.value).data
     hamming_distance = 100
@@ -987,6 +978,19 @@ if __name__ == "__main__":
         "fov_offset": args.fov_offset,
         "channel_offset": args.channel_offset,
     }
+
+    # If adding blanks, check that codebook is compatible before beginning conversion (otherwise it will
+    # cause an error after wasting time converting images)
+    if args.add_blanks:
+        channelsN = len(codebook["c"])
+        for row in codebook[0].data:
+            row_sum = sum(row == 0)
+            if row_sum == channelsN or row_sum == 0:
+                raise ValueError(
+                    "Error: blank code generation only built for one-hot codebooks (codebooks where\
+                                  each round has exactly one active channel)."
+                )
+
     cli(
         args.input_dir,
         output_dir,
