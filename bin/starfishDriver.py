@@ -568,7 +568,7 @@ def createComposite(
     for pos in range(fov_count):
         print(pos)
 
-        fov = "fov_" + "0" * (3 - len(str(pos))) + str(pos)
+        fov = "fov_" + "0" * (5 - len(str(pos))) + str(pos)
         img = experiment[fov].get_image("primary")
 
         x_min = composite_coords[pos]["x_min"]
@@ -621,7 +621,7 @@ def saveCompositeResults(spots, decoded, exploc, output_name):
 
     # Create a new SpotFindingResults object with only spots from each position and save separately
     for pos in range(len(composite_coords)):
-        fov = "fov_{:03}".format(pos)
+        fov = "fov_{:05}".format(pos)
         spot_attrs = {}
         x_min = composite_coords[pos]["x_min"]
         x_max = composite_coords[pos]["x_max"]
@@ -697,7 +697,7 @@ def saveCompositeResults(spots, decoded, exploc, output_name):
 
     # Save decoded transcripts
     for pos in composite_coords:
-        fov = "fov_" + "0" * (3 - len(str(pos))) + str(pos)
+        fov = "fov_" + "0" * (5 - len(str(pos))) + str(pos)
 
         # Subset transcripts for this FOV based on the FOV's composite coordinates
         x_min = composite_coords[pos]["x_min"]
@@ -859,7 +859,7 @@ def run(
     # Otherwise run on a per FOV basis
     else:
         if selected_fovs is not None:
-            fovs = ["fov_{:03}".format(int(f)) for f in selected_fovs]
+            fovs = ["fov_{:05}".format(int(f)) for f in selected_fovs]
         else:
             fovs = experiment.keys()
 

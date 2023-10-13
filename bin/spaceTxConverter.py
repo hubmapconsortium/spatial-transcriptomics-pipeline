@@ -663,7 +663,6 @@ def cli(
     print(primary_tile_fetcher)
     # print(aux_name_to_dimensions)
     # print(aux_tile_fetcher)
-
     write_experiment_json(
         path=output_dir,
         fov_count=counts["fovs"],
