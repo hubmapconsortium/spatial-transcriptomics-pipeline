@@ -67,7 +67,7 @@ steps:
       expression: |
         ${ var dir = [];
            for(var i=0;i<inputs.file_array.length; i++){
-             dir.push({"class": "Directory", "basename": "fov_"+String(i).padStart(3,'0'), "listing": inputs.file_array[i]});
+             dir.push({"class": "Directory", "basename": "fov_"+String(i).padStart(5,'0'), "listing": inputs.file_array[i]});
            }
            return {"pool_dir": {
              "class": "Directory",
