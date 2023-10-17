@@ -1581,7 +1581,7 @@ if __name__ == "__main__":
     fovs = False
     if args.selected_fovs is not None:
         # manually specified FOVs override anything else
-        fovs = ["fov_{:03}".format(int(f)) for f in args.selected_fovs]
+        fovs = ["fov_{:05}".format(int(f)) for f in args.selected_fovs]
     elif args.exp_output:
         # reading in from experiment can have multiple FOVs
         fovs = [k for k in transcripts.keys()]

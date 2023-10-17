@@ -663,7 +663,6 @@ def cli(
     print(primary_tile_fetcher)
     # print(aux_name_to_dimensions)
     # print(aux_tile_fetcher)
-
     write_experiment_json(
         path=output_dir,
         fov_count=counts["fovs"],
@@ -724,15 +723,6 @@ def blank_codebook(real_codebook, num_blanks):
             np.zeros((channelsN**roundsN, roundsN, channelsN)), dims=["target", "r", "c"]
         )
     )
-
-    # Check that codebook is one-hot
-    for row in real_codebook[0].data:
-        row_sum = sum(row == 0)
-        if row_sum == channelsN or row_sum == 0:
-            raise ValueError(
-                "Error: blank code generation only built for one-hot codebooks (codebooks where\
-                              each round has exactly one active channel)."
-            )
 
     # Calculate hamming distance rule in codebook
     codes = real_codebook.argmax(Axes.CH.value).data
@@ -988,6 +978,27 @@ if __name__ == "__main__":
         "fov_offset": args.fov_offset,
         "channel_offset": args.channel_offset,
     }
+
+    # If adding blanks, check that codebook is compatible before beginning conversion (otherwise it will
+    # cause an error after wasting time converting images)
+    if args.codebook_csv:
+        codebook = parse_codebook(args.codebook_csv)
+    if args.codebook_json:
+        codebook = Codebook.open_json(str(args.codebook_json))
+    if args.add_blanks:
+        channelsN = len(codebook["c"])
+        for row in codebook[0].data:
+            row_sum = sum(row == 0)
+            if row_sum == channelsN or row_sum == 0:
+                raise ValueError(
+                    "Error: blank code generation only built for one-hot codebooks (codebooks where\
+                                  each round has exactly one active channel)."
+                )
+        if any(["blank" in target.lower() for target in codebook["target"].data]):
+            raise ValueError(
+                "Error: codebook already contains blank codes, set add_blanks to False."
+            )
+
     cli(
         args.input_dir,
         output_dir,

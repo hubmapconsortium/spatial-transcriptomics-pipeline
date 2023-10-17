@@ -391,7 +391,7 @@ def cli(
         str(input_dir / "experiment.json")
     )
     if selected_fovs is not None:
-        fovs = ["fov_{:03}".format(int(f)) for f in selected_fovs]
+        fovs = ["fov_{:05}".format(int(f)) for f in selected_fovs]
     else:
         fovs = list(exp.keys())
 
