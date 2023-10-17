@@ -18,6 +18,6 @@ RUN cd /starfish;make install-dev
 
 COPY bin /opt
 COPY input_schemas /opt
-RUN chmod +x /opt/*.py
+RUN chmod +x /opt/*.*
 
 CMD ["/bin/bash"]

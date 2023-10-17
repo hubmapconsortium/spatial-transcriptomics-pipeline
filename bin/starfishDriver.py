@@ -1004,7 +1004,7 @@ if __name__ == "__main__":
     # for item in vars(args):
     #    print(item, ':', vars(args)[item])
 
-    output_dir = f"tmp/{args.tmp_prefix}/4_Decoded/"
+    output_dir = f"tmp/{args.tmp_prefix}/4_Decoded_{args.tmp_prefix}/"
 
     exploc = args.exp_loc / "experiment.json"
     experiment = starfish.core.experiment.experiment.Experiment.from_json(str(exploc))

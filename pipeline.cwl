@@ -291,6 +291,10 @@ inputs:
     type: int?
     doc: If provided, the number of processes that will be spawned for processing. Otherwise, the maximum number of available CPUs will be used.
 
+  scatter_into_n:
+    type: int?
+    doc: If provided, the step to run decoding will be split into n batches, where each batch is (FOV count/n) FOVs big.
+
   decoding_blob:
     - 'null'
     - type: record
@@ -1031,6 +1035,7 @@ steps:
         pickValue: first_non_null
       parameter_json: parameter_json
       selected_fovs: selected_fovs
+      fov_count: fov_count
       level_method: level_method
       use_ref_img: use_ref_img
       anchor_view: anchor_view
@@ -1038,6 +1043,7 @@ steps:
       rescale: rescale
       not_filtered_results: not_filtered_results
       n_processes: n_processes
+      scatter_into_n: scatter_into_n
       decoding_blob: decoding_blob
       decoding_pixel: decoding_pixel
     out:

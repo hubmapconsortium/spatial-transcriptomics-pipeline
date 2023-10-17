@@ -8,6 +8,7 @@ requirements:
    - class: InlineJavascriptRequirement
    - class: StepInputExpressionRequirement
    - class: MultipleInputFeatureRequirement
+   - class: ScatterFeatureRequirement
 
 inputs:
   exp_loc:
@@ -21,6 +22,10 @@ inputs:
   selected_fovs:
     type: int[]?
     doc: If provided, starfish will only be run on FOVs with these indices.
+
+  fov_count:
+    type: int?
+    doc: The number of FOVs that are included in this experiment
 
   use_ref_img:
     type: boolean?
@@ -51,6 +56,10 @@ inputs:
   n_processes:
     type: int?
     doc: If provided, the number of processes that will be spawned for processing. Otherwise, the maximum number of available CPUs will be used.
+
+  scatter_into_n:
+    type: int?
+    doc: If provided, the step to run decoding will be split into n batches, where each batch is (FOV count/n) FOVs big.
 
   decoding_blob:
     - 'null'
@@ -184,14 +193,10 @@ inputs:
 outputs:
   decoded:
     type: Directory
-    outputSource: execute_runner/decoded
+    outputSource: restage/pool_dir
 
 steps:
 
-  tmpname:
-    run: tmpdir.cwl
-    in: []
-    out: [tmp]
 
   read_schema:
     run:
@@ -222,10 +227,99 @@ steps:
     in:
       datafile: parameter_json
       schema: read_schema/data
-    out: [selected_fovs, level_method, use_ref_img, is_volume, anchor_view, rescale, not_filtered_results, n_processes, decoding_min_sigma, decoding_max_sigma, decoding_num_sigma, decoding_threshold, decoding_overlap, decoding_decode_method, decoding_decoder_trace_building_strategy, decoding_decoder_max_distance, decoding_decoder_min_intensity, decoding_decoder_metric, decoding_decoder_norm_order, decoding_decoder_anchor_round, decoding_decoder_search_radius, decoding_decoder_return_original_intensities, decoding_decoder_error_rounds, decoding_decoder_mode, decoding_decoder_physical_coords, decoding_metric, decoding_distance_threshold, decoding_magnitude_threshold, decoding_min_area, decoding_max_area, decoding_norm_order, decoding_composite_decode, decoding_composite_pmin, decoding_composite_pmax]
+    out: [fov_count, selected_fovs, level_method, use_ref_img, is_volume, anchor_view, rescale, not_filtered_results, n_processes, scatter_into_n, decoding_min_sigma, decoding_max_sigma, decoding_num_sigma, decoding_threshold, decoding_overlap, decoding_decode_method, decoding_decoder_trace_building_strategy, decoding_decoder_max_distance, decoding_decoder_min_intensity, decoding_decoder_metric, decoding_decoder_norm_order, decoding_decoder_anchor_round, decoding_decoder_search_radius, decoding_decoder_return_original_intensities, decoding_decoder_error_rounds, decoding_decoder_mode, decoding_decoder_physical_coords, decoding_metric, decoding_distance_threshold, decoding_magnitude_threshold, decoding_min_area, decoding_max_area, decoding_norm_order, decoding_composite_decode, decoding_composite_pmin, decoding_composite_pmax]
     when: $(inputs.datafile != null)
 
+  scatter_generator:
+    run:
+      class: ExpressionTool
+      expression: |
+        ${ var fovs = inputs.selected_fovs;
+           if(fovs === null){
+             fovs = [];
+             for (let i=0; i<inputs.fov_count; i++) {
+               fovs.push(Number(i));
+             }
+           }
+           if(inputs.scatter_into_n === null){
+             return {"scatter_out": new Array(fovs)};
+           } else {
+             var scattered = new Array(inputs.scatter_into_n);
+             var chunkSize = Math.ceil(inputs.fov_count / inputs.scatter_into_n);
+             var loc = 0;
+             for (let i = 0; i<fovs.length; i += chunkSize) {
+               var subs = [];
+               for (let j=i; j<i + chunkSize && j<fovs.length; j +=1) {
+                 subs.push(Number(fovs[j]));
+               }
+               scattered[loc] = subs;
+               loc += 1;
+             }
+             return {"scatter_out": scattered};
+           }; }
+      inputs:
+        scatter_into_n:
+          type: int?
+        selected_fovs:
+          type: int[]?
+        fov_count:
+          type: int
+      outputs:
+        scatter_out:
+          type:
+            type: array
+            items:
+              type: array
+              items: int
+    in:
+      scatter_into_n:
+        source: [stage_runner/scatter_into_n, scatter_into_n]
+        valueFrom: |
+          ${
+            if(self[0]){
+              return self[0];
+            } else if(self[1]) {
+              return self[1];
+            } else {
+              return null;
+            }
+          }
+      selected_fovs:
+        source: [stage_runner/selected_fovs, selected_fovs]
+        valueFrom: |
+          ${
+            if(self[0]){
+              return self[0];
+            } else if(self[1]) {
+              return self[1];
+            } else {
+              return null;
+            }
+          }
+      fov_count:
+        source: [stage_runner/fov_count, fov_count]
+        valueFrom: |
+          ${
+            if(self[0]){
+              return self[0];
+            } else if(self[1]) {
+              return self[1];
+            } else {
+              return null;
+            }
+          }
+    out: [scatter_out]
+
+  tmpname:
+    run: tmpdir.cwl
+    scatter: sc_count
+    in:
+      sc_count: scatter_generator/scatter_out
+    out: [tmp]
+
   execute_runner:
+    scatter: [selected_fovs, tmp_prefix]
+    scatterMethod: dotproduct
     run:
       class: CommandLineTool
       baseCommand: /opt/starfishDriver.py
@@ -246,7 +340,9 @@ steps:
             prefix: --exp-loc
 
         selected_fovs:
-          type: int[]?
+          type:
+            type: array
+            items: int
           inputBinding:
             prefix: --selected-fovs
           doc: If provided, processing will only be run on FOVs with these indices.
@@ -437,23 +533,12 @@ steps:
         decoded:
           type: Directory
           outputBinding:
-            glob: $("tmp/" + inputs.tmp_prefix + "/4_Decoded/")
+            glob: $("tmp/" + inputs.tmp_prefix + "/4_Decoded_" + inputs.tmp_prefix + "/")
 
     in:
       tmp_prefix: tmpname/tmp
       exp_loc: exp_loc
-      selected_fovs:
-        source: [stage_runner/selected_fovs, selected_fovs]
-        valueFrom: |
-          ${
-            if(self[0]){
-              return self[0];
-            } else if(self[1]) {
-              return self[1];
-            } else {
-              return null;
-            }
-          }
+      selected_fovs: scatter_generator/scatter_out
       use_ref_img:
         source: [stage_runner/use_ref_img, use_ref_img]
         pickValue: first_non_null
@@ -587,3 +672,36 @@ steps:
             };
           }
     out: [decoded]
+  restage:
+    run:
+      class: CommandLineTool
+      baseCommand: /opt/starfishRunnerCondensation.sh
+      requirements:
+        DockerRequirement:
+          dockerPull: hubmap/starfish-custom:latest
+        InitialWorkDirRequirement:
+          listing:
+            - $(inputs.file_array)
+      inputs:
+        file_array:
+          type:
+            type: array
+            items: Directory
+          inputBinding:
+            position: 1
+
+        outputDir:
+          type: string
+          inputBinding:
+            position: 2
+          default: "4_Decoded"
+
+      outputs:
+        pool_dir:
+          type: Directory
+          outputBinding:
+            glob: $("4_Decoded/")
+
+    in:
+      file_array: execute_runner/decoded
+    out: [pool_dir]

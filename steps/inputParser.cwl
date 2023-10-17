@@ -73,6 +73,7 @@ outputs:
   rescale: boolean
   not_filtered_results: boolean
   n_processes: int
+  scatter_into_n: int
   decoding_min_sigma: float[]
   decoding_max_sigma: float[]
   decoding_num_sigma: int
