@@ -26,6 +26,7 @@ from skimage.registration import phase_cross_correlation
 from starfish import Experiment, ImageStack
 from starfish.types import Levels
 from tqdm import tqdm
+import pdb
 
 
 def saveImg(loc: str, prefix: str, img: ImageStack):
@@ -182,8 +183,10 @@ def subtract_background(img, background):
     for r in range(img.num_rounds):
         for ch in range(img.num_chs):
             for z in range(img.num_zplanes):
-                img.xarray.data[r, ch, z] -= bg_dat[r, ch % num_chs, z]
-            img.xarray.data[r, ch][img.xarray.data[r, ch] < 0] = 0
+                data = img.xarray.data[r, ch, z].astype("float32")
+                data -= bg_dat[r, ch % num_chs, z].astype("float32")
+                data[data < 0] = 0
+                img.xarray.data[r, ch, z] = data.astype("uint16")
 
     return img
 
@@ -241,17 +244,13 @@ def rolling_ball(img, rolling_rad=3, num_threads=1):
     """
     Peform rolling ball background subtraction.
     """
-    # Have to convert to integer values first as otherwise the resulting images are blank
     for r in range(img.num_rounds):
         for ch in range(img.num_chs):
             for z in range(img.num_zplanes):
-                data = np.rint(img.xarray.data[r, ch, z] * 2**16)
                 background = restoration.rolling_ball(
-                    data, radius=rolling_rad, num_threads=num_threads
+                    img.xarray.data[r, ch, z], radius=rolling_rad, num_threads=num_threads
                 )
-                data -= background
-                data /= 2**16
-                img.xarray.data[r, ch, z] = deepcopy(data)
+                img.xarray.data[r, ch, z] -= background
     return img
 
 
@@ -267,14 +266,13 @@ def match_hist_2_min(img):
             meds[(r, ch)] = np.mean(img.xarray.data[r, ch])
     min_rch = sorted(meds.items(), key=lambda item: item[1])[0][0]
 
-    # Use min image as reference for histogram matching (need to convert to ints or it takes a VERY long time)
-    reference = np.rint(img.xarray.data[min_rch[0], min_rch[1]] * 2**16)
+    # Use min image as reference for histogram matching
+    reference = img.xarray.data[min_rch[0], min_rch[1]]
     for r in range(img.num_rounds):
         for ch in range(img.num_chs):
-            data = np.rint(img.xarray.data[r, ch] * 2**16)
-            matched = exposure.match_histograms(data, reference)
-            matched /= 2**16
-            img.xarray.data[r, ch] = deepcopy(matched)
+            img.xarray.data[r, ch] = np.rint(
+                exposure.match_histograms(img.xarray.data[r, ch], reference)
+            )
     return img
 
 
@@ -409,7 +407,7 @@ def cli(
             # If a background image is provided, subtract it from the primary image.
             bg = exp[fov].get_image(background_name)
             print("\tremoving existing backgound...")
-            img = subtract_background(img, bg)
+            # img = subtract_background(img, bg)
             if anchor_name:
                 print("\tremoving existing background from anchor image...")
                 anchor = subtract_background(anchor, bg)

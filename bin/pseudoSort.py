@@ -115,7 +115,13 @@ def reformatter(
                             ),
                         )
                         print(varTable)
-                        img = skimage.io.imread(file_path).astype("uint16")
+                        img = skimage.io.imread(file_path)
+
+                        # Convert to uint16 if not already
+                        if np.max(img) <= 1:
+                            img = np.rint(img * 2**16).astype("uint16")
+                        if img.dtype != "uint16":
+                            img = img.astype("uint16")
                         # img_out = img
 
                         # figure out what slice to take.
