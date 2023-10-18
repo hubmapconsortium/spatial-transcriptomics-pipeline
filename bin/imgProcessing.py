@@ -26,7 +26,6 @@ from skimage.registration import phase_cross_correlation
 from starfish import Experiment, ImageStack
 from starfish.types import Levels
 from tqdm import tqdm
-import pdb
 
 
 def saveImg(loc: str, prefix: str, img: ImageStack):
@@ -407,7 +406,7 @@ def cli(
             # If a background image is provided, subtract it from the primary image.
             bg = exp[fov].get_image(background_name)
             print("\tremoving existing backgound...")
-            # img = subtract_background(img, bg)
+            img = subtract_background(img, bg)
             if anchor_name:
                 print("\tremoving existing background from anchor image...")
                 anchor = subtract_background(anchor, bg)
