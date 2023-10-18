@@ -151,6 +151,13 @@ class FISHTile(FetchedTile):
         # print(cached_read_fn(self._file_path).shape)
         try:
             img = cached_read_fn(self._file_path)
+
+            # Convert to uint16 if not already
+            if np.max(img) <= 1:
+                img = np.rint(img * 2**16).astype("uint16")
+            if img.dtype != "uint16":
+                img = img.astype("uint16")
+
             # iterate through and parse through the cache_read_order
             slices = []
             # print(self.cache_read_order)
@@ -181,7 +188,7 @@ class FISHTile(FetchedTile):
                     e,
                 )
             )
-            return np.zeros((2048, 2048))
+            return np.zeros((2048, 2048), dtype="uint16")
 
 
 class PrimaryTileFetcher(TileFetcher):
