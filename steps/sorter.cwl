@@ -149,6 +149,12 @@ steps:
     in: []
     out: [tmp]
 
+  file_sizer:
+    run: fileSizer.cwl
+    in:
+      example_dir: input_dir
+    out: [dir_size]
+
   stage_sort:
     run: inputParser.cwl
     in:
@@ -156,6 +162,7 @@ steps:
       schema: read_schema/data
     out: [round_count, fov_count, round_offset, fov_offset, channel_offset, channel_slope, file_format, file_vars, cache_read_order, aux_tilesets_aux_names, aux_tilesets_aux_file_formats, aux_tilesets_aux_file_vars, aux_tilesets_aux_cache_read_order, aux_tilesets_aux_channel_count, aux_tilesets_aux_channel_slope, aux_tilesets_aux_channel_intercept]
     when: $(inputs.datafile != null)
+
   execute_sort:
     run:
       class: CommandLineTool
@@ -164,8 +171,14 @@ steps:
       requirements:
         DockerRequirement:
           dockerPull: hubmap/starfish-custom:latest
+        ResourceRequirement:
+          tmpdirMin: $(inputs.dir_size * 1.2)
+          outdirMin: $(inputs.dir_size * 1.2)
 
       inputs:
+
+        dir_size:
+          type: long
 
         tmp_prefix:
           type: string
@@ -287,6 +300,7 @@ steps:
         log:
           type: stdout
     in:
+      dir_size: file_sizer/dir_size
       tmp_prefix: tmpname/tmp
       input_dir: input_dir
       codebook:

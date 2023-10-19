@@ -110,6 +110,12 @@ steps:
     in: []
     out: [tmp]
 
+  file_sizer:
+    run: fileSizer.cwl
+    in:
+      example_dir: input_dir
+    out: [dir_size]
+
   read_schema:
     run:
       class: CommandLineTool
@@ -149,9 +155,17 @@ steps:
 
       requirements:
         DockerRequirement:
-            dockerPull: hubmap/starfish-custom:latest
+          dockerPull: hubmap/starfish-custom:latest
+        ResourceRequirement:
+          tmpdirMin: $(inputs.dir_size * 2)
+          outdirMin: $(inputs.dir_size * 2)
+          coresMin: $(inputs.n_processes)
+          ramMin: $(inputs.n_processes * 20 * 24)
 
       inputs:
+        dir_size:
+          type: long
+
         tmp_prefix:
           type: string
           inputBinding:
@@ -287,6 +301,7 @@ steps:
           outputBinding:
             glob: $("tmp/" + inputs.tmp_prefix + "/3_processed/")
     in:
+      dir_size: file_sizer/dir_size
       tmp_prefix: tmpname/tmp
       input_dir: input_dir
       selected_fovs:

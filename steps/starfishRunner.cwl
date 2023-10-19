@@ -197,6 +197,11 @@ outputs:
 
 steps:
 
+  file_sizer:
+    run: fileSizer.cwl
+    in:
+      example_dir: exp_loc
+    out: [dir_size]
 
   read_schema:
     run:
@@ -327,8 +332,27 @@ steps:
       requirements:
         DockerRequirement:
           dockerPull: hubmap/starfish-custom:latest
+        ResourceRequirement:
+          tmpdirMin: $(inputs.dir_size * 1.1)
+          outdirMin: $(inputs.dir_size * 0.1)
+          coresMin: $(inputs.n_processes)
+          ramMin: |
+            ${
+              if(inputs.decoding_blob === null){
+                return (inputs.dir_size/inputs.fov_count) * 4;
+              } else if(inputs.decoding_blob.min_intensity !== null) {
+                return (inputs.dir_size/inputs.fov_count) * 10;
+              } else if(inputs.decoding_blob.mode !== null) {
+                return (inputs.dir_size/inputs.fov_count) * 10;
+              } else {
+                return (inputs.dir_size/inputs.fov_count) * 10;
+              }
+            }
 
       inputs:
+        dir_size:
+          type: long
+
         tmp_prefix:
           type: string
           inputBinding:
@@ -346,6 +370,9 @@ steps:
           inputBinding:
             prefix: --selected-fovs
           doc: If provided, processing will only be run on FOVs with these indices.
+
+        fov_count:
+          type: int
 
         use_ref_img:
           type: boolean?
@@ -537,8 +564,21 @@ steps:
 
     in:
       tmp_prefix: tmpname/tmp
+      dir_size: file_sizer/dir_size
       exp_loc: exp_loc
       selected_fovs: scatter_generator/scatter_out
+      fov_count:
+        source: [stage_runner/fov_count, fov_count]
+        valueFrom: |
+          ${
+            if(self[0]){
+              return self[0];
+            } else if(self[1]) {
+              return self[1];
+            } else {
+              return null;
+            }
+          }
       use_ref_img:
         source: [stage_runner/use_ref_img, use_ref_img]
         pickValue: first_non_null

@@ -176,6 +176,12 @@ steps:
     in: []
     out: [tmp]
 
+  file_sizer:
+    run: fileSizer.cwl
+    in:
+      example_dir: tiffs
+    out: [dir_size]
+
   read_schema:
     run:
       class: CommandLineTool
@@ -216,7 +222,14 @@ steps:
       requirements:
         DockerRequirement:
             dockerPull: hubmap/starfish-custom:latest
+        ResourceRequirement:
+          tmpdirMin: $(inputs.dir_size * 2)
+          outdirMin: $(inputs.dir_size * 2)
+
       inputs:
+        dir_size:
+          type: long
+
         tmp_prefix:
           type: string
           inputBinding:
@@ -390,6 +403,7 @@ steps:
           outputBinding:
             glob: $("tmp/" + inputs.tmp_prefix + "/2_tx_converted/")
     in:
+      dir_size: file_sizer/dir_size
       tmp_prefix: tmpname/tmp
       tiffs: tiffs
       codebook:
