@@ -14,6 +14,10 @@ inputs:
     type: Directory
     doc: The directory containing all .tiff files
 
+  dir_size:
+    type: long?
+    doc: Size of tiffs, in MiB. If provided, will be used to calculate ResourceRequirement.
+
   codebook_csv:
     type: File?
     doc: Flattened csv input, refer to record entry.
@@ -176,12 +180,6 @@ steps:
     in: []
     out: [tmp]
 
-  file_sizer:
-    run: fileSizer.cwl
-    in:
-      example_dir: tiffs
-    out: [dir_size]
-
   read_schema:
     run:
       class: CommandLineTool
@@ -223,12 +221,26 @@ steps:
         DockerRequirement:
             dockerPull: hubmap/starfish-custom:latest
         ResourceRequirement:
-          tmpdirMin: $(inputs.dir_size * 2)
-          outdirMin: $(inputs.dir_size * 2)
+          tmpdirMin: |
+            ${
+              if(inputs.dir_size === null) {
+                return null;
+              } else {
+                return inputs.dir_size * 2;
+              }
+            }
+          outdirMin: |
+            ${
+              if(inputs.dir_size === null) {
+                return null;
+              } else {
+                return inputs.dir_size * 2;
+              }
+            }
 
       inputs:
         dir_size:
-          type: long
+          type: long?
 
         tmp_prefix:
           type: string
@@ -403,7 +415,7 @@ steps:
           outputBinding:
             glob: $("tmp/" + inputs.tmp_prefix + "/2_tx_converted/")
     in:
-      dir_size: file_sizer/dir_size
+      dir_size: dir_size
       tmp_prefix: tmpname/tmp
       tiffs: tiffs
       codebook:

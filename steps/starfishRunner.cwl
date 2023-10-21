@@ -15,6 +15,10 @@ inputs:
     type: Directory
     doc: Location of directory containing starfish experiment.json file
 
+  dir_size:
+    type: long?
+    doc: Size of exp_loc, in MiB. If provided, will be used to calculate ResourceRequirement.
+
   parameter_json:
     type: File?
     doc: JSON formatted input parameters.
@@ -197,12 +201,6 @@ outputs:
 
 steps:
 
-  file_sizer:
-    run: fileSizer.cwl
-    in:
-      example_dir: exp_loc
-    out: [dir_size]
-
   read_schema:
     run:
       class: CommandLineTool
@@ -333,25 +331,50 @@ steps:
         DockerRequirement:
           dockerPull: hubmap/starfish-custom:latest
         ResourceRequirement:
-          tmpdirMin: $(inputs.dir_size * 1.1)
-          outdirMin: $(inputs.dir_size * 0.1)
-          coresMin: $(inputs.n_processes)
+          tmpdirMin: |
+            ${
+              if(inputs.dir_size === null) {
+                return null;
+              } else {
+                return inputs.dir_size * 1.2;
+              }
+            }
+          outdirMin: |
+            ${
+              if(inputs.dir_size === null) {
+                return null;
+              } else {
+                return inputs.dir_size * 0.2;
+              }
+            }
+          coresMin: |
+            ${
+              if(inputs.n_processes === null) {
+                return null;
+              } else {
+                return inputs.n_processes;
+              }
+            }
           ramMin: |
             ${
-              if(inputs.decoding_blob === null){
-                return (inputs.dir_size/inputs.fov_count) * 4;
-              } else if(inputs.decoding_blob.min_intensity !== null) {
-                return (inputs.dir_size/inputs.fov_count) * 10;
-              } else if(inputs.decoding_blob.mode !== null) {
-                return (inputs.dir_size/inputs.fov_count) * 10;
+              if(inputs.dir_size === null){
+                return null;
               } else {
-                return (inputs.dir_size/inputs.fov_count) * 10;
+                if(inputs.decoding_blob === null){
+                  return parseInt((inputs.dir_size/inputs.fov_count) * 4);
+                } else if(inputs.decoding_blob.min_intensity !== null) {
+                  return parseInt((inputs.dir_size/inputs.fov_count) * 10);
+                } else if(inputs.decoding_blob.mode !== null) {
+                  return parseInt((inputs.dir_size/inputs.fov_count) * 10);
+                } else {
+                  return parseInt((inputs.dir_size/inputs.fov_count) * 10);
+                }
               }
             }
 
       inputs:
         dir_size:
-          type: long
+          type: long?
 
         tmp_prefix:
           type: string
@@ -564,7 +587,7 @@ steps:
 
     in:
       tmp_prefix: tmpname/tmp
-      dir_size: file_sizer/dir_size
+      dir_size: dir_size
       exp_loc: exp_loc
       selected_fovs: scatter_generator/scatter_out
       fov_count:

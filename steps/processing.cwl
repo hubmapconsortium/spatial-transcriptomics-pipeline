@@ -14,6 +14,10 @@ inputs:
     type: Directory
     doc: Root directory containing space_tx formatted experiment
 
+  dir_size:
+    type: long?
+    doc: The size of input_dir in MiB. If provided, will be used to specify storage space requests.
+
   parameter_json:
     type: File?
     doc: json containing step parameters.
@@ -110,12 +114,6 @@ steps:
     in: []
     out: [tmp]
 
-  file_sizer:
-    run: fileSizer.cwl
-    in:
-      example_dir: input_dir
-    out: [dir_size]
-
   read_schema:
     run:
       class: CommandLineTool
@@ -157,14 +155,42 @@ steps:
         DockerRequirement:
           dockerPull: hubmap/starfish-custom:latest
         ResourceRequirement:
-          tmpdirMin: $(inputs.dir_size * 2)
-          outdirMin: $(inputs.dir_size * 2)
-          coresMin: $(inputs.n_processes)
-          ramMin: $(inputs.n_processes * 20 * 24)
+          tmpdirMin: |
+            ${
+              if(inputs.dir_size === null) {
+                return null;
+              } else {
+                return inputs.dir_size * 2;
+              }
+            }
+          outdirMin: |
+            ${
+              if(inputs.dir_size === null) {
+                return null;
+              } else {
+                return inputs.dir_size * 2;
+              }
+            }
+          coresMin: |
+            ${
+              if(inputs.n_processes === null) {
+                return null;
+              } else {
+                return inputs.n_processes;
+              }
+            }
+          ramMin: |
+            ${
+              if(inputs.n_processes === null) {
+                return null;
+              } else {
+                return inputs.n_processes * 20 * 24;
+              }
+            }
 
       inputs:
         dir_size:
-          type: long
+          type: long?
 
         tmp_prefix:
           type: string
@@ -301,7 +327,7 @@ steps:
           outputBinding:
             glob: $("tmp/" + inputs.tmp_prefix + "/3_processed/")
     in:
-      dir_size: file_sizer/dir_size
+      dir_size: dir_size
       tmp_prefix: tmpname/tmp
       input_dir: input_dir
       selected_fovs:

@@ -639,9 +639,29 @@ steps:
     out: [run_baysor, aux_views, skip_formatting, skip_processing, register_aux_view, fov_positioning_x_locs, fov_positioning_x_shape, fov_positioning_x_voxel, fov_positioning_y_locs, fov_positioning_y_shape, fov_positioning_y_voxel, fov_positioning_z_locs, fov_positioning_z_shape, fov_positioning_z_voxel, run_cellpose, add_blanks, skip_qc]
     when: $(inputs.datafile != null)
 
+  sizer:
+    run: steps/fileSizer.cwl
+    in:
+      exp_loc: exp_loc
+      input_dir: input_dir
+      tiffs: tiffs
+      example_dir:
+        valueFrom: |
+          ${
+            if (inputs.exp_loc !== null) {
+              return inputs.exp_loc;
+            } else if(inputs.input_dir !== null) {
+              return inputs.input_dir;
+            } else {
+              return inputs.tiffs;
+            }
+          }
+    out: [dir_size]
+
   sorter:
     run: steps/sorter.cwl
     in:
+      dir_size: sizer/dir_size
       channel_yml: channel_yml
       cycle_yml: cycle_yml
       parameter_json: parameter_json
@@ -725,6 +745,7 @@ steps:
   spaceTxConversion:
     run: steps/spaceTxConversion.cwl
     in:
+      dir_size: sizer/dir_size
       tiffs:
         source: [sorter/pseudosorted_dir, tiffs]
         valueFrom: |
@@ -964,6 +985,7 @@ steps:
   processing:
     run: steps/processing.cwl
     in:
+      dir_size: sizer/dir_size
       skip_processing:
         source: [stage/skip_processing, skip_processing]
         valueFrom: |
@@ -1030,6 +1052,7 @@ steps:
   starfishRunner:
     run: steps/starfishRunner.cwl
     in:
+      dir_size: sizer/dir_size
       exp_loc:
         source: [processing/processed_exp, spaceTxConversion/spaceTx_converted, exp_loc]
         pickValue: first_non_null
