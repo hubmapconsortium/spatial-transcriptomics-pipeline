@@ -209,6 +209,9 @@ steps:
       requirements:
         DockerRequirement:
           dockerPull: hubmap/starfish-custom:latest
+          ramMin: 100
+          tmpdirmin: 100
+          outdirmin: 100
 
       inputs:
         schema:
@@ -745,7 +748,27 @@ steps:
         InitialWorkDirRequirement:
           listing:
             - $(inputs.file_array)
+        ResourceRequirement:
+          tmpdirMin: |
+            ${
+              if(inputs.dir_size === null) {
+                return null;
+              } else {
+                return inputs.dir_size * 1.2;
+              }
+            }
+          outdirMin: |
+            ${
+              if(inputs.dir_size === null) {
+                return null;
+              } else {
+                return inputs.dir_size * 0.2;
+              }
+            }
       inputs:
+        dir_size:
+          type: long
+
         file_array:
           type:
             type: array
@@ -767,4 +790,5 @@ steps:
 
     in:
       file_array: execute_runner/decoded
+      dir_size: dir_size
     out: [pool_dir]

@@ -141,6 +141,9 @@ steps:
       requirements:
         DockerRequirement:
           dockerPull: hubmap/starfish-custom:latest
+          ramMin: 100
+          tmpdirmin: 100
+          outdirmin: 100
 
       inputs:
         schema:
