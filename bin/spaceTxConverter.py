@@ -19,7 +19,6 @@ from slicedimage import ImageFormat
 from starfish import Codebook
 from starfish.experiment.builder import FetchedTile, TileFetcher, write_experiment_json
 from starfish.types import Axes, Coordinates, CoordinateValue
-import pdb
 
 # below is modified from parsing example from starfish docs
 
