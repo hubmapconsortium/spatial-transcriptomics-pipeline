@@ -3,6 +3,7 @@
 import functools
 import os
 import random
+import re
 import sys
 from argparse import ArgumentParser
 from datetime import datetime
@@ -26,6 +27,220 @@ from starfish.types import Axes, Coordinates, CoordinateValue
 # cache that maps between file_path and the npy file.
 
 
+# From: https://github.com/ZhuangLab/storm-analysis/blob/master/storm_analysis/sa_library/datareader.py
+class Reader(object):
+    """
+    The superclass containing those functions that
+    are common to reading a STORM movie file.
+
+    Subclasses should implement:
+     1. __init__(self, filename, verbose = False)
+        This function should open the file and extract the
+        various key bits of meta-data such as the size in XY
+        and the length of the movie.
+
+     2. loadAFrame(self, frame_number)
+        Load the requested frame and return it as numpy array.
+    """
+
+    def __init__(self, filename, verbose=False):
+        super(Reader, self).__init__()
+        self.filename = filename
+        self.fileptr = None
+        self.verbose = verbose
+
+    def __del__(self):
+        self.close()
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, etype, value, traceback):
+        self.close()
+
+    def averageFrames(self, start=None, end=None):
+        """
+        Average multiple frames in a movie.
+        """
+        length = 0
+        average = np.zeros((self.image_height, self.image_width), dtype=float)
+        for [i, frame] in self.frameIterator(start, end):
+            if self.verbose and ((i % 10) == 0):
+                print(" processing frame:", i, " of", self.number_frames)
+            length += 1
+            average += frame
+
+        if length > 0:
+            average = average / float(length)
+
+        return average
+
+    def close(self):
+        if self.fileptr is not None:
+            self.fileptr.close()
+            self.fileptr = None
+
+    def filmFilename(self):
+        """
+        Returns the film name.
+        """
+        return self.filename
+
+    def filmSize(self):
+        """
+        Returns the film size.
+        """
+        return [self.image_width, self.image_height, self.number_frames]
+
+    def filmLocation(self):
+        """
+        Returns the picture x,y location, if available.
+        """
+        if hasattr(self, "stage_x"):
+            return [self.stage_x, self.stage_y]
+        else:
+            return [0.0, 0.0]
+
+    def filmScale(self):
+        """
+        Returns the scale used to display the film when
+        the picture was taken.
+        """
+        if hasattr(self, "scalemin") and hasattr(self, "scalemax"):
+            return [self.scalemin, self.scalemax]
+        else:
+            return [100, 2000]
+
+    def frameIterator(self, start=None, end=None):
+        """
+        Iterator for going through the frames of a movie.
+        """
+        if start is None:
+            start = 0
+        if end is None:
+            end = self.number_frames
+
+        for i in range(start, end):
+            yield [i, self.loadAFrame(i)]
+
+    def hashID(self):
+        """
+        A (hopefully) unique string that identifies this movie.
+        """
+        return hashlib.md5(self.loadAFrame(0).tobytes()).hexdigest()
+
+    def loadAFrame(self, frame_number):
+        assert frame_number >= 0, "Frame_number must be greater than or equal to 0, it is " + str(
+            frame_number
+        )
+        assert frame_number < self.number_frames, "Frame number must be less than " + str(
+            self.number_frames
+        )
+
+    def lockTarget(self):
+        """
+        Returns the film focus lock target.
+        """
+        if hasattr(self, "lock_target"):
+            return self.lock_target
+        else:
+            return 0.0
+
+
+class DaxReader(Reader):
+    """
+    Dax reader class. This is a Zhuang lab custom format.
+    """
+
+    def __init__(self, filename, verbose=False):
+        super(DaxReader, self).__init__(filename, verbose=verbose)
+
+        # save the filenames
+        dirname = os.path.dirname(filename)
+        if len(dirname) > 0:
+            dirname = dirname + "/"
+        self.inf_filename = dirname + os.path.splitext(os.path.basename(filename))[0] + ".inf"
+
+        # defaults
+        self.image_height = None
+        self.image_width = None
+
+        # extract the movie information from the associated inf file
+        size_re = re.compile(r"frame dimensions = ([\d]+) x ([\d]+)")
+        length_re = re.compile(r"number of frames = ([\d]+)")
+        endian_re = re.compile(r" (big|little) endian")
+        stagex_re = re.compile(r"Stage X = ([\d\.\-]+)")
+        stagey_re = re.compile(r"Stage Y = ([\d\.\-]+)")
+        lock_target_re = re.compile(r"Lock Target = ([\d\.\-]+)")
+        scalemax_re = re.compile(r"scalemax = ([\d\.\-]+)")
+        scalemin_re = re.compile(r"scalemin = ([\d\.\-]+)")
+
+        inf_file = open(self.inf_filename, "r")
+        while 1:
+            line = inf_file.readline()
+            if not line:
+                break
+            m = size_re.match(line)
+            if m:
+                self.image_height = int(m.group(2))
+                self.image_width = int(m.group(1))
+            m = length_re.match(line)
+            if m:
+                self.number_frames = int(m.group(1))
+            m = endian_re.search(line)
+            if m:
+                if m.group(1) == "big":
+                    self.bigendian = 1
+                else:
+                    self.bigendian = 0
+            m = stagex_re.match(line)
+            if m:
+                self.stage_x = float(m.group(1))
+            m = stagey_re.match(line)
+            if m:
+                self.stage_y = float(m.group(1))
+            m = lock_target_re.match(line)
+            if m:
+                self.lock_target = float(m.group(1))
+            m = scalemax_re.match(line)
+            if m:
+                self.scalemax = int(m.group(1))
+            m = scalemin_re.match(line)
+            if m:
+                self.scalemin = int(m.group(1))
+
+        inf_file.close()
+
+        # set defaults, probably correct, but warn the user
+        # that they couldn't be determined from the inf file.
+        if not self.image_height:
+            print("Could not determine image size, assuming 256x256.")
+            self.image_height = 256
+            self.image_width = 256
+
+        # open the dax file
+        if os.path.exists(filename):
+            self.fileptr = open(filename, "rb")
+        else:
+            if self.verbose:
+                print("dax data not found", filename)
+
+    def loadAFrame(self, frame_number):
+        """
+        Load a frame & return it as a numpy array.
+        """
+        super(DaxReader, self).loadAFrame(frame_number)
+
+        self.fileptr.seek(frame_number * self.image_height * self.image_width * 2)
+        image_data = np.fromfile(
+            self.fileptr, dtype="uint16", count=self.image_height * self.image_width
+        )
+        image_data = np.reshape(image_data, [self.image_height, self.image_width])
+        if self.bigendian:
+            image_data.byteswap(True)
+        return image_data
+
+
 @functools.lru_cache(maxsize=1)
 def cached_read_fn(file_path) -> np.ndarray:
     # return skimage.io.imread(file_path, format="tiff")
@@ -43,6 +258,9 @@ class FISHTile(FetchedTile):
         locs: Mapping[Axes, float] = None,
         shape: Mapping[Axes, int] = None,
         voxel: Mapping[Axes, float] = None,
+        data_org: pd.DataFrame = None,
+        aux: bool = False,
+        aux_name: str = None,
     ):
         """
         Tile class generalized for most FISH experiments.
@@ -85,6 +303,9 @@ class FISHTile(FetchedTile):
         if shape:
             self.img_shape = shape
         self.coord_def = locs and voxel and shape
+        self.data_org = data_org
+        self.aux = aux
+        self.aux_name = aux_name
         # print("zpl {};ch {}".format(zplane,ch))
 
     @property
@@ -150,7 +371,65 @@ class FISHTile(FetchedTile):
         """
         # print(cached_read_fn(self._file_path).shape)
         try:
-            img = cached_read_fn(self._file_path)
+            if ".dax" in self._file_path and not self.aux:
+                color_count = len(
+                    set(data_org[["bit" in name for name in data_org["channelName"]]]["color"])
+                )
+                prefix = "/".join(self._file_path.split("/")[:-1])
+                suffix = self._file_path.split("/")[-1]
+                dax = DaxReader(
+                    prefix
+                    + "/"
+                    + suffix.split("_")[0]
+                    + f"_{self._rnd // color_count}_"
+                    + suffix.split("_")[-1]
+                )
+                zs = sorted(
+                    [
+                        float(z)
+                        for z in self.data_org["zPos"][0]
+                        .replace("[", "")
+                        .replace("]", "")
+                        .split(",")
+                    ]
+                )
+                z_map = {z: z_ind for z_ind, z in enumerate(zs)}
+                row = self.data_org[self.data_org["round"] == self._rnd]
+                this_zs = [
+                    z_map[float(z)]
+                    for z in list(row["zPos"])[0].replace("[", "").replace("]", "").split(",")
+                ]
+                frames = [
+                    int(frame)
+                    for frame in list(row["frame"])[0].replace("[", "").replace("]", "").split(",")
+                ]
+                this_frame = frames[np.where(np.array(this_zs) == self._zplane)[0][0]]
+                img = dax.loadAFrame(this_frame)
+            elif ".dax" in self._file_path and self.aux:
+                dax = DaxReader(self._file_path)
+                zs = sorted(
+                    [
+                        float(z)
+                        for z in self.data_org["zPos"][0]
+                        .replace("[", "")
+                        .replace("]", "")
+                        .split(",")
+                    ]
+                )
+                z_map = {z: z_ind for z_ind, z in enumerate(zs)}
+                row = self.data_org[self.data_org["channelName"] == self.aux_name]
+                this_zs = [
+                    z_map[float(z)]
+                    for z in list(row["zPos"])[0].replace("[", "").replace("]", "").split(",")
+                ]
+                frames = [
+                    int(frame)
+                    for frame in list(row["frame"])[0].replace("[", "").replace("]", "").split(",")
+                ]
+                this_frame = frames[np.where(np.array(this_zs) == self._zplane)[0][0]]
+                img = dax.loadAFrame(this_frame)
+            else:
+                img = cached_read_fn(self._file_path)
 
             # Convert to uint16 if not already
             if np.max(img) <= 1:
@@ -209,6 +488,7 @@ class PrimaryTileFetcher(TileFetcher):
         locs: List[Mapping[Axes, float]] = None,
         shape: Mapping[Axes, int] = None,
         voxel: Mapping[Axes, float] = None,
+        data_org: pd.DataFrame = None,
     ) -> None:
         """
         Implement a TileFetcher for a single Field of View.
@@ -264,6 +544,7 @@ class PrimaryTileFetcher(TileFetcher):
         self.locs = locs
         self.voxel = voxel
         self.img_shape = shape
+        self.data_org = data_org
 
     def get_tile(
         self, fov_id: int, round_label: int, ch_label: int, zplane_label: int
@@ -317,9 +598,19 @@ class PrimaryTileFetcher(TileFetcher):
                 self.locs[fov_id],
                 self.img_shape,
                 self.voxel,
+                self.data_org,
+                False,
             )
         else:
-            return FISHTile(file_path, zplane_label, ch_label, round_label, self.cache_read_order)
+            return FISHTile(
+                file_path,
+                zplane_label,
+                ch_label,
+                round_label,
+                self.cache_read_order,
+                data_org=self.data_org,
+                aux=False,
+            )
 
 
 class AuxTileFetcher(TileFetcher):
@@ -343,6 +634,8 @@ class AuxTileFetcher(TileFetcher):
         locs: List[Mapping[Axes, float]] = None,
         shape: Mapping[Axes, int] = None,
         voxel: Mapping[Axes, float] = None,
+        data_org: pd.DataFrame = None,
+        name: str = None,
     ) -> None:
         """
         Implement a TileFetcher for a single Field of View with a single channel.
@@ -410,6 +703,8 @@ class AuxTileFetcher(TileFetcher):
         self.locs = locs
         self.voxel = voxel
         self.img_shape = shape
+        self.data_org = data_org
+        self.name = name
 
     def get_tile(
         self, fov_id: int, round_label: int, ch_label: int, zplane_label: int
@@ -468,6 +763,9 @@ class AuxTileFetcher(TileFetcher):
                 self.locs[fov_id],
                 self.img_shape,
                 self.voxel,
+                data_org,
+                True,
+                self.name,
             )
         else:
             return FISHTile(
@@ -476,6 +774,9 @@ class AuxTileFetcher(TileFetcher):
                 ch_label_adj,
                 round_label,
                 self.cache_read_order,
+                data_org=self.data_org,
+                aux=True,
+                aux_name=self.name,
             )
 
 
@@ -495,6 +796,13 @@ def parse_codebook(codebook_csv: str) -> Codebook:
         Codebook object in SpaceTx format.
     """
     csv: pd.DataFrame = pd.read_csv(codebook_csv, index_col=0)
+
+    # Drop extra columns from vizgen codebook if they are there
+    if "barcodeType" in csv.columns:
+        csv = csv[csv["barcodeType"] == "merfish"]
+        csv = csv[[col for col in csv.columns if col not in ["id", "barcodeType"]]]
+        csv = csv[[col for col in csv.columns if "Aux" not in col]].astype(int)
+
     genes = csv.index.values
     data_raw = csv.values
     rounds = csv.shape[1]
@@ -528,6 +836,7 @@ def cli(
     locs: List[Mapping[Axes, float]] = None,
     shape: Mapping[Axes, int] = None,
     voxel: Mapping[Axes, float] = None,
+    data_org: pd.DataFrame = None,
 ) -> int:
     """CLI entrypoint for spaceTx format construction for SeqFISH data
 
@@ -620,6 +929,7 @@ def cli(
         locs,
         shape,
         voxel,
+        data_org,
     )
 
     aux_name_to_dimensions = {}
@@ -659,6 +969,8 @@ def cli(
                 locs,
                 shape,
                 voxel,
+                data_org,
+                name,
             )
     # aux_tile_fetcher = {"DAPI": AuxTileFetcher(os.path.expanduser(input_dir), file_format, file_vars, counts["fov_offset"], counts["round_offset"],3)}
     # aux_name_to_dimensions = {"DAPI": aux_image_dimensions}
@@ -895,6 +1207,7 @@ if __name__ == "__main__":
     p.add_argument("--z-pos-shape", type=int, nargs="?")
     p.add_argument("--z-pos-voxel", type=float, nargs="?")
     p.add_argument("--add-blanks", dest="add_blanks", action="store_true")
+    p.add_argument("--data-org-file", type=Path)
     p.set_defaults(add_blanks=False)
 
     args = p.parse_args()
@@ -1006,6 +1319,15 @@ if __name__ == "__main__":
                 "Error: codebook already contains blank codes, set add_blanks to False."
             )
 
+    if args.data_org_file:
+        data_org = pd.read_csv(args.data_org_file)
+        data_org["round"] = [
+            int(ch_name.replace("bit", "")) - 1 if "bit" in ch_name else -1
+            for ch_name in data_org["channelName"]
+        ]
+    else:
+        data_org = None
+
     cli(
         args.input_dir,
         output_dir,
@@ -1024,6 +1346,7 @@ if __name__ == "__main__":
         locs,
         shape,
         voxel,
+        data_org,
     )
 
     # Note: this must trigger AFTER write_experiment_json, as it will clobber the codebook with
