@@ -1078,10 +1078,9 @@ if __name__ == "__main__":
     addKwarg(args, pixelRunnerKwargs, "min_area")
     addKwarg(args, pixelRunnerKwargs, "max_area")
     addKwarg(args, pixelRunnerKwargs, "norm_order")
-    if pixelRunnerKwargs['magnitude_threshold'] is not None:
-        if pixelRunnerKwargs['magnitude_threshold'] < 1:
-            pixelRunnerKwargs['magnitude_threshold'] *= 2**16
-
+    if pixelRunnerKwargs["magnitude_threshold"] is not None:
+        if pixelRunnerKwargs["magnitude_threshold"] < 1:
+            pixelRunnerKwargs["magnitude_threshold"] *= 2**16
 
     decodeKwargs = {}
 
