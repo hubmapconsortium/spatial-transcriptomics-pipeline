@@ -195,10 +195,7 @@ def init_scale(img: ImageStack):
     pixel_histos = {}
     for r in range(img.num_rounds):
         for ch in range(img.num_chs):
-            data = deepcopy(img.xarray.data[r, ch])
-            data = np.rint(data * (2**16))
-            data[data == 2**16] = (2**16) - 1
-            hist = np.histogram(data, bins=range((2**16)))
+            hist = np.histogram(img.xarray.data[r, ch], bins=range((2**16)))
             pixel_histos[(r, ch)] = hist[0]
 
     # Estimate scaling factors using cumulative distribution of each images intensities
@@ -1081,6 +1078,9 @@ if __name__ == "__main__":
     addKwarg(args, pixelRunnerKwargs, "min_area")
     addKwarg(args, pixelRunnerKwargs, "max_area")
     addKwarg(args, pixelRunnerKwargs, "norm_order")
+    if pixelRunnerKwargs["magnitude_threshold"] is not None:
+        if pixelRunnerKwargs["magnitude_threshold"] < 1:
+            pixelRunnerKwargs["magnitude_threshold"] *= 2**16
 
     decodeKwargs = {}
 
