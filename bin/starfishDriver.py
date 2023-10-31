@@ -384,7 +384,7 @@ def pixelDriver(
     pixelRunner = starfish.spots.DetectPixels.PixelSpotDecoder(
         codebook=codebook,
         distance_threshold=distance_threshold,
-        magnitude_threshold=magnitude_threshold * 2**16,
+        magnitude_threshold=magnitude_threshold,
         metric=metric,
         min_area=min_area,
         max_area=max_area,
