@@ -361,10 +361,11 @@ def pixelDriver(
     codebook: Codebook,
     distance_threshold: float,
     magnitude_threshold: float,
-    metric: str = "euclidean",
+    pnorm: int = 2,
     min_area: int = 2,
     max_area: int = np.inf,
     norm_order: int = 2,
+    n_processes: int = 1,
 ) -> DecodedIntensityTable:
     """
     Method to run Starfish's PixelSpotDecoder on the provided ImageStack
@@ -385,10 +386,11 @@ def pixelDriver(
         codebook=codebook,
         distance_threshold=distance_threshold,
         magnitude_threshold=magnitude_threshold * 2**16,
-        metric=metric,
+        pnorm=pnorm,
         min_area=min_area,
         max_area=max_area,
         norm_order=norm_order,
+        n_workers=n_processes,
     )
     return pixelRunner.run(img)
 
@@ -563,7 +565,6 @@ def createComposite(
     composite_coords, physical_coords, y_max_all, x_max_all, shape = getCoords(
         exploc, selected_fovs
     )
-    fov_count = len(composite_coords)
 
     # Create empty combined images
     combined_img = np.zeros(
@@ -1017,7 +1018,7 @@ if __name__ == "__main__":
     # == MetricDistance
     p.add_argument("--max-distance", type=float, nargs="?")
     p.add_argument("--min-intensity", type=float, nargs="?")
-    p.add_argument("--metric", type=str, nargs="?")  # NOTE also used in pixelRunner
+    p.add_argument("--metric", type=str, nargs="?")
     p.add_argument("--norm-order", type=int, nargs="?")  # NOTE also used in pixelRunner
     p.add_argument("--anchor-round", type=int, nargs="?")  # also used in PerRoundMaxChannel
     p.add_argument(
@@ -1029,7 +1030,7 @@ if __name__ == "__main__":
     p.add_argument("--error-rounds", type=int, nargs="?")
     p.add_argument("--mode", type=str, nargs="?")
     p.add_argument("--physical-coords", dest="physical_coords", action="store_true")
-    p.add_argument("--n-processes", type=int, nargs="?")
+    p.add_argument("--n-processes", type=int, nargs="?")  # also used in PixelDecoder
 
     # == postcodeDecode
     p.add_argument("--composite-decode", dest="composite_decode", action="store_true")
@@ -1039,6 +1040,7 @@ if __name__ == "__main__":
     # pixelRunner kwargs
     p.add_argument("--distance-threshold", type=float, nargs="?")
     p.add_argument("--magnitude-threshold", type=float, nargs="?")
+    p.add_argument("--pnorm", type=int, nargs="?")
     p.add_argument("--min-area", type=int, nargs="?")
     p.add_argument("--max-area", type=int, nargs="?")
 
@@ -1075,9 +1077,11 @@ if __name__ == "__main__":
     addKwarg(args, pixelRunnerKwargs, "metric")
     addKwarg(args, pixelRunnerKwargs, "distance_threshold")
     addKwarg(args, pixelRunnerKwargs, "magnitude_threshold")
+    addKwarg(args, pixelRunnerKwargs, "pnorm")
     addKwarg(args, pixelRunnerKwargs, "min_area")
     addKwarg(args, pixelRunnerKwargs, "max_area")
     addKwarg(args, pixelRunnerKwargs, "norm_order")
+    addKwarg(args, pixelRunnerKwargs, "n_processes")
     if pixelRunnerKwargs["magnitude_threshold"] is not None:
         if pixelRunnerKwargs["magnitude_threshold"] < 1:
             pixelRunnerKwargs["magnitude_threshold"] *= 2**16

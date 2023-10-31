@@ -350,9 +350,9 @@ inputs:
                 min_intensity:
                   type: float
                   doc: Minimum intensity of spots.
-                metric:
-                  type: string?
-                  doc: Metric name to be used for determining distance.
+                pnorm:
+                  type: int?
+                  doc: Which Minkowski p-norm to use. 1 is the sum-of-absolute-values “Manhattan” distance 2 is the usual Euclidean distance infinity is the maximum-coordinate-difference distance A finite large p may cause a ValueError if overflow can occur.
                 norm_order:
                   type: int?
                   doc: Refer to starfish documentation for metric_distance
@@ -404,9 +404,9 @@ inputs:
     - type: record
       name: pixel
       fields:
-        metric:
-          type: string?
-          doc: The sklearn metric string to pass to NearestNeighbors. Defaults to euclidean.
+        pnorm:
+          type: int?
+          doc: Which Minkowski p-norm to use. 1 is the sum-of-absolute-values “Manhattan” distance 2 is the usual Euclidean distance infinity is the maximum-coordinate-difference distance A finite large p may cause a ValueError if overflow can occur.
         distance_threshold:
           type: float
           doc: Spots whose codewords are more than this metric distance from an expected code are filtered

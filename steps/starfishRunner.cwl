@@ -120,9 +120,9 @@ inputs:
                 min_intensity:
                   type: float
                   doc: Minimum intensity of spots.
-                metric:
-                  type: string?
-                  doc: Metric name to be used for determining distance.
+                pnorm:
+                  type: int?
+                  doc: Which Minkowski p-norm to use. 1 is the sum-of-absolute-values “Manhattan” distance 2 is the usual Euclidean distance infinity is the maximum-coordinate-difference distance A finite large p may cause a ValueError if overflow can occur.
                 norm_order:
                   type: int?
                   doc: Refer to starfish documentation for metric_distance
@@ -175,9 +175,6 @@ inputs:
     - type: record
       name: pixel
       fields:
-        metric:
-          type: string?
-          doc: The sklearn metric string to pass to NearestNeighbors. Defaults to 'euclidean'
         distance_threshold:
           type: float
           doc: Spots whose codewords are more than this metric distance from an expected code are filtered
@@ -190,6 +187,9 @@ inputs:
         max_area:
           type: int?
           doc: Spots with total area greater than this value are filtered. Defaults to `np.inf`.
+        pnorm:
+          type: int?
+          doc: Which Minkowski p-norm to use. 1 is the sum-of-absolute-values “Manhattan” distance 2 is the usual Euclidean distance infinity is the maximum-coordinate-difference distance A finite large p may cause a ValueError if overflow can occur.
         norm_order:
           type: int?
           doc: Order of L_p norm to apply to intensities and codes when using metric_decode to pair each intensities to its closest target (default = 2)
@@ -234,7 +234,7 @@ steps:
     in:
       datafile: parameter_json
       schema: read_schema/data
-    out: [fov_count, selected_fovs, level_method, use_ref_img, is_volume, anchor_view, rescale, not_filtered_results, n_processes, scatter_into_n, decoding_min_sigma, decoding_max_sigma, decoding_num_sigma, decoding_threshold, decoding_overlap, decoding_decode_method, decoding_decoder_trace_building_strategy, decoding_decoder_max_distance, decoding_decoder_min_intensity, decoding_decoder_metric, decoding_decoder_norm_order, decoding_decoder_anchor_round, decoding_decoder_search_radius, decoding_decoder_return_original_intensities, decoding_decoder_error_rounds, decoding_decoder_mode, decoding_decoder_physical_coords, decoding_metric, decoding_distance_threshold, decoding_magnitude_threshold, decoding_min_area, decoding_max_area, decoding_norm_order, decoding_composite_decode, decoding_composite_pmin, decoding_composite_pmax]
+    out: [fov_count, selected_fovs, level_method, use_ref_img, is_volume, anchor_view, rescale, not_filtered_results, n_processes, scatter_into_n, decoding_min_sigma, decoding_max_sigma, decoding_num_sigma, decoding_threshold, decoding_overlap, decoding_decode_method, decoding_decoder_trace_building_strategy, decoding_decoder_max_distance, decoding_decoder_min_intensity, decoding_decoder_pnorm, decoding_decoder_norm_order, decoding_decoder_anchor_round, decoding_decoder_search_radius, decoding_decoder_return_original_intensities, decoding_decoder_error_rounds, decoding_decoder_mode, decoding_decoder_physical_coords, decoding_pnorm, decoding_distance_threshold, decoding_magnitude_threshold, decoding_min_area, decoding_max_area, decoding_norm_order, decoding_composite_decode, decoding_composite_pmin, decoding_composite_pmax]
     when: $(inputs.datafile != null)
 
   scatter_generator:
@@ -498,10 +498,10 @@ steps:
                         type: float
                         inputBinding:
                           prefix: --min-intensity
-                      metric:
-                        type: string?
+                      pnorm:
+                        type: int?
                         inputBinding:
-                          prefix: --metric
+                          prefix: --int
                       norm_order:
                         type: int?
                         inputBinding:
@@ -558,10 +558,10 @@ steps:
            - type: record
              name: pixel
              fields:
-               metric:
-                 type: string?
+               pnorm:
+                 type: int?
                  inputBinding:
-                   prefix: --metric
+                   prefix: --pnorm
                distance_threshold:
                  type: float
                  inputBinding:
@@ -673,7 +673,7 @@ steps:
             }
           }
       decoding_blob:
-        source: [decoding_blob, stage_runner/decoding_min_sigma, stage_runner/decoding_max_sigma, stage_runner/decoding_num_sigma, stage_runner/decoding_threshold, stage_runner/decoding_overlap, stage_runner/decoding_decode_method, stage_runner/decoding_decoder_trace_building_strategy, stage_runner/decoding_decoder_max_distance, stage_runner/decoding_decoder_min_intensity, stage_runner/decoding_decoder_metric, stage_runner/decoding_decoder_norm_order, stage_runner/decoding_decoder_anchor_round, stage_runner/decoding_decoder_search_radius, stage_runner/decoding_decoder_return_original_intensities, stage_runner/decoding_decoder_error_rounds, stage_runner/decoding_decoder_mode, stage_runner/decoding_decoder_physical_coords, stage_runner/decoding_composite_decode, stage_runner/decoding_composite_pmin, stage_runner/decoding_composite_pmax]
+        source: [decoding_blob, stage_runner/decoding_min_sigma, stage_runner/decoding_max_sigma, stage_runner/decoding_num_sigma, stage_runner/decoding_threshold, stage_runner/decoding_overlap, stage_runner/decoding_decode_method, stage_runner/decoding_decoder_trace_building_strategy, stage_runner/decoding_decoder_max_distance, stage_runner/decoding_decoder_min_intensity, stage_runner/decoding_decoder_pnorm, stage_runner/decoding_decoder_norm_order, stage_runner/decoding_decoder_anchor_round, stage_runner/decoding_decoder_search_radius, stage_runner/decoding_decoder_return_original_intensities, stage_runner/decoding_decoder_error_rounds, stage_runner/decoding_decoder_mode, stage_runner/decoding_decoder_physical_coords, stage_runner/decoding_composite_decode, stage_runner/decoding_composite_pmin, stage_runner/decoding_composite_pmax]
         valueFrom: |
           ${
             if(!self[6]){
@@ -696,7 +696,7 @@ steps:
                   trace_building_strategy: self[7],
                   max_distance: self[8],
                   min_intensity: self[9],
-                  metric: self[10],
+                  pnorm: self[10],
                   norm_order: self[11],
                   anchor_round: self[12],
                   search_radius: self[13],
@@ -722,14 +722,14 @@ steps:
             };
           }
       decoding_pixel:
-        source: [decoding_pixel, stage_runner/decoding_metric, stage_runner/decoding_distance_threshold, stage_runner/decoding_magnitude_threshold, stage_runner/decoding_min_area, stage_runner/decoding_max_area, stage_runner/decoding_norm_order]
+        source: [decoding_pixel, stage_runner/decoding_pnorm, stage_runner/decoding_distance_threshold, stage_runner/decoding_magnitude_threshold, stage_runner/decoding_min_area, stage_runner/decoding_max_area, stage_runner/decoding_norm_order]
         valueFrom: |
           ${
             if(!self[2]){
               return self[0]
             } else {
               return {
-                metric: self[1],
+                pnorm: self[1],
                 distance_threshold: self[2],
                 magnitude_threshold: self[3],
                 min_area: self[4],

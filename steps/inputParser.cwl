@@ -83,7 +83,7 @@ outputs:
   decoding_decoder_trace_building_strategy: string
   decoding_decoder_max_distance: float
   decoding_decoder_min_intensity: float
-  decoding_decoder_metric: string
+  decoding_decoder_pnorm: int
   decoding_decoder_norm_order: int
   decoding_decoder_anchor_round: int
   decoding_decoder_search_radius: int
@@ -91,7 +91,7 @@ outputs:
   decoding_decoder_error_rounds: int
   decoding_decoder_mode: string
   decoding_decoder_physical_coords: boolean
-  decoding_metric: string
+  decoding_pnorm: int
   decoding_distance_threshold: float
   decoding_magnitude_threshold: float
   decoding_min_area: int
