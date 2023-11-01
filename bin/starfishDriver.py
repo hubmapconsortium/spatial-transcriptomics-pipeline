@@ -1082,7 +1082,7 @@ if __name__ == "__main__":
     addKwarg(args, pixelRunnerKwargs, "max_area")
     addKwarg(args, pixelRunnerKwargs, "norm_order")
     addKwarg(args, pixelRunnerKwargs, "n_processes")
-    if pixelRunnerKwargs["magnitude_threshold"] is not None:
+    if "magnitude_threshold" in pixelRunnerKwargs.keys():
         if pixelRunnerKwargs["magnitude_threshold"] < 1:
             pixelRunnerKwargs["magnitude_threshold"] *= 2**16
 
