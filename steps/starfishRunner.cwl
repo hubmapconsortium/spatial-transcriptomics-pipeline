@@ -324,8 +324,62 @@ steps:
       sc_count: scatter_generator/scatter_out
     out: [tmp]
 
+  fileDivider:
+    scatter: [scatter, tmpname]
+    scatterMethod: dotproduct
+    run:
+      class: ExpressionTool
+      requirements:
+        - class: InlineJavascriptRequirement
+        - class: LoadListingRequirement
+      inputs:
+        experiment:
+          type: Directory
+          doc: Directory containing spaceTx-formatted experiment
+
+        scatter:
+          type:
+            type: array
+            items: int
+          doc: List describing the FOVs in this specific scatter.
+
+        tmpname:
+          type: string
+          doc: suffixes for output folders
+
+      outputs:
+        out: Directory
+
+      expression: |
+        ${
+          var dir_lis = [];
+          for(var i=0;i<inputs.experiment.listing.length; i++){
+            var id = inputs.experiment.listing[i].basename;
+            if(id.includes("json")){
+              dir_lis.push(inputs.experiment.listing[i])
+            } else {
+              for(var j=0;j<inputs.scatter.length; j++) {
+                if(id.includes("fov_"+String(inputs.scatter[j]).padStart(5,'0'))){
+                  dir_lis.push(inputs.experiment.listing[i])
+                }
+              }
+            }
+          }
+          return {"out": {
+            "class": "Directory",
+            "basename": "3A_divided_tx_"+inputs.tmpname,
+            "listing": dir_lis}
+          };
+        }
+    in:
+      experiment: exp_loc
+      scatter: scatter_generator/scatter_out
+      tmpname: tmpname/tmp
+    out:
+      [out]
+
   execute_runner:
-    scatter: [selected_fovs, tmp_prefix]
+    scatter: [selected_fovs, tmp_prefix, exp_loc]
     scatterMethod: dotproduct
     run:
       class: CommandLineTool
@@ -592,7 +646,7 @@ steps:
     in:
       tmp_prefix: tmpname/tmp
       dir_size: dir_size
-      exp_loc: exp_loc
+      exp_loc: fileDivider/out
       selected_fovs: scatter_generator/scatter_out
       fov_count:
         source: [stage_runner/fov_count, fov_count]
