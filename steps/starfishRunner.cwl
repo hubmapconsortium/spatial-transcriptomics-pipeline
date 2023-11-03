@@ -795,14 +795,10 @@ steps:
     out: [decoded]
   restage:
     run:
-      class: CommandLineTool
-      baseCommand: /opt/starfishRunnerCondensation.sh
+      class: ExpressionTool
       requirements:
-        DockerRequirement:
-          dockerPull: hubmap/starfish-custom:latest
-        InitialWorkDirRequirement:
-          listing:
-            - $(inputs.file_array)
+        InlineJavascriptRequirement: {}
+        LoadListingRequirement: {}
         ResourceRequirement:
           tmpdirMin: |
             ${
@@ -820,6 +816,20 @@ steps:
                 return inputs.dir_size * 0.2;
               }
             }
+      expression: |
+        ${
+          var listing = [];
+          for(var i=0;i<inputs.file_array.length;i++){
+            for(var j=0;j<inputs.file_array[i].listing.length;j++){
+              listing.push(inputs.file_array[i].listing[j]);
+            }
+          }
+          return {"pool_dir": {
+            "class": "Directory",
+            "basename": "4_Decoded",
+            "listing": listing,
+          }};
+        }
       inputs:
         dir_size:
           type: long
@@ -828,20 +838,10 @@ steps:
           type:
             type: array
             items: Directory
-          inputBinding:
-            position: 1
-
-        outputDir:
-          type: string
-          inputBinding:
-            position: 2
-          default: "4_Decoded"
 
       outputs:
         pool_dir:
           type: Directory
-          outputBinding:
-            glob: $("4_Decoded/")
 
     in:
       file_array: execute_runner/decoded
