@@ -1014,6 +1014,7 @@ steps:
           }
       parameter_json: parameter_json
       selected_fovs: selected_fovs
+      fov_count: fov_count
       clip_min: clip_min
       clip_max: clip_max
       level_method: level_method
@@ -1049,6 +1050,7 @@ steps:
       match_histogram: match_histogram
       tophat_radius: tophat_radius
       n_processes: n_processes
+      scatter_into_n: scatter_into_n
     when: $(inputs.skip_processing == false)
     out:
       [processed_exp]

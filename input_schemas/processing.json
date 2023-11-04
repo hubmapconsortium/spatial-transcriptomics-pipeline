@@ -1,4 +1,5 @@
 [
+	"fov_count",
 	"selected_fovs",
 	"clip_min?",
 	"clip_max?",
@@ -20,6 +21,7 @@
 	"tophat_radius?",
 	"channel_count",
 	"n_processes?",
+	"scatter_into_n?",
 	{
 		"aux_tilesets":[
 			[

@@ -798,7 +798,8 @@ steps:
       class: ExpressionTool
       requirements:
         InlineJavascriptRequirement: {}
-        LoadListingRequirement: {}
+        LoadListingRequirement:
+          loadListing: deep_listing
         ResourceRequirement:
           tmpdirMin: |
             ${
@@ -813,16 +814,41 @@ steps:
               if(inputs.dir_size === null) {
                 return null;
               } else {
-                return inputs.dir_size * 0.2;
+                return inputs.dir_size * 1.2;
               }
             }
       expression: |
         ${
           var listing = [];
+          var csv = [];
+          var cdf = [];
+          var spots = [];
           for(var i=0;i<inputs.file_array.length;i++){
             for(var j=0;j<inputs.file_array[i].listing.length;j++){
-              listing.push(inputs.file_array[i].listing[j]);
+              var item = inputs.file_array[i].listing[j];
+              if(item.class == "Directory") {
+                if(item.basename === "csv") {
+                  for(var k=0;k<item.listing.length;k++){
+                    csv.push(item.listing[k]);
+                  }
+                } else if(item.basename === "cdf") {
+                  for(var k=0;k<item.listing.length;k++){
+                    cdf.push(item.listing[k]);
+                  }
+                } else {
+                  for(var k=0;k<item.listing.length; k++){
+                    spots.push(item.listing[k]);
+                  }
+                }
+              } else {
+                listing.push(item);
+              }
             }
+          }
+          listing.push({"class":"Directory","basename":"csv","listing":csv});
+          listing.push({"class":"Directory","basename":"cdf","listing":cdf});
+          if(spots.length > 0){
+            listing.push({"class":"Directory","basename":"spots","listing":spots});
           }
           return {"pool_dir": {
             "class": "Directory",

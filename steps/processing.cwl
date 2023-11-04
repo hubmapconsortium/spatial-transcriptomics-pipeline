@@ -8,6 +8,7 @@ requirements:
    - class: InlineJavascriptRequirement
    - class: StepInputExpressionRequirement
    - class: MultipleInputFeatureRequirement
+   - class: ScatterFeatureRequirement
 
 inputs:
   input_dir:
@@ -25,6 +26,10 @@ inputs:
   selected_fovs:
     type: int[]?
     doc: If provided, processing will only be run on FOVs with these indices.
+
+  fov_count:
+    type: int?
+    doc: The number of FOVs that are included in this experiment
 
   clip_min:
     type: float?
@@ -102,17 +107,16 @@ inputs:
     type: int?
     doc: If provided, the number of processes that will be spawned for processing. Otherwise, the maximum number of available CPUs will be used.
 
+  scatter_into_n:
+    type: int?
+    doc: If provided, the step to run decoding will be split into n batches, where each batch is (FOV count/n) FOVs big.
+
 outputs:
   processed_exp:
     type: Directory
-    outputSource: execute_processing/processed_exp
+    outputSource: restage/pool_dir
 
 steps:
-
-  tmpname:
-    run: tmpdir.cwl
-    in: []
-    out: [tmp]
 
   read_schema:
     run:
@@ -147,10 +151,153 @@ steps:
     in:
       datafile: parameter_json
       schema: read_schema/data
-    out: [selected_fovs, clip_min, clip_max, level_method, rescale, register_aux_view, register_to_primary, channels_per_reg, background_view, register_background, anchor_view, high_sigma, deconvolve_iter, deconvolve_sigma, low_sigma, rolling_radius, match_histogram, tophat_radius, channel_count, aux_tilesets_aux_names, aux_tilesets_aux_channel_count, is_volume, n_processes]
+    out: [fov_count, selected_fovs, clip_min, clip_max, level_method, rescale, register_aux_view, register_to_primary, channels_per_reg, background_view, register_background, anchor_view, high_sigma, deconvolve_iter, deconvolve_sigma, low_sigma, rolling_radius, match_histogram, tophat_radius, channel_count, aux_tilesets_aux_names, aux_tilesets_aux_channel_count, is_volume, n_processes, scatter_into_n]
     when: $(inputs.datafile != null)
 
+  scatter_generator:
+    run:
+      class: ExpressionTool
+      expression: |
+        ${ var fovs = inputs.selected_fovs;
+           if(fovs === null){
+             fovs = [];
+             for (let i=0; i<inputs.fov_count; i++) {
+               fovs.push(Number(i));
+             }
+           }
+           if(inputs.scatter_into_n === null){
+             return {"scatter_out": new Array(fovs)};
+           } else {
+             var scattered = new Array(inputs.scatter_into_n);
+             var chunkSize = Math.ceil(inputs.fov_count / inputs.scatter_into_n);
+             var loc = 0;
+             for (let i = 0; i<fovs.length; i += chunkSize) {
+               var subs = [];
+               for (let j=i; j<i + chunkSize && j<fovs.length; j +=1) {
+                 subs.push(Number(fovs[j]));
+               }
+               scattered[loc] = subs;
+               loc += 1;
+             }
+             return {"scatter_out": scattered};
+           }; }
+      inputs:
+        scatter_into_n:
+          type: int?
+        selected_fovs:
+          type: int[]?
+        fov_count:
+          type: int
+      outputs:
+        scatter_out:
+          type:
+            type: array
+            items:
+              type: array
+              items: int
+    in:
+      scatter_into_n:
+        source: [stage_processing/scatter_into_n, scatter_into_n]
+        valueFrom: |
+          ${
+            if(self[0]){
+              return self[0];
+            } else if(self[1]) {
+              return self[1];
+            } else {
+              return null;
+            }
+          }
+      selected_fovs:
+        source: [stage_processing/selected_fovs, selected_fovs]
+        valueFrom: |
+          ${
+            if(self[0]){
+              return self[0];
+            } else if(self[1]) {
+              return self[1];
+            } else {
+              return null;
+            }
+          }
+      fov_count:
+        source: [stage_processing/fov_count, fov_count]
+        valueFrom: |
+          ${
+            if(self[0]){
+              return self[0];
+            } else if(self[1]) {
+              return self[1];
+            } else {
+              return null;
+            }
+          }
+    out: [scatter_out]
+
+  tmpname:
+    run: tmpdir.cwl
+    scatter: sc_count
+    in:
+      sc_count: scatter_generator/scatter_out
+    out: [tmp]
+
+  fileDivider:
+    scatter: [scatter, tmpname]
+    scatterMethod: dotproduct
+    run:
+      class: ExpressionTool
+      requirements:
+        - class: InlineJavascriptRequirement
+        - class: LoadListingRequirement
+      inputs:
+        experiment:
+          type: Directory
+          doc: Directory containing spaceTx-formatted experiment
+
+        scatter:
+          type:
+            type: array
+            items: int
+          doc: List describing the FOVs in this specific scatter.
+
+        tmpname:
+          type: string
+          doc: suffixes for output folders
+
+      outputs:
+        out: Directory
+
+      expression: |
+        ${
+          var dir_lis = [];
+          for(var i=0;i<inputs.experiment.listing.length; i++){
+            var id = inputs.experiment.listing[i].basename;
+            if(id.includes("json")){
+              dir_lis.push(inputs.experiment.listing[i])
+            } else {
+              for(var j=0;j<inputs.scatter.length; j++) {
+                if(id.includes("fov_"+String(inputs.scatter[j]).padStart(5,'0'))){
+                  dir_lis.push(inputs.experiment.listing[i])
+                }
+              }
+            }
+          }
+          return {"out": {
+            "class": "Directory",
+            "basename": "2A_divided_tx_"+inputs.tmpname,
+            "listing": dir_lis}
+          };
+        }
+    in:
+      experiment: input_dir
+      scatter: scatter_generator/scatter_out
+      tmpname: tmpname/tmp
+    out:
+      [out]
+
   execute_processing:
+    scatter: [selected_fovs, tmp_prefix, input_dir]
+    scatterMethod: dotproduct
     run:
       class: CommandLineTool
       baseCommand: /opt/imgProcessing.py
@@ -333,19 +480,8 @@ steps:
     in:
       dir_size: dir_size
       tmp_prefix: tmpname/tmp
-      input_dir: input_dir
-      selected_fovs:
-        source: [stage_processing/selected_fovs, selected_fovs]
-        valueFrom: |
-          ${
-            if(self[0]){
-              return self[0];
-            } else if(self[1]) {
-              return self[1];
-            } else {
-              return null;
-            }
-          }
+      input_dir: fileDivider/out
+      selected_fovs: scatter_generator/scatter_out
       clip_min:
         source: [stage_processing/clip_min, clip_min]
         valueFrom: |
@@ -586,3 +722,86 @@ steps:
           }
     out: [processed_exp]
 
+  restage:
+    run:
+      class: ExpressionTool
+      requirements:
+        InlineJavascriptRequirement: {}
+        LoadListingRequirement: {}
+        ResourceRequirement:
+          tmpdirMin: |
+            ${
+              if(inputs.dir_size === null) {
+                return null;
+              } else {
+                return inputs.dir_size * 1.2;
+              }
+            }
+          outdirMin: |
+            ${
+              if(inputs.dir_size === null) {
+                return null;
+              } else {
+                return inputs.dir_size * 0.2;
+              }
+            }
+      expression: |
+        ${
+          var listing = [];
+          for(var i=0;i<inputs.file_array.length;i++){
+            for(var j=0;j<inputs.file_array[i].listing.length;j++){
+              var item = inputs.file_array[i].listing[j]
+              if(!item.basename.includes("json")) {
+                listing.push(item);
+              } else {
+                if(item.basename.includes("fov")) {
+                  for(var k=0;k<inputs.scatter[i].length; k++){
+                    if(item.basename.includes("fov_"+String(inputs.scatter[i][k]).padStart(5,'0'))){
+                      listing.push(item);
+                    }
+                  }
+                }
+              }
+            }
+          }
+          for(var i=0; i<inputs.og_dir.listing.length;i++) {
+            var item = inputs.og_dir.listing[i];
+            if(item.basename.includes("json") && !item.basename.includes("fov")) {
+              listing.push(item);
+            }
+          }
+          return {"pool_dir": {
+            "class": "Directory",
+            "basename": "3_Processed",
+            "listing": listing,
+          }};
+        }
+      inputs:
+        dir_size:
+          type: long
+
+        file_array:
+          type:
+            type: array
+            items: Directory
+
+        og_dir:
+          type: Directory
+
+        scatter:
+          type:
+            type: array
+            items:
+              type: array
+              items: int
+
+      outputs:
+        pool_dir:
+          type: Directory
+
+    in:
+      file_array: execute_processing/processed_exp
+      og_dir: input_dir
+      scatter: scatter_generator/scatter_out
+      dir_size: dir_size
+    out: [pool_dir]
