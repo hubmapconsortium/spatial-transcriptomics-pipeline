@@ -844,7 +844,7 @@ def run(
         makedirs(output_dir + "spots")
 
     reporter = open(
-        path.join(output_dir, datetime.now().strftime("%Y%m%d_%H%M_starfish_runner.log")), "w"
+        path.join(output_dir, datetime.now().strftime("%Y%m%d_%H%M%S.%f_starfish_runner.log")), "w"
     )
     sys.stdout = reporter
     sys.stderr = reporter

@@ -363,7 +363,7 @@ def cli(
     os.makedirs(output_dir, exist_ok=True)
 
     reporter = open(
-        path.join(output_dir, datetime.now().strftime("%Y%m%d_%H%M_img_processing.log")), "w"
+        path.join(output_dir, datetime.now().strftime("%Y%m%d_%H%M%S.%f_img_processing.log")), "w"
     )
     sys.stdout = reporter
     sys.stderr = reporter

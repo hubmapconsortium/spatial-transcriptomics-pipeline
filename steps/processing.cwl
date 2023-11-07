@@ -766,7 +766,7 @@ steps:
           }
           for(var i=0; i<inputs.og_dir.listing.length;i++) {
             var item = inputs.og_dir.listing[i];
-            if(item.basename.includes("json") && !item.basename.includes("fov")) {
+            if(item.basename.includes("json") && !item.basename.includes("fov") && !item.basename.includes("log")) {
               listing.push(item);
             }
           }
