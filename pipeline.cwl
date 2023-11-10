@@ -426,6 +426,10 @@ inputs:
 
 # segmentation
 
+  skip_seg:
+    type: boolean?
+    doc: If true, segmentation (and QC) will be skipped.
+
 ## cellpose-specific vars
 
   run_cellpose:
@@ -573,6 +577,12 @@ inputs:
     doc: If true, will save graphical output to a pdf.
     default: True
 
+# Pipeline directly... we may not need this tbh.
+#  img_size:
+#    type: int
+#    doc: Size of docker image in MiB, used for select disk space requirements.
+#    default: 8000
+
 outputs:
   1_Pseudosort:
     type: Directory
@@ -616,9 +626,9 @@ steps:
         DockerRequirement:
           dockerPull: hubmap/starfish-custom:latest
         ResourceRequirement:
-          ramMin: 100
-          tmpdirMin: 100
-          outdirMin: 100
+          ramMin: 1000
+          tmpdirMin: 1000
+          outdirMin: 1000
 
       inputs:
         schema:
@@ -640,7 +650,7 @@ steps:
     in:
       datafile: parameter_json
       schema: read_schema/data
-    out: [run_baysor, aux_views, skip_formatting, skip_processing, register_aux_view, fov_positioning_x_locs, fov_positioning_x_shape, fov_positioning_x_voxel, fov_positioning_y_locs, fov_positioning_y_shape, fov_positioning_y_voxel, fov_positioning_z_locs, fov_positioning_z_shape, fov_positioning_z_voxel, run_cellpose, add_blanks, skip_qc]
+    out: [run_baysor, aux_views, skip_formatting, skip_processing, register_aux_view, fov_positioning_x_locs, fov_positioning_x_shape, fov_positioning_x_voxel, fov_positioning_y_locs, fov_positioning_y_shape, fov_positioning_y_voxel, fov_positioning_z_locs, fov_positioning_z_shape, fov_positioning_z_voxel, run_cellpose, add_blanks, skip_seg, skip_qc]
     when: $(inputs.datafile != null)
 
   sizer:
@@ -1117,6 +1127,16 @@ steps:
   segmentation:
     run: steps/segmentation.cwl
     in:
+      skip_seg:
+        source: [stage/skip_seg, skip_seg]
+        valueFrom: |
+          ${
+            if(self[0] || self[1]){
+              return true;
+            } else {
+              return false;
+            };
+          }
       decoded_loc: starfishRunner/decoded
       exp_loc:
         source: [processing/processed_exp, spaceTxConversion/spaceTx_converted, exp_loc]
@@ -1164,6 +1184,7 @@ steps:
           }
     out:
       [segmented]
+    when: $(inputs.skip_seg == false)
 
   baysorStaged:
     run: steps/baysorStaged.cwl
@@ -1186,6 +1207,16 @@ steps:
   qc:
     run: steps/qc.cwl
     in:
+      skip_seg:
+        source: [stage/skip_seg, skip_seg]
+        valueFrom: |
+          ${
+            if(self[0] || self[1]){
+              return true;
+            } else {
+              return false;
+            };
+          }
       skip_qc:
         source: [stage/skip_qc, skip_qc]
         valueFrom: |
@@ -1257,6 +1288,6 @@ steps:
               "exp": self
             };
           }
-    when: $(inputs.skip_qc == false)
+    when: $(inputs.skip_qc == false && inputs.skip_seg == false)
     out:
       [qc_metrics]

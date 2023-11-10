@@ -127,9 +127,9 @@ steps:
         DockerRequirement:
           dockerPull: hubmap/starfish-custom:latest
         ResourceRequirement:
-          ramMin: 100
-          tmpdirMin: 100
-          outdirMin: 100
+          ramMin: 1000
+          tmpdirMin: 1000
+          outdirMin: 1000
 
       inputs:
         schema:
@@ -311,7 +311,7 @@ steps:
               if(inputs.dir_size === null) {
                 return null;
               } else {
-                return inputs.dir_size * 2;
+                return inputs.dir_size * 4;
               }
             }
           outdirMin: |
@@ -319,7 +319,7 @@ steps:
               if(inputs.dir_size === null) {
                 return null;
               } else {
-                return inputs.dir_size * 2;
+                return inputs.dir_size * 4;
               }
             }
           coresMin: |

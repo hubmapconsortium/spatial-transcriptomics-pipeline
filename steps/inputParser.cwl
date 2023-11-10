@@ -100,6 +100,7 @@ outputs:
   decoding_composite_decode: boolean
   decoding_composite_pmin: float
   decoding_composite_pmax: float
+  skip_seg: boolean
   run_cellpose: boolean
   use_mrna: boolean
   pretrained_model_str: string

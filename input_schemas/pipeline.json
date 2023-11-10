@@ -21,5 +21,6 @@
 		]
 	},
 	"add_blanks",
+	"skip_seg",
 	"skip_qc"
 ]
