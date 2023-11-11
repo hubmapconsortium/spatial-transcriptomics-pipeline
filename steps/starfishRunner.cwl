@@ -330,8 +330,13 @@ steps:
     run:
       class: ExpressionTool
       requirements:
-        - class: InlineJavascriptRequirement
-        - class: LoadListingRequirement
+        InlineJavascriptRequirement: {}
+        LoadListingRequirement: {}
+        ResourceRequirement:
+          ramMin: 1000
+          tmpdirMin: 1000
+          outdirMin: 1000
+
       inputs:
         experiment:
           type: Directory

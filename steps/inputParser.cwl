@@ -3,7 +3,11 @@ cwlVersion: v1.0
 class: ExpressionTool
 
 requirements:
-  - class: InlineJavascriptRequirement
+  InlineJavascriptRequirement: {}
+  ResourceRequirement:
+    ramMin: 1000
+    tmpdirMin: 1000
+    outdirMin: 1000
 
 inputs:
   datafile:

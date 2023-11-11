@@ -156,6 +156,11 @@ steps:
 
   scatter_generator:
     run:
+      requirements:
+        ResourceRequirement:
+          ramMin: 1000
+          tmpdirMin: 1000
+          outdirMin: 1000
       class: ExpressionTool
       expression: |
         ${ var fovs = inputs.selected_fovs;

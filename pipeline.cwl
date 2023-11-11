@@ -1091,6 +1091,7 @@ steps:
   cellpose:
     run: steps/cellpose.cwl
     in:
+      dir_size: sizer/dir_size
       exp_loc:
         source: [processing/processed_exp, spaceTxConversion/spaceTx_converted, exp_loc]
         pickValue: first_non_null
