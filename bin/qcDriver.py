@@ -4,6 +4,7 @@ import collections
 import gc
 import pickle
 import sys
+import json
 from argparse import ArgumentParser
 from datetime import datetime
 from functools import partialmethod
@@ -1493,6 +1494,7 @@ if __name__ == "__main__":
     p.add_argument("--transcript-pkl", type=Path)
     p.add_argument("--segmentation-loc", type=Path, nargs="?")
 
+    p.add_argument("--loc-json", type=Path)
     p.add_argument("--roi", type=Path)
     p.add_argument("--x-size", type=int, nargs="?")
     p.add_argument("--y-size", type=int, nargs="?")
@@ -1577,6 +1579,12 @@ if __name__ == "__main__":
         size[0] = args.x_size
         size[1] = args.y_size
         size[2] = args.z_size
+    elif args.loc_json:
+        f = open(args.loc_json)
+        raw_locs = json.load(f)
+        size[0] = int(raw_locs["x_pos_shape"])
+        size[1] = int(raw_locs["y_pos_shape"])
+        size[2] = int(raw_locs["z_pos_shape"])
 
     fovs = False
     if args.selected_fovs is not None:
