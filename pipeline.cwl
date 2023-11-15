@@ -44,6 +44,10 @@ inputs:
     type: File?
     doc: Flattened json input, refer to record entry.
 
+  locs_json:
+    type: File?
+    doc: Flattened json input, refer to record entry.
+
   mask_roi_files:
     type: Directory?
     doc: Flattened directory input, refer to record entry "binary_mask"
@@ -153,11 +157,11 @@ inputs:
   fov_positioning:
     - 'null'
     - type: record
-      name: dummy
+      name: locs
       fields:
-        dummy:
-          type: string?
-          doc: Added to prevent cli parsing of the fov_positioning record.
+        locs:
+          type: File?
+          doc: Input locations as a json file, using the same records as below.
     - type: record
       name: fov_positioning
       fields:
@@ -950,7 +954,7 @@ steps:
             }
           }
       fov_positioning:
-        source: [fov_positioning, stage/fov_positioning_x_locs, stage/fov_positioning_x_shape, stage/fov_positioning_x_voxel, stage/fov_positioning_y_locs, stage/fov_positioning_y_shape, stage/fov_positioning_y_voxel, stage/fov_positioning_z_locs, stage/fov_positioning_z_shape, stage/fov_positioning_z_voxel]
+        source: [fov_positioning, stage/fov_positioning_x_locs, stage/fov_positioning_x_shape, stage/fov_positioning_x_voxel, stage/fov_positioning_y_locs, stage/fov_positioning_y_shape, stage/fov_positioning_y_voxel, stage/fov_positioning_z_locs, stage/fov_positioning_z_shape, stage/fov_positioning_z_voxel, locs_json]
         valueFrom: |
           ${
             if(self[1]) {
@@ -967,6 +971,8 @@ steps:
               };
             } else if (self[0]) {
               return self[0];
+            } else if (self[10]) {
+              return {"locs": self[10]};
             } else {
               return null;
             }
@@ -1240,18 +1246,22 @@ steps:
         pickValue: first_non_null
       parameter_json: parameter_json
       imagesize:
-        source: fov_positioning
+        source: [fov_positioning, locs_json]
         valueFrom: |
           ${
-            if(self &&
-               'x_shape' in self && self['x_shape'] != null &&
-               'y_shape' in self && self['y_shape'] != null &&
-               'z_shape' in self && self['z_shape'] != null){
+            if(self[0] &&
+               'x_shape' in self[0] && self[0]['x_shape'] != null &&
+               'y_shape' in self[0] && self[0]['y_shape'] != null &&
+               'z_shape' in self[0] && self[0]['z_shape'] != null){
               return {
-                "x_size": self['x_shape'],
-                "y_size": self['y_shape'],
-                "z_size": self['z_shape']
+                "x_size": self[0]['x_shape'],
+                "y_size": self[0]['y_shape'],
+                "z_size": self[0]['z_shape']
               };
+            } else if(self[0] && "locs" in self[0]){
+              return self[0];
+            } else if(self[1]){
+              return {"locs": self[1]};
             } else {
               return null;
             }

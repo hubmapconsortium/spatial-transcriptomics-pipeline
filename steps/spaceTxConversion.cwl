@@ -26,6 +26,10 @@ inputs:
     type: File?
     doc: Flattened json input, refer to record entry.
 
+  locs_json:
+    type: File?
+    doc: Flattened json input, refer to record entry.
+
   codebook:
     type:
       - 'null'
@@ -127,11 +131,11 @@ inputs:
   fov_positioning:
     - 'null'
     - type: record
-      name: dummy
+      name: locs
       fields:
-        dummy:
-          type: string?
-          doc: Added to prevent cli parsing of the fov_positioning record.
+        locs:
+          type: File?
+          doc: Input locations as a json file, using the same records as below.
     - type: record
       name: fov_positioning
       fields:
@@ -329,8 +333,7 @@ steps:
             prefix: --cache-read-order
 
         aux_tilesets:
-          type:
-            type: record
+          - type: record
             name: aux_tilesets
             fields:
               aux_names:
@@ -368,6 +371,13 @@ steps:
 
         fov_positioning:
           - 'null'
+          - type: record
+            name: locs
+            fields:
+              locs:
+                type: File?
+                inputBinding:
+                  prefix: --loc-json
           - type: record
             name: fov_positioning
             fields:
@@ -488,12 +498,14 @@ steps:
             };
           }
       fov_positioning:
-        source: [fov_positioning, stage_conversion/fov_positioning_x_locs, stage_conversion/fov_positioning_x_shape, stage_conversion/fov_positioning_x_voxel, stage_conversion/fov_positioning_y_locs, stage_conversion/fov_positioning_y_shape, stage_conversion/fov_positioning_y_voxel, stage_conversion/fov_positioning_z_locs, stage_conversion/fov_positioning_z_shape, stage_conversion/fov_positioning_z_voxel]
+        source: [fov_positioning, stage_conversion/fov_positioning_x_locs, stage_conversion/fov_positioning_x_shape, stage_conversion/fov_positioning_x_voxel, stage_conversion/fov_positioning_y_locs, stage_conversion/fov_positioning_y_shape, stage_conversion/fov_positioning_y_voxel, stage_conversion/fov_positioning_z_locs, stage_conversion/fov_positioning_z_shape, stage_conversion/fov_positioning_z_voxel, locs_json]
         valueFrom: |
           ${
             if(self[1] === null){
-              if(!(self[0].x_locs === null) && !(self[0].x_shape === null) && !(self[0].x_voxel === null)){
+              if((self[0].hasAttribute("x_locs") && self[0].hasAttribute("x_shape") && self[0].hasAttribute("x_voxel")) || self[0].hasAttribute("locs")){
                 return self[0];
+              } else if(self[10]){
+                return {"locs": self[10]};
               } else {
                 return null;
               }

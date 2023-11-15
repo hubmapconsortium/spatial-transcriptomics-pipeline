@@ -19,6 +19,10 @@ inputs:
     type: File?
     doc: Flattened codebook input, refer to record entry.
 
+  locs_json:
+    type: File?
+    doc: Flattened json input, refer to record entry.
+
   codebook:
     type:
       - 'null'
@@ -89,11 +93,11 @@ inputs:
     type:
       - 'null'
       - type: record
-        name: dummy
+        name: locs
         fields:
-          dummy:
-            type: string?
-            doc: Added to prevent cli parsing of the fov_positioning record.
+          locs:
+            type: File?
+            doc: Input locations as a json file, using the same records as below.
       - type: record
         name: fov_positioning
         fields:
@@ -245,6 +249,13 @@ steps:
         imagesize:
           - 'null'
           - type: record
+            name: locs
+            fields:
+              locs:
+                type: File?
+                inputBinding:
+                  prefix: --loc-json
+          - type: record
             fields:
               - name: x_size
                 type: int
@@ -332,11 +343,17 @@ steps:
           }
       roi: roi
       imagesize:
-        source: [imagesize, stage_qc/fov_positioning_x_shape, stage_qc/fov_positioning_y_shape, stage_qc/fov_positioning_z_shape]
+        source: [imagesize, stage_qc/fov_positioning_x_shape, stage_qc/fov_positioning_y_shape, stage_qc/fov_positioning_z_shape, locs_json]
         valueFrom: |
           ${
             if(!self[1]){
-              return self[0];
+              if(self[0]){
+                return self[0];
+              } else if(self[4]){
+                return {"locs": self[4]};
+              } else {
+                return null;
+              }
             } else {
               return {
                 "x_size": self[1],
