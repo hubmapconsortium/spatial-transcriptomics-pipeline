@@ -1,11 +1,12 @@
 #!/usr/bin/env python
 
 import functools
+import hashlib
+import json
 import os
 import random
 import re
 import sys
-import json
 from argparse import ArgumentParser
 from datetime import datetime
 from pathlib import Path
@@ -1261,8 +1262,8 @@ if __name__ == "__main__":
     voxel = {}
     raw_locs = {}
 
-    locs = ["{}_pos_locs", "{}_pos_shape", "{}_pos_voxel"]
-    dims = ["x","y","z"]
+    dims = ["{}_locs", "{}_shape", "{}_voxel"]
+    axes = ["x", "y", "z"]
     # load locs from json
     if args.loc_json:
         f = open(args.loc_json)
@@ -1270,27 +1271,28 @@ if __name__ == "__main__":
 
         # validate that json has expected keys
         missing_keys = []
-        for l in locs:
-            for d in dims:
-                var = l.format(d)
+        for d in dims:
+            for a in axes:
+                var = d.format(a)
                 if var not in raw_locs.keys():
                     missing_keys.append(var)
         if len(missing_keys) > 0:
-            raise Exception("Loaded location json is missing expected keys: " + missing_keys)
+            raise Exception("Loaded location json is missing expected keys: " + str(missing_keys))
     # load locs from passed parameters
-    else if args.x_pos_locs:
-        for l in locs:
-            for d in dims:
-                var = l.format(d)
-                raw_locs[var] = getattr(args, var)
+    elif args.x_pos_locs:
+        for d in dims:
+            for a in axes:
+                var = d.format(a)
+                var_long = d.format(a + "_pos")
+                raw_locs[var] = getattr(args, var_long)
     # format locs, if present.
     if len(raw_locs) > 0:
         # sanity check that length matches number of fovs:
         axis = [Axes.X, Axes.Y, Axes.ZPLANE]
         pos_locs = {}
-        pos_locs[Axes.X] = raw_locs["x_pos_locs"]
-        pos_locs[Axes.Y] = raw_locs["y_pos_locs"]
-        pos_locs[Axes.ZPLANE] = raw_locs["z_pos_locs"]
+        pos_locs[Axes.X] = raw_locs["x_locs"]
+        pos_locs[Axes.Y] = raw_locs["y_locs"]
+        pos_locs[Axes.ZPLANE] = raw_locs["z_locs"]
 
         for ax in axis:
             if pos_locs[ax]:
@@ -1305,13 +1307,13 @@ if __name__ == "__main__":
                     this_loc[ax] = float(pos_locs[ax][i])
             locs.append(this_loc)
 
-        shape[Axes.X] = int(raw_locs["x_pos_shape"])
-        shape[Axes.Y] = int(raw_locs["y_pos_shape"])
-        shape[Axes.ZPLANE] = int(raw_locs["z_pos_shape"])
+        shape[Axes.X] = int(raw_locs["x_shape"])
+        shape[Axes.Y] = int(raw_locs["y_shape"])
+        shape[Axes.ZPLANE] = int(raw_locs["z_shape"])
 
-        voxel[Axes.X] = float(raw_locs["x_pos_voxel"])
-        voxel[Axes.Y] = float(raw_locs["y_pos_voxel"])
-        voxel[Axes.ZPLANE] = float(raw_locs["z_pos_voxel"])
+        voxel[Axes.X] = float(raw_locs["x_voxel"])
+        voxel[Axes.Y] = float(raw_locs["y_voxel"])
+        voxel[Axes.ZPLANE] = float(raw_locs["z_voxel"])
 
     counts = {
         "rounds": args.round_count,

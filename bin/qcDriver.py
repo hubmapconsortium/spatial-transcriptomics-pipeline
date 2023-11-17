@@ -2,9 +2,9 @@
 
 import collections
 import gc
+import json
 import pickle
 import sys
-import json
 from argparse import ArgumentParser
 from datetime import datetime
 from functools import partialmethod
@@ -1582,9 +1582,9 @@ if __name__ == "__main__":
     elif args.loc_json:
         f = open(args.loc_json)
         raw_locs = json.load(f)
-        size[0] = int(raw_locs["x_pos_shape"])
-        size[1] = int(raw_locs["y_pos_shape"])
-        size[2] = int(raw_locs["z_pos_shape"])
+        size[0] = int(raw_locs["x_shape"])
+        size[1] = int(raw_locs["y_shape"])
+        size[2] = int(raw_locs["z_shape"])
 
     fovs = False
     if args.selected_fovs is not None:

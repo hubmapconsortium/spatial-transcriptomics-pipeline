@@ -502,7 +502,7 @@ steps:
         valueFrom: |
           ${
             if(self[1] === null){
-              if((self[0].hasAttribute("x_locs") && self[0].hasAttribute("x_shape") && self[0].hasAttribute("x_voxel")) || self[0].hasAttribute("locs")){
+              if(self[0] !== null && ((self[0].x_locs !== null && self[0].x_shape !== null && self[0].x_voxel !== null) || self[0].locs !== null)){
                 return self[0];
               } else if(self[10]){
                 return {"locs": self[10]};

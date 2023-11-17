@@ -27,6 +27,8 @@
 	{
 		"fov_positioning":[
 			[
+			],
+			[
 				"x_locs?",
 				"x_shape?",
 				"x_voxel?",
@@ -36,8 +38,6 @@
 				"z_locs?",
 				"z_shape?",
 				"z_voxel?"
-			],
-			[
 			]
 		]
 	},
