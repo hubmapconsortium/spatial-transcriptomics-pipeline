@@ -374,8 +374,15 @@ class FISHTile(FetchedTile):
         # print(cached_read_fn(self._file_path).shape)
         try:
             if ".dax" in self._file_path and not self.aux:
+                if self.data_org is None:
+                    raise Exception("If images are of type .dax, a data_org_file is required.")
+
                 color_count = len(
-                    set(data_org[["bit" in name for name in data_org["channelName"]]]["color"])
+                    set(
+                        self.data_org[["bit" in name for name in self.data_org["channelName"]]][
+                            "color"
+                        ]
+                    )
                 )
                 prefix = "/".join(self._file_path.split("/")[:-1])
                 suffix = self._file_path.split("/")[-1]

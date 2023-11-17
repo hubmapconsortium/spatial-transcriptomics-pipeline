@@ -30,6 +30,10 @@ inputs:
     type: File?
     doc: Flattened json input, refer to record entry.
 
+  data_org_file:
+    type: File?
+    doc: The data org file used to describe .dax formatted images.
+
   codebook:
     type:
       - 'null'
@@ -277,6 +281,11 @@ steps:
                   inputBinding:
                     prefix: --codebook-json
 
+        data_org_file:
+          type: File?
+          inputBinding:
+            prefix: --data-org-file
+
         round_count:
           type: int
           inputBinding:
@@ -445,6 +454,7 @@ steps:
               return {json: self[2]};
             }
           }
+      data_org_file: data_org_file
       round_count:
         source: [stage_conversion/round_count, round_count]
         pickValue: first_non_null

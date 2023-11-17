@@ -48,6 +48,10 @@ inputs:
     type: File?
     doc: Flattened json input, refer to record entry.
 
+  data_org_file:
+    type: File?
+    doc: The data org file used to describe .dax formatted images.
+
   mask_roi_files:
     type: Directory?
     doc: Flattened directory input, refer to record entry "binary_mask"
@@ -581,12 +585,6 @@ inputs:
     doc: If true, will save graphical output to a pdf.
     default: True
 
-# Pipeline directly... we may not need this tbh.
-#  img_size:
-#    type: int
-#    doc: Size of docker image in MiB, used for select disk space requirements.
-#    default: 8000
-
 outputs:
   1_Pseudosort:
     type: Directory
@@ -801,6 +799,7 @@ steps:
               return self[0];
             }
           }
+      data_org_file: data_org_file
       round_count:
         source: [stagedSorted/round_count, round_count]
         valueFrom: |
