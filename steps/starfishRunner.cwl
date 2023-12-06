@@ -252,7 +252,7 @@ steps:
              return {"scatter_out": new Array(fovs)};
            } else {
              var scattered = new Array(inputs.scatter_into_n);
-             var chunkSize = Math.ceil(inputs.fov_count / inputs.scatter_into_n);
+             var chunkSize = Math.ceil(fovs.length / inputs.scatter_into_n);
              var loc = 0;
              for (let i = 0; i<fovs.length; i += chunkSize) {
                var subs = [];

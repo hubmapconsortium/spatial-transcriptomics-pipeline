@@ -174,7 +174,7 @@ steps:
              return {"scatter_out": new Array(fovs)};
            } else {
              var scattered = new Array(inputs.scatter_into_n);
-             var chunkSize = Math.ceil(inputs.fov_count / inputs.scatter_into_n);
+             var chunkSize = Math.ceil(fovs.length / inputs.scatter_into_n);
              var loc = 0;
              for (let i = 0; i<fovs.length; i += chunkSize) {
                var subs = [];
@@ -316,16 +316,12 @@ steps:
               if(inputs.dir_size === null) {
                 return null;
               } else {
-                return inputs.dir_size * 4;
+                return inputs.dir_size;
               }
             }
           outdirMin: |
             ${
-              if(inputs.dir_size === null) {
-                return null;
-              } else {
-                return inputs.dir_size * 4;
-              }
+              return 1000;
             }
           coresMin: |
             ${

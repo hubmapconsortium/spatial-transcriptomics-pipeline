@@ -238,16 +238,12 @@ steps:
               if(inputs.dir_size === null) {
                 return null;
               } else {
-                return inputs.dir_size * 4;
+                return inputs.dir_size;
               }
             }
           outdirMin: |
             ${
-              if(inputs.dir_size === null) {
-                return null;
-              } else {
-                return inputs.dir_size * 4;
-              }
+              return 1000;
             }
 
       inputs:
