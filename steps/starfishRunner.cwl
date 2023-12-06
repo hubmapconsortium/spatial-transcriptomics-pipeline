@@ -325,17 +325,12 @@ steps:
     out: [tmp]
 
   fileDivider:
-    scatter: [scatter, tmpname]
-    scatterMethod: dotproduct
+    scatter: scatter
     run:
       class: ExpressionTool
       requirements:
-        InlineJavascriptRequirement: {}
-        LoadListingRequirement: {}
-        ResourceRequirement:
-          ramMin: 1000
-          tmpdirMin: 1000
-          outdirMin: 1000
+        - class: InlineJavascriptRequirement
+        - class: LoadListingRequirement
 
       inputs:
         experiment:
@@ -348,12 +343,8 @@ steps:
             items: int
           doc: List describing the FOVs in this specific scatter.
 
-        tmpname:
-          type: string
-          doc: suffixes for output folders
-
       outputs:
-        out: Directory
+        out: File[]
 
       expression: |
         ${
@@ -370,27 +361,27 @@ steps:
               }
             }
           }
-          return {"out": {
-            "class": "Directory",
-            "basename": "3A_divided_tx_"+inputs.tmpname,
-            "listing": dir_lis}
-          };
+          return {"out": dir_lis};
         }
     in:
       experiment: exp_loc
       scatter: scatter_generator/scatter_out
-      tmpname: tmpname/tmp
     out:
       [out]
 
   execute_runner:
-    scatter: [selected_fovs, tmp_prefix, exp_loc]
+    scatter: [selected_fovs, tmp_prefix, exp_files]
     scatterMethod: dotproduct
     run:
       class: CommandLineTool
       baseCommand: /opt/starfishDriver.py
 
       requirements:
+        InitialWorkDirRequirement:
+          listing:
+            - entryname: "$('input_dir_'+inputs.tmp_prefix)"
+              writable: true
+              entry: "$({class: 'Directory', listing: inputs.exp_files})"
         DockerRequirement:
           dockerPull: hubmap/starfish-custom:latest
         ResourceRequirement:
@@ -444,8 +435,12 @@ steps:
           inputBinding:
             prefix: --tmp-prefix
 
+        exp_files:
+          type: File[]
+          doc: Formatted input from fileDivider step.
+
         exp_loc:
-          type: Directory
+          type: string
           inputBinding:
             prefix: --exp-loc
 
@@ -651,7 +646,9 @@ steps:
     in:
       tmp_prefix: tmpname/tmp
       dir_size: dir_size
-      exp_loc: fileDivider/out
+      exp_files: fileDivider/out
+      exp_loc:
+        valueFrom: $("input_dir_" + inputs.tmp_prefix)
       selected_fovs: scatter_generator/scatter_out
       fov_count:
         source: [stage_runner/fov_count, fov_count]

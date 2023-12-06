@@ -247,13 +247,13 @@ steps:
     out: [tmp]
 
   fileDivider:
-    scatter: [scatter, tmpname]
-    scatterMethod: dotproduct
+    scatter: scatter
     run:
       class: ExpressionTool
       requirements:
         - class: InlineJavascriptRequirement
         - class: LoadListingRequirement
+
       inputs:
         experiment:
           type: Directory
@@ -265,12 +265,8 @@ steps:
             items: int
           doc: List describing the FOVs in this specific scatter.
 
-        tmpname:
-          type: string
-          doc: suffixes for output folders
-
       outputs:
-        out: Directory
+        out: File[]
 
       expression: |
         ${
@@ -287,27 +283,27 @@ steps:
               }
             }
           }
-          return {"out": {
-            "class": "Directory",
-            "basename": "2A_divided_tx_"+inputs.tmpname,
-            "listing": dir_lis}
-          };
+          return {"out": dir_lis};
         }
     in:
       experiment: input_dir
       scatter: scatter_generator/scatter_out
-      tmpname: tmpname/tmp
     out:
       [out]
 
   execute_processing:
-    scatter: [selected_fovs, tmp_prefix, input_dir]
+    scatter: [selected_fovs, tmp_prefix, input_files]
     scatterMethod: dotproduct
     run:
       class: CommandLineTool
       baseCommand: /opt/imgProcessing.py
 
       requirements:
+        InitialWorkDirRequirement:
+          listing:
+            - entryname: "$('input_dir_'+inputs.tmp_prefix)"
+              writable: true
+              entry: "$({class: 'Directory', listing: inputs.input_files})"
         DockerRequirement:
           dockerPull: hubmap/starfish-custom:latest
         ResourceRequirement:
@@ -349,8 +345,12 @@ steps:
           inputBinding:
             prefix: --tmp-prefix
 
+        input_files:
+          type: File[]
+          doc: Formatted input from fileDivider step.
+
         input_dir:
-          type: Directory
+          type: string
           inputBinding:
             prefix: --input-dir
           doc: Root directory containing space_tx formatted experiment
@@ -481,7 +481,9 @@ steps:
     in:
       dir_size: dir_size
       tmp_prefix: tmpname/tmp
-      input_dir: fileDivider/out
+      input_files: fileDivider/out
+      input_dir:
+        valueFrom: $("input_dir_" + inputs.tmp_prefix)
       selected_fovs: scatter_generator/scatter_out
       clip_min:
         source: [stage_processing/clip_min, clip_min]
