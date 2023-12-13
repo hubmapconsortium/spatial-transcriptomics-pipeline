@@ -166,7 +166,7 @@ steps:
         ${ var fovs = inputs.selected_fovs;
            if(fovs === null){
              fovs = [];
-             for (let i=0; i<inputs.fov_count; i++) {
+             for (var i=0; i<inputs.fov_count; i++) {
                fovs.push(Number(i));
              }
            }
@@ -176,9 +176,9 @@ steps:
              var scattered = new Array(inputs.scatter_into_n);
              var chunkSize = Math.ceil(fovs.length / inputs.scatter_into_n);
              var loc = 0;
-             for (let i = 0; i<fovs.length; i += chunkSize) {
+             for (var i = 0; i<fovs.length; i += chunkSize) {
                var subs = [];
-               for (let j=i; j<i + chunkSize && j<fovs.length; j +=1) {
+               for (var j=i; j<i + chunkSize && j<fovs.length; j +=1) {
                  subs.push(Number(fovs[j]));
                }
                scattered[loc] = subs;
@@ -750,6 +750,18 @@ steps:
             }
       expression: |
         ${
+          var all_fovs = [];
+          for(var i=0; i<inputs.fov_count; i++){
+            var to_push = true;
+            for(var j=0; j<inputs.scatter.length; j++){
+              if(inputs.scatter[j].includes(i)){
+                to_push = false;
+              }
+            }
+            if(to_push) {
+              all_fovs.push(Number(i));
+            }
+          }
           var listing = [];
           for(var i=0;i<inputs.file_array.length;i++){
             for(var j=0;j<inputs.file_array[i].listing.length;j++){
@@ -769,7 +781,13 @@ steps:
           }
           for(var i=0; i<inputs.og_dir.listing.length;i++) {
             var item = inputs.og_dir.listing[i];
-            if(item.basename.includes("json") && !item.basename.includes("fov") && !item.basename.includes("log")) {
+            if(item.basename.includes("fov")){
+              for(var j=0;j<all_fovs.length; j++){
+                if(item.basename.includes("fov_"+String(all_fovs[j]).padStart(5,'0'))) {
+                  listing.push(item);
+                }
+              }
+            } else if(item.basename.includes("json") && !item.basename.includes("log")) {
               listing.push(item);
             }
           }
@@ -791,6 +809,9 @@ steps:
         og_dir:
           type: Directory
 
+        fov_count:
+          type: int
+
         scatter:
           type:
             type: array
@@ -807,4 +828,16 @@ steps:
       og_dir: input_dir
       scatter: scatter_generator/scatter_out
       dir_size: dir_size
+      fov_count:
+        source: [stage_processing/fov_count, fov_count]
+        valueFrom: |
+          ${
+            if(self[0]){
+              return self[0];
+            } else if(self[1]) {
+              return self[1];
+            } else {
+              return null;
+            }
+          }
     out: [pool_dir]
