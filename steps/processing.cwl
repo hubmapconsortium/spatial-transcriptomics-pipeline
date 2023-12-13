@@ -731,23 +731,6 @@ steps:
       requirements:
         InlineJavascriptRequirement: {}
         LoadListingRequirement: {}
-        ResourceRequirement:
-          tmpdirMin: |
-            ${
-              if(inputs.dir_size === null) {
-                return null;
-              } else {
-                return inputs.dir_size * 1.2;
-              }
-            }
-          outdirMin: |
-            ${
-              if(inputs.dir_size === null) {
-                return null;
-              } else {
-                return inputs.dir_size * 0.2;
-              }
-            }
       expression: |
         ${
           var listing = [];

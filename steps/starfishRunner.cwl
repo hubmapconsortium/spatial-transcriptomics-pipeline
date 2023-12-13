@@ -390,16 +390,12 @@ steps:
               if(inputs.dir_size === null) {
                 return null;
               } else {
-                return inputs.dir_size * 1.2;
+                return inputs.dir_size;
               }
             }
           outdirMin: |
             ${
-              if(inputs.dir_size === null) {
-                return null;
-              } else {
-                return inputs.dir_size * 0.2;
-              }
+              return 1000;
             }
           coresMin: |
             ${
@@ -802,23 +798,6 @@ steps:
         InlineJavascriptRequirement: {}
         LoadListingRequirement:
           loadListing: deep_listing
-        ResourceRequirement:
-          tmpdirMin: |
-            ${
-              if(inputs.dir_size === null) {
-                return null;
-              } else {
-                return inputs.dir_size * 1.2;
-              }
-            }
-          outdirMin: |
-            ${
-              if(inputs.dir_size === null) {
-                return null;
-              } else {
-                return inputs.dir_size * 1.2;
-              }
-            }
       expression: |
         ${
           var listing = [];
