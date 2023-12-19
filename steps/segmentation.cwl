@@ -167,6 +167,11 @@ steps:
       requirements:
         DockerRequirement:
           dockerPull: hubmap/starfish-custom:latest
+        InitialWorkDirRequirement:
+          listing:
+            - entryname: "$('input_dir_'+inputs.tmp_prefix)"
+              writable: true
+              entry: "$(inputs.exp_loc)"
 
       inputs:
         tmp_prefix:
@@ -181,6 +186,9 @@ steps:
 
         exp_loc:
           type: Directory
+
+        exp_loc_staged:
+          type: string
           inputBinding:
             prefix: --exp-loc
 
@@ -288,6 +296,8 @@ steps:
       tmp_prefix: tmpname/tmp
       decoded_loc: decoded_loc
       exp_loc: exp_loc
+      exp_loc_staged:
+        valueFrom: $("input_dir_" + inputs.tmp_prefix)
       selected_fovs:
         source: [stage_segmentation/selected_fovs, selected_fovs]
         valueFrom: |

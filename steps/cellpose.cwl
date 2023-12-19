@@ -142,6 +142,11 @@ steps:
       baseCommand: /opt/cellposeStaging.py
 
       requirements:
+        InitialWorkDirRequirement:
+          listing:
+            - entryname: "$('input_dir_'+inputs.tmp_prefix)"
+              writable: true
+              entry: "$(inputs.exp_loc)"
         DockerRequirement:
           dockerPull: hubmap/starfish-custom:latest
         ResourceRequirement:
@@ -150,16 +155,12 @@ steps:
               if(inputs.dir_size === null) {
                 return null;
               } else {
-                return inputs.dir_size * 4;
+                return inputs.dir_size;
               }
             }
           outdirMin: |
             ${
-              if(inputs.dir_size === null) {
-                return null;
-              } else {
-                return inputs.dir_size * 4;
-              }
+              return 1000;
             }
 
       inputs:
@@ -174,6 +175,9 @@ steps:
         exp_loc:
           type: Directory
           doc: Root directory containing space_tx formatted experiment
+
+        exp_loc_staged:
+          type: string
           inputBinding:
             prefix: --input-dir
 
@@ -211,6 +215,8 @@ steps:
       dir_size: dir_size
       tmp_prefix: tmpname/tmp
       exp_loc: exp_loc
+      exp_loc_staged:
+        valueFrom: $("input_dir_" + inputs.tmp_prefix)
       decoded_loc:
         source: [decoded_loc, stage_cellpose/use_mrna, use_mrna]
         valueFrom: |
