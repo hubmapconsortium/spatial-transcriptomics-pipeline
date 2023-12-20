@@ -730,7 +730,8 @@ steps:
       class: ExpressionTool
       requirements:
         InlineJavascriptRequirement: {}
-        LoadListingRequirement: {}
+        LoadListingRequirement:
+          loadListing: deep_listing
       expression: |
         ${
           var all_fovs = [];
