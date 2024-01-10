@@ -749,7 +749,7 @@ steps:
           var listing = [];
           for(var i=0;i<inputs.file_array.length;i++){
             for(var j=0;j<inputs.file_array[i].listing.length;j++){
-              var item = inputs.file_array[i].listing[j]
+              var item = inputs.file_array[i].listing[j];
               if(!item.basename.includes("json")) {
                 listing.push(item);
               } else {
@@ -769,6 +769,7 @@ steps:
               for(var j=0;j<all_fovs.length; j++){
                 if(item.basename.includes("fov_"+String(all_fovs[j]).padStart(5,'0'))) {
                   listing.push(item);
+                  break;
                 }
               }
             } else if(item.basename.includes("json") && !item.basename.includes("log")) {
