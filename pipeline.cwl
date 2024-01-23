@@ -1242,7 +1242,16 @@ steps:
           }
       segmentation_loc:
         source: [baysorStaged/baysor, segmentation/segmented]
-        pickValue: first_non_null
+        valueFrom: |
+          ${
+            if(self[0]) {
+              return self[0];
+            } else if(self[1]) {
+              return self[1];
+            } else {
+              return null;
+            }
+          }
       parameter_json: parameter_json
       imagesize:
         source: [fov_positioning, locs_json]

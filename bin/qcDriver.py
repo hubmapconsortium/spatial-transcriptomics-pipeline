@@ -1484,7 +1484,7 @@ if __name__ == "__main__":
     p = ArgumentParser()
 
     p.add_argument("--tmp-prefix", type=str)
-    p.add_argument("--codebook-exp", type=Path)
+    p.add_argument("--codebook-file", type=Path)
     p.add_argument("--exp-output", type=Path)
     p.add_argument("--selected-fovs", nargs="+", const=None)
     p.add_argument("--has-spots", dest="has_spots", action="store_true")
@@ -1543,15 +1543,13 @@ if __name__ == "__main__":
                 "{}/spots/{}_SpotFindingResults.json".format(args.exp_output, k)
             )
 
-    if args.codebook_exp:
-        codebook = Codebook.open_json(str(args.codebook_exp) + "/codebook.json")
+    if args.codebook_file:
+        codebook = Codebook.open_json(str(args.codebook_file))
 
         if (
             args.roi
         ):  # NOTE Going to assume 1 FOV for now. Largely used for debugging, not pipeline runs.
-            exp = starfish.core.experiment.experiment.Experiment.from_json(
-                str(args.codebook_exp) + "/experiment.json"
-            )
+            exp = starfish.core.experiment.experiment.Experiment.from_json(str(args.codebook_file))
             img = exp[list(exp.keys())[0]].get_image("primary")
             roi = BinaryMaskCollection.from_fiji_roi_set(
                 path_to_roi_set_zip=args.roi, original_image=img
