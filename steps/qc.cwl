@@ -19,6 +19,10 @@ inputs:
     type: File?
     doc: Flattened codebook input, refer to record entry.
 
+  locs_json:
+    type: File?
+    doc: Flattened json input, refer to record entry.
+
   codebook:
     type:
       - 'null'
@@ -89,11 +93,11 @@ inputs:
     type:
       - 'null'
       - type: record
-        name: dummy
+        name: locs
         fields:
-          dummy:
-            type: string?
-            doc: Added to prevent cli parsing of the fov_positioning record.
+          locs:
+            type: File?
+            doc: Input locations as a json file, using the same records as below.
       - type: record
         name: fov_positioning
         fields:
@@ -140,7 +144,11 @@ steps:
 
       requirements:
         DockerRequirement:
-          dockerPull: hubmap/starfish-custom:2.61
+          dockerPull: hubmap/starfish-custom:latest
+        ResourceRequirement:
+          ramMin: 1000
+          tmpdirMin: 1000
+          outdirMin: 1000
 
       inputs:
         schema:
@@ -165,6 +173,49 @@ steps:
     out: [selected_fovs, find_ripley, save_pdf, fov_positioning_x_shape, fov_positioning_y_shape, fov_positioning_z_shape, decoding_decode_method, decoding_magnitude_threshold, decoding_decoder_min_intensity]
     when: $(inputs.datafile != null)
 
+  codebook_grabber:
+    run:
+      class: ExpressionTool
+      requirements:
+        - class: InlineJavascriptRequirement
+        - class: LoadListingRequirement
+
+      inputs:
+        experiment:
+          type: Directory?
+          doc: A directory containing a spaceTx-formatted experiment
+
+      outputs:
+        codebook:
+          type: File?
+
+      expression: |
+        ${
+          for(var i=0;i<inputs.experiment.listing.length; i++){
+            if(inputs.experiment.listing[i].basename.includes("codebook.json")){
+              return {"codebook": inputs.experiment.listing[i]};
+            }
+          }
+          return null;
+        }
+    in:
+      experiment:
+        source: [codebook, codebook_exp]
+        valueFrom: |
+          ${
+            if(self[1]){
+              return self[1];
+            } else if(self[0] && "exp" in self[0]) {
+              return self[0].exp;
+            } else {
+              return null;
+            }
+          }
+    out:
+      [codebook]
+    when: $(inputs.experiment != null)
+
+
   execute_qc:
     run:
       class: CommandLineTool
@@ -172,7 +223,12 @@ steps:
 
       requirements:
         DockerRequirement:
-          dockerPull: hubmap/starfish-custom:2.61
+          dockerPull: hubmap/starfish-custom:latest
+        InitialWorkDirRequirement:
+          listing:
+            - entryname: "$('input_dir_' + inputs.tmp_prefix)"
+              writable: true
+              entry: "$(inputs.data_exp_dir)"
 
       inputs:
         tmp_prefix:
@@ -192,17 +248,21 @@ steps:
               name: exp
               fields:
                 exp:
-                  type: Directory
+                  type: File
                   inputBinding:
-                    prefix: --codebook-exp
+                    prefix: --codebook-file
 
         segmentation_loc:
           type: Directory?
           inputBinding:
             prefix: --segmentation-loc
 
+        data_exp_dir:
+          type: Directory
+
         data:
           type:
+          - 'null'
           - type: record
             name: pkl
             fields:
@@ -214,13 +274,11 @@ steps:
                 type: File
                 inputBinding:
                   prefix: --transcript-pkl
-          - type: record
-            name: exp
-            fields:
-              exp:
-                type: Directory
-                inputBinding:
-                  prefix: --exp-output
+
+        data_exp_staged:
+          type: string
+          inputBinding:
+            prefix: --exp-output
 
         selected_fovs:
           type: int[]?
@@ -235,11 +293,18 @@ steps:
 
         roi:
           type: File?
-          inputBinding:
+          inputBinding: 
             prefix: --roi
 
         imagesize:
           - 'null'
+          - type: record
+            name: locs
+            fields:
+              locs:
+                type: File?
+                inputBinding:
+                  prefix: --loc-json
           - type: record
             fields:
               - name: x_size
@@ -280,13 +345,13 @@ steps:
     in:
       tmp_prefix: tmpname/tmp
       codebook:
-        source: [codebook, codebook_exp, codebook_pkl]
+        source: [codebook, codebook_grabber/codebook, codebook_pkl]
         valueFrom: |
           ${
-            if(self[0]){
-              return self[0];
-            } else if(self[1]) {
+            if(self[1]){
               return {exp: self[1]};
+            } else if(self[0]) {
+              return self[0];
             } else {
               return {pkl: self[2]}
             }
@@ -315,24 +380,44 @@ steps:
              }
           }
       data:
-        source: [data, data_exp, data_pkl_spots, data_pkl_transcripts]
+        source: [data, data_pkl_spots, data_pkl_transcripts]
         valueFrom: |
           ${
-            if(self[0]){
+            if(self[0] && !("exp" in self[0])){
               return self[0];
-            } else if(self[1]) {
-              return {exp: self[1]};
+            } else if(self[2]){
+              return {pkl: {spots: self[1], transcripts: self[2]}};
             } else {
-              return {pkl: {spots: self[2], transcripts: self[3]}};
+              return null;
             }
           }
+      data_exp_dir:
+        source: [data, data_exp]
+        valueFrom: |
+          ${
+            if(self[0] && "exp" in self[0]){
+              return self[0].exp;
+            } else if(self[1]) {
+              return self[1];
+            } else {
+              return null;
+            }
+          }
+      data_exp_staged:
+        valueFrom: $("input_dir_" + inputs.tmp_prefix)
       roi: roi
       imagesize:
-        source: [imagesize, stage_qc/fov_positioning_x_shape, stage_qc/fov_positioning_y_shape, stage_qc/fov_positioning_z_shape]
+        source: [imagesize, stage_qc/fov_positioning_x_shape, stage_qc/fov_positioning_y_shape, stage_qc/fov_positioning_z_shape, locs_json]
         valueFrom: |
           ${
             if(!self[1]){
-              return self[0];
+              if(self[0]){
+                return self[0];
+              } else if(self[4]){
+                return {"locs": self[4]};
+              } else {
+                return null;
+              }
             } else {
               return {
                 "x_size": self[1],

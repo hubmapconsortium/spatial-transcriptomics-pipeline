@@ -3,7 +3,11 @@ cwlVersion: v1.0
 class: ExpressionTool
 
 requirements:
-  - class: InlineJavascriptRequirement
+  InlineJavascriptRequirement: {}
+  ResourceRequirement:
+    ramMin: 1000
+    tmpdirMin: 1000
+    outdirMin: 1000
 
 inputs:
   datafile:
@@ -35,6 +39,7 @@ outputs:
   aux_tilesets_aux_file_formats: string[]
   aux_tilesets_aux_file_vars: string[]
   aux_tilesets_aux_cache_read_order: string[]
+  aux_tilesets_aux_single_round: string[]
   aux_tilesets_aux_channel_count: float[]
   aux_tilesets_aux_channel_slope: float[]
   aux_tilesets_aux_channel_intercept: int[]
@@ -55,6 +60,7 @@ outputs:
   clip_max: float
   level_method: string
   register_aux_view: string
+  register_to_primary: boolean
   channels_per_reg: int
   background_view: string
   register_background: boolean
@@ -71,6 +77,7 @@ outputs:
   rescale: boolean
   not_filtered_results: boolean
   n_processes: int
+  scatter_into_n: int
   decoding_min_sigma: float[]
   decoding_max_sigma: float[]
   decoding_num_sigma: int
@@ -80,7 +87,7 @@ outputs:
   decoding_decoder_trace_building_strategy: string
   decoding_decoder_max_distance: float
   decoding_decoder_min_intensity: float
-  decoding_decoder_metric: string
+  decoding_decoder_pnorm: int
   decoding_decoder_norm_order: int
   decoding_decoder_anchor_round: int
   decoding_decoder_search_radius: int
@@ -88,7 +95,7 @@ outputs:
   decoding_decoder_error_rounds: int
   decoding_decoder_mode: string
   decoding_decoder_physical_coords: boolean
-  decoding_metric: string
+  decoding_pnorm: int
   decoding_distance_threshold: float
   decoding_magnitude_threshold: float
   decoding_min_area: int
@@ -97,6 +104,7 @@ outputs:
   decoding_composite_decode: boolean
   decoding_composite_pmin: float
   decoding_composite_pmax: float
+  skip_seg: boolean
   run_cellpose: boolean
   use_mrna: boolean
   pretrained_model_str: string

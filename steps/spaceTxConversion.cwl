@@ -14,6 +14,10 @@ inputs:
     type: Directory
     doc: The directory containing all .tiff files
 
+  dir_size:
+    type: long?
+    doc: Size of tiffs, in MiB. If provided, will be used to calculate ResourceRequirement.
+
   codebook_csv:
     type: File?
     doc: Flattened csv input, refer to record entry.
@@ -21,6 +25,14 @@ inputs:
   codebook_json:
     type: File?
     doc: Flattened json input, refer to record entry.
+
+  locs_json:
+    type: File?
+    doc: Flattened json input, refer to record entry.
+
+  data_org_file:
+    type: File?
+    doc: The data org file used to describe .dax formatted images.
 
   codebook:
     type:
@@ -107,6 +119,9 @@ inputs:
         aux_cache_read_order:
           type: string[]?
           doc: Order of non x,y dimensions within each image. One entry per aux_name, with semicolon-delimited vars.
+        aux_single_round:
+          type: string[]?
+          doc: If True, aux view will only be a single round.
         aux_channel_count:
           type: int[]?
           doc: Count of channels in each aux image
@@ -120,11 +135,11 @@ inputs:
   fov_positioning:
     - 'null'
     - type: record
-      name: dummy
+      name: locs
       fields:
-        dummy:
-          type: string?
-          doc: Added to prevent cli parsing of the fov_positioning record.
+        locs:
+          type: File?
+          doc: Input locations as a json file, using the same records as below.
     - type: record
       name: fov_positioning
       fields:
@@ -180,7 +195,11 @@ steps:
 
       requirements:
         DockerRequirement:
-          dockerPull: hubmap/starfish-custom:2.61
+          dockerPull: hubmap/starfish-custom:latest
+        ResourceRequirement:
+          ramMin: 1000
+          tmpdirMin: 1000
+          outdirMin: 1000
 
       inputs:
         schema:
@@ -202,7 +221,7 @@ steps:
     in:
       datafile: parameter_json
       schema: read_schema/data
-    out: [round_count, zplane_count, channel_count, fov_count, round_offset, fov_offset, zplane_offset, channel_offset, file_format, file_vars, cache_read_order, aux_tilesets_aux_names, aux_tilesets_aux_file_formats, aux_tilesets_aux_file_vars, aux_tilesets_aux_cache_read_order, aux_tilesets_aux_channel_count, aux_tilesets_aux_channel_slope, aux_tilesets_aux_channel_intercept,  fov_positioning_x_locs, fov_positioning_x_shape, fov_positioning_x_voxel, fov_positioning_y_locs, fov_positioning_y_shape, fov_positioning_y_voxel, fov_positioning_z_locs, fov_positioning_z_shape, fov_positioning_z_voxel, add_blanks]
+    out: [round_count, zplane_count, channel_count, fov_count, round_offset, fov_offset, zplane_offset, channel_offset, file_format, file_vars, cache_read_order, aux_tilesets_aux_names, aux_tilesets_aux_file_formats, aux_tilesets_aux_file_vars, aux_tilesets_aux_cache_read_order, aux_tilesets_aux_single_round, aux_tilesets_aux_channel_count, aux_tilesets_aux_channel_slope, aux_tilesets_aux_channel_intercept,  fov_positioning_x_locs, fov_positioning_x_shape, fov_positioning_x_voxel, fov_positioning_y_locs, fov_positioning_y_shape, fov_positioning_y_voxel, fov_positioning_z_locs, fov_positioning_z_shape, fov_positioning_z_voxel, add_blanks]
     when: $(inputs.datafile != null)
 
   execute_conversion:
@@ -212,8 +231,25 @@ steps:
 
       requirements:
         DockerRequirement:
-            dockerPull: hubmap/starfish-custom:2.61
+            dockerPull: hubmap/starfish-custom:latest
+        ResourceRequirement:
+          tmpdirMin: |
+            ${
+              if(inputs.dir_size === null) {
+                return null;
+              } else {
+                return inputs.dir_size;
+              }
+            }
+          outdirMin: |
+            ${
+              return 1000;
+            }
+
       inputs:
+        dir_size:
+          type: long?
+
         tmp_prefix:
           type: string
           inputBinding:
@@ -240,6 +276,11 @@ steps:
                   type: File
                   inputBinding:
                     prefix: --codebook-json
+
+        data_org_file:
+          type: File?
+          inputBinding:
+            prefix: --data-org-file
 
         round_count:
           type: int
@@ -297,8 +338,7 @@ steps:
             prefix: --cache-read-order
 
         aux_tilesets:
-          type:
-            type: record
+          - type: record
             name: aux_tilesets
             fields:
               aux_names:
@@ -317,6 +357,10 @@ steps:
                 type: string[]?
                 inputBinding:
                   prefix: --aux-cache-read-order
+              aux_single_round:
+                type: string[]?
+                inputBinding:
+                  prefix: --aux-single-round
               aux_channel_count:
                 type: int[]?
                 inputBinding:
@@ -332,6 +376,13 @@ steps:
 
         fov_positioning:
           - 'null'
+          - type: record
+            name: locs
+            fields:
+              locs:
+                type: File?
+                inputBinding:
+                  prefix: --loc-json
           - type: record
             name: fov_positioning
             fields:
@@ -383,6 +434,7 @@ steps:
           outputBinding:
             glob: $("tmp/" + inputs.tmp_prefix + "/2_tx_converted/")
     in:
+      dir_size: dir_size
       tmp_prefix: tmpname/tmp
       tiffs: tiffs
       codebook:
@@ -398,6 +450,7 @@ steps:
               return {json: self[2]};
             }
           }
+      data_org_file: data_org_file
       round_count:
         source: [stage_conversion/round_count, round_count]
         pickValue: first_non_null
@@ -432,7 +485,7 @@ steps:
         source: [stage_conversion/cache_read_order, cache_read_order]
         pickValue: first_non_null
       aux_tilesets:
-        source: [aux_tilesets, stage_conversion/aux_tilesets_aux_names, stage_conversion/aux_tilesets_aux_file_formats, stage_conversion/aux_tilesets_aux_file_vars, stage_conversion/aux_tilesets_aux_cache_read_order, stage_conversion/aux_tilesets_aux_channel_count, stage_conversion/aux_tilesets_aux_channel_slope, stage_conversion/aux_tilesets_aux_channel_intercept]
+        source: [aux_tilesets, stage_conversion/aux_tilesets_aux_names, stage_conversion/aux_tilesets_aux_file_formats, stage_conversion/aux_tilesets_aux_file_vars, stage_conversion/aux_tilesets_aux_cache_read_order, stage_conversion/aux_tilesets_aux_single_round, stage_conversion/aux_tilesets_aux_channel_count, stage_conversion/aux_tilesets_aux_channel_slope, stage_conversion/aux_tilesets_aux_channel_intercept]
         valueFrom: |
           ${
             if(!self[1]){
@@ -443,19 +496,22 @@ steps:
                 aux_file_formats: self[2],
                 aux_file_vars: self[3],
                 aux_cache_read_order: self[4],
-                aux_channel_count: self[5],
-                aux_channel_slope: self[6],
-                aux_channel_intercept: self[7]
+                aux_single_round: self[5],
+                aux_channel_count: self[6],
+                aux_channel_slope: self[7],
+                aux_channel_intercept: self[8]
               };
             };
           }
       fov_positioning:
-        source: [fov_positioning, stage_conversion/fov_positioning_x_locs, stage_conversion/fov_positioning_x_shape, stage_conversion/fov_positioning_x_voxel, stage_conversion/fov_positioning_y_locs, stage_conversion/fov_positioning_y_shape, stage_conversion/fov_positioning_y_voxel, stage_conversion/fov_positioning_z_locs, stage_conversion/fov_positioning_z_shape, stage_conversion/fov_positioning_z_voxel]
+        source: [fov_positioning, stage_conversion/fov_positioning_x_locs, stage_conversion/fov_positioning_x_shape, stage_conversion/fov_positioning_x_voxel, stage_conversion/fov_positioning_y_locs, stage_conversion/fov_positioning_y_shape, stage_conversion/fov_positioning_y_voxel, stage_conversion/fov_positioning_z_locs, stage_conversion/fov_positioning_z_shape, stage_conversion/fov_positioning_z_voxel, locs_json]
         valueFrom: |
           ${
             if(self[1] === null){
-              if(!(self[0].x_locs === null) && !(self[0].x_shape === null) && !(self[0].x_voxel === null)){
+              if(self[0] !== null && ((self[0].x_locs !== null && self[0].x_shape !== null && self[0].x_voxel !== null) || self[0].locs !== null)){
                 return self[0];
+              } else if(self[10]){
+                return {"locs": self[10]};
               } else {
                 return null;
               }

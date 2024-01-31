@@ -2,6 +2,7 @@
 
 import collections
 import gc
+import json
 import pickle
 import sys
 from argparse import ArgumentParser
@@ -954,7 +955,7 @@ def plotBarcodeAbundance(pdf, decoded=None, results=None):
             targets = decoded[decoded["corrected_rounds"] == 0]["target"].data.tolist()
             full_counts = pd.Series(collections.Counter(targets)).sort_values(ascending=False)
         else:
-            fulldict = results["reals_full"]
+            fulldict = results["reals_full"].copy()
             fulldict.update(results["blanks_full"])
             full_counts = pd.Series(fulldict.values()).sort_values(ascending=False)
 
@@ -1483,7 +1484,7 @@ if __name__ == "__main__":
     p = ArgumentParser()
 
     p.add_argument("--tmp-prefix", type=str)
-    p.add_argument("--codebook-exp", type=Path)
+    p.add_argument("--codebook-file", type=Path)
     p.add_argument("--exp-output", type=Path)
     p.add_argument("--selected-fovs", nargs="+", const=None)
     p.add_argument("--has-spots", dest="has_spots", action="store_true")
@@ -1493,6 +1494,7 @@ if __name__ == "__main__":
     p.add_argument("--transcript-pkl", type=Path)
     p.add_argument("--segmentation-loc", type=Path, nargs="?")
 
+    p.add_argument("--loc-json", type=Path)
     p.add_argument("--roi", type=Path)
     p.add_argument("--x-size", type=int, nargs="?")
     p.add_argument("--y-size", type=int, nargs="?")
@@ -1541,15 +1543,13 @@ if __name__ == "__main__":
                 "{}/spots/{}_SpotFindingResults.json".format(args.exp_output, k)
             )
 
-    if args.codebook_exp:
-        codebook = Codebook.open_json(str(args.codebook_exp) + "/codebook.json")
+    if args.codebook_file:
+        codebook = Codebook.open_json(str(args.codebook_file))
 
         if (
             args.roi
         ):  # NOTE Going to assume 1 FOV for now. Largely used for debugging, not pipeline runs.
-            exp = starfish.core.experiment.experiment.Experiment.from_json(
-                str(args.codebook_exp) + "/experiment.json"
-            )
+            exp = starfish.core.experiment.experiment.Experiment.from_json(str(args.codebook_file))
             img = exp[list(exp.keys())[0]].get_image("primary")
             roi = BinaryMaskCollection.from_fiji_roi_set(
                 path_to_roi_set_zip=args.roi, original_image=img
@@ -1577,11 +1577,17 @@ if __name__ == "__main__":
         size[0] = args.x_size
         size[1] = args.y_size
         size[2] = args.z_size
+    elif args.loc_json:
+        f = open(args.loc_json)
+        raw_locs = json.load(f)
+        size[0] = int(raw_locs["x_shape"])
+        size[1] = int(raw_locs["y_shape"])
+        size[2] = int(raw_locs["z_shape"])
 
     fovs = False
     if args.selected_fovs is not None:
         # manually specified FOVs override anything else
-        fovs = ["fov_{:03}".format(int(f)) for f in args.selected_fovs]
+        fovs = ["fov_{:05}".format(int(f)) for f in args.selected_fovs]
     elif args.exp_output:
         # reading in from experiment can have multiple FOVs
         fovs = [k for k in transcripts.keys()]

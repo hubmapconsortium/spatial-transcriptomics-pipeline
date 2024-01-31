@@ -91,11 +91,14 @@ def saveExp(
                 print(f"\tcopied {file}")
 
 
-def register_primary(img, reg_img, chs_per_reg):
+def register_primary_aux(img, reg_img, chs_per_reg):
     """
     Register primary images using provided registration images.
     chs_per_reg is number of primary image channels
     associated with each registration image.
+
+    Calculates shifts between auxillary images using the first
+    auxillary image as a reference, then applies shifts to primary images.
     """
     # Calculate registration shifts from registration images
     shifts = {}
@@ -129,6 +132,44 @@ def register_primary(img, reg_img, chs_per_reg):
     return img
 
 
+def register_primary_primary(img, reg_img):
+    """
+    Register primary images using provided registration images.
+
+    Calculates shifts between primary images and the single auxillary image
+    and then applies shifts to primary images.
+    """
+
+    # Calculate shifts from each primary image to the registration image
+    shifts = {}
+    for r in range(img.num_rounds):
+        for ch in range(img.num_chs):
+            shift, error, diffphase = phase_cross_correlation(
+                reg_img.xarray.data[0, 0], img.xarray.data[r, ch], upsample_factor=100
+            )
+            shifts[(r, ch)] = shift
+
+    # Create transformation matrices
+    shape = img.raw_shape
+    tforms = {}
+    for r, ch in shifts:
+        tform = np.diag([1.0] * 4)
+        # Start from 1 because we don't want to shift in the z direction (if there is one)
+        for i in range(1, 3):
+            tform[i, 3] = shifts[(r, ch)][i]
+        tforms[(r, ch)] = tform
+
+    # Register primary images
+    for r in range(img.num_rounds):
+        for ch in range(img.num_chs):
+            img.xarray.data[r, ch] = ndimage.affine_transform(
+                img.xarray.data[r, ch],
+                np.linalg.inv(tforms[(r, ch)]),
+                output_shape=shape[2:],
+            )
+    return img
+
+
 def subtract_background(img, background):
     """
     Subtract real background image from primary images. Will register to same reference as primary images were
@@ -141,21 +182,24 @@ def subtract_background(img, background):
     for r in range(img.num_rounds):
         for ch in range(img.num_chs):
             for z in range(img.num_zplanes):
-                img.xarray.data[r, ch, z] -= bg_dat[r, ch % num_chs, z]
-            img.xarray.data[r, ch][img.xarray.data[r, ch] < 0] = 0
+                data = img.xarray.data[r, ch, z].astype("float32")
+                data -= bg_dat[r, ch % num_chs, z].astype("float32")
+                data[data < 0] = 0
+                img.xarray.data[r, ch, z] = data.astype("uint16")
 
     return img
 
 
-def morph_open(rchs, image, size):
+def morph_open(images):
     """
     Multiprocessing helper function to run morphological openings in parallel.
     """
+    size = 100
     morphed = []
-    for r, ch in rchs:
-        background = np.zeros_like(image[r, ch])
-        for z in range(image.shape[2]):
-            background[z] = cv2.morphologyEx(image[r, ch, z], cv2.MORPH_OPEN, disk(size))
+    for image in images:
+        background = np.zeros_like(image)
+        for z in range(image.shape[0]):
+            background[z] = cv2.morphologyEx(image[z], cv2.MORPH_OPEN, disk(size))
         morphed.append(background)
     return morphed
 
@@ -173,14 +217,20 @@ def subtract_background_estimate(img, num_threads):
         ranges.append(int((len(rchs) / num_threads) * i))
     chunked_rchs = [rchs[ranges[i] : ranges[i + 1]] for i in range(len(ranges[:-1]))]
 
+    # Create list of lists of images corresponding to the above chunking
+    chunked_imgs = []
+    for rch_chunk in chunked_rchs:
+        chunk = []
+        for rch in rch_chunk:
+            chunk.append(img.xarray.data[rch[0], rch[1]])
+        chunked_imgs.append(chunk)
+
     # Run morph open in parallel
-    size = 100
     with ProcessPoolExecutor() as pool:
-        part = partial(morph_open, image=img.xarray.data, size=size)
-        poolMap = pool.map(part, [rch_chunk for rch_chunk in chunked_rchs])
+        poolMap = pool.map(morph_open, [img_chunk for img_chunk in chunked_imgs])
         results = [x for x in poolMap]
 
-    # Replace values in img
+    # Subtract background estimates from img
     for i in range(len(chunked_rchs)):
         for j in range(len(chunked_rchs[i])):
             r, ch = chunked_rchs[i][j]
@@ -193,17 +243,13 @@ def rolling_ball(img, rolling_rad=3, num_threads=1):
     """
     Peform rolling ball background subtraction.
     """
-    # Have to convert to integer values first as otherwise the resulting images are blank
     for r in range(img.num_rounds):
         for ch in range(img.num_chs):
             for z in range(img.num_zplanes):
-                data = np.rint(img.xarray.data[r, ch, z] * 2**16)
                 background = restoration.rolling_ball(
-                    data, radius=rolling_rad, num_threads=num_threads
+                    img.xarray.data[r, ch, z], radius=rolling_rad, num_threads=num_threads
                 )
-                data -= background
-                data /= 2**16
-                img.xarray.data[r, ch, z] = deepcopy(data)
+                img.xarray.data[r, ch, z] -= background
     return img
 
 
@@ -219,14 +265,13 @@ def match_hist_2_min(img):
             meds[(r, ch)] = np.mean(img.xarray.data[r, ch])
     min_rch = sorted(meds.items(), key=lambda item: item[1])[0][0]
 
-    # Use min image as reference for histogram matching (need to convert to ints or it takes a VERY long time)
-    reference = np.rint(img.xarray.data[min_rch[0], min_rch[1]] * 2**16)
+    # Use min image as reference for histogram matching
+    reference = img.xarray.data[min_rch[0], min_rch[1]]
     for r in range(img.num_rounds):
         for ch in range(img.num_chs):
-            data = np.rint(img.xarray.data[r, ch] * 2**16)
-            matched = exposure.match_histograms(data, reference)
-            matched /= 2**16
-            img.xarray.data[r, ch] = deepcopy(matched)
+            img.xarray.data[r, ch] = np.rint(
+                exposure.match_histograms(img.xarray.data[r, ch], reference)
+            )
     return img
 
 
@@ -252,7 +297,8 @@ def cli(
     clip_max: float = 99.9,
     level_method: str = "",
     is_volume: bool = False,
-    aux_name: str = None,
+    register_aux_view: str = None,
+    register_to_primary: bool = False,
     ch_per_reg: int = 1,
     background_name: str = None,
     register_background: bool = False,
@@ -317,7 +363,7 @@ def cli(
     os.makedirs(output_dir, exist_ok=True)
 
     reporter = open(
-        path.join(output_dir, datetime.now().strftime("%Y%m%d_%H%M_img_processing.log")), "w"
+        path.join(output_dir, datetime.now().strftime("%Y%m%d_%H%M%S.%f_img_processing.log")), "w"
     )
     sys.stdout = reporter
     sys.stderr = reporter
@@ -338,12 +384,11 @@ def cli(
         level_method = Levels.SCALE_BY_IMAGE
 
     t0 = time()
-
     exp = starfish.core.experiment.experiment.Experiment.from_json(
         str(input_dir / "experiment.json")
     )
     if selected_fovs is not None:
-        fovs = ["fov_{:03}".format(int(f)) for f in selected_fovs]
+        fovs = ["fov_{:05}".format(int(f)) for f in selected_fovs]
     else:
         fovs = list(exp.keys())
 
@@ -427,11 +472,27 @@ def cli(
                 print("\tapplying histogram matching to anchor image...")
                 anchor = match_hist_2_min(anchor)
 
-        if aux_name:
-            # If registration image is given calculate registration shifts for each image and apply them
-            register = exp[fov].get_image(aux_name)
-            print("\taligning to " + aux_name)
-            img = register_primary(img, register, ch_per_reg)
+        if register_to_primary:
+            # If register_to_primary calculate registration shifts between primary images and the single aux image and
+            # apply to primary images
+            register = exp[fov].get_image(register_aux_view)
+            if register.shape["r"] != 1:
+                raise Exception(
+                    "If --register-primary-view is used, auxillary images must have only a single round/channel (use the --aux-single-round option)"
+                )
+            else:
+                print("\taligning to " + register_aux_view)
+                img = register_primary_primary(img, register)
+        elif register_aux_view:
+            # If not register_to_primary but still registering, calculate registration shifts between specified aux images and apply to primary images
+            register = exp[fov].get_image(register_aux_view)
+            if register.shape["r"] != img.shape["r"]:
+                raise Exception(
+                    "If --register-aux-view is used, auxillary image dimensions must match primary image dimensions"
+                )
+            else:
+                print("\taligning to " + register_aux_view)
+                img = register_primary_aux(img, register, ch_per_reg)
 
         if not rescale and not (clip_min == 0 and clip_max == 0):
             print("\tclip and scaling...")
@@ -449,6 +510,11 @@ def cli(
 
         else:
             print("\tskipping clip and scale.")
+            # Clip values below 0 and greater than 1 (prevents errors in decoding)
+            clip = starfish.image.Filter.ClipPercentileToZero(
+                p_min=0, p_max=100, is_volume=is_volume, level_method=Levels.CLIP
+            )
+            clip.run(img, in_place=True)
 
         print(f"\tView {fov} complete")
         # save modified image
@@ -480,6 +546,7 @@ if __name__ == "__main__":
     p.add_argument("--level-method", type=str, nargs="?")
     p.add_argument("--is-volume", dest="is_volume", action="store_true")
     p.add_argument("--register-aux-view", type=str, nargs="?")
+    p.add_argument("--register-to-primary", dest="register_to_primary", action="store_true")
     p.add_argument("--ch-per-reg", type=int, nargs="?")
     p.add_argument("--background-view", type=str, nargs="?")
     p.add_argument("--register-background", dest="register_background", action="store_true")
@@ -515,7 +582,8 @@ if __name__ == "__main__":
         clip_max=args.clip_max,
         level_method=args.level_method,
         is_volume=args.is_volume,
-        aux_name=args.register_aux_view,
+        register_aux_view=args.register_aux_view,
+        register_to_primary=args.register_to_primary,
         ch_per_reg=args.ch_per_reg,
         background_name=args.background_view,
         register_background=args.register_background,

@@ -58,7 +58,14 @@ This method is not recommended due to creating additional computational overhead
 
   *Note: A long list of warnings is expected due to the way the pipeline fails with an explanation if incorrect inputs are provided. The tool ran successfully if the final output is `Final process status is success`*
 ## Example PIPEFISH Run
-1. Download and extract one of our [pre-formatted, open-access datasets](https://zenodo.org/record/7647746). *The mouse brain ISS data is recommended as a first choice due to filesize and short run time.*
+1. Download and extract one of our [pre-formatted, open-access datasets](https://zenodo.org/record/7647746). 
+    - The mouse brain ISS data is recommended as a first choice due to filesize, memory footprint, and short run time.
+    - Expected memory needed to run datasets:
+      - *iss_mouse_brain*: 2.8GB
+      - *merfish_human_u2os*: 6.9GB
+      - *seqfish_mouse_embryo*: 38.5GB
+
+    The seqfish dataset is particularly memory and time intensive because it uses the CheckAll decoder; this is fairly typical for images of this size (6 x 2048 x 2048) using this decoding method.
 2. From inside the extracted directory, run the provided `prep_input.py` script. This will generate a `pipeline.yml` file with absolute paths to the downloaded data.
 3. The pipeline can now be run with `cwltool {path to cloned repo}/pipeline.cwl {path to downloaded data}/pipeline.yml`.
 
@@ -182,7 +189,7 @@ If these fields were not specified for `sorter.cwl`, they must be satisfied for 
 - `channel_count` *int*
   The number of total channels per imaging round.
 - `cache_read_order` *string[]*
-  Describes the order of the axes within each individual image file.  Accepted values are CH, X, Y, Z.
+  Describes the order of the axes within each individual image file.  Accepted values are CH, X, Y, Z, R.
 
 Optional variables that describe the real-world locations of each fov and size of each voxel.  These must be all unspecified or all specified.  Required for QC to run.
 - `x_locs`, `y_locs`, `z_locs` *float[]*
@@ -223,14 +230,16 @@ The following variables describe the structure of auxiliary views, if any are pr
     The same as “file_vars”, for each auxiliary view.
   - `aux_cache_read_order` *string[]*
     The same as “cache_read_order”, for each auxiliary view.
+  - `aux_single_round` *boolean[]?*
+    If provided and True, specified aux views will only have one round.
   - `aux_channel_count` *int[]*
     The number of channels in each aux view.
   - `aux_channel_slope` *float[]*
-    Used to convert 0-indexed channel IDs to the channel within the image, in the case that aux views use higher-indexed channels in an image already used in another view.  Defaults to 1.
+    Used to convert 0-indexed channel IDs to the channel within the image, in the case that aux views use higher-indexed channels in an image already used in another view.  If channels are 1:1 to the primary view, use 1.
     Calculated as :
       `Image index = int(index * channel_slope) + channel_intercept`
   - `aux_channel_intercept` *int[]*
-    Used to convert 0-indexed channel IDs to the channel within the image, in the case that aux views use higher-indexed channels in an image already used in another view.  See above calculation. Defaults to 0.
+    Used to convert 0-indexed channel IDs to the channel within the image, in the case that aux views use higher-indexed channels in an image already used in another view.  See above calculation. If channels are 1:1 to the primary view, use 0.
 
 #### Image Processing
 The following are used in `processing.cwl` for basic image formatting.

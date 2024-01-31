@@ -8,11 +8,16 @@ requirements:
    - class: InlineJavascriptRequirement
    - class: StepInputExpressionRequirement
    - class: MultipleInputFeatureRequirement
+   - class: ScatterFeatureRequirement
 
 inputs:
   input_dir:
     type: Directory
     doc: Root directory containing space_tx formatted experiment
+
+  dir_size:
+    type: long?
+    doc: The size of input_dir in MiB. If provided, will be used to specify storage space requests.
 
   parameter_json:
     type: File?
@@ -21,6 +26,10 @@ inputs:
   selected_fovs:
     type: int[]?
     doc: If provided, processing will only be run on FOVs with these indices.
+
+  fov_count:
+    type: int?
+    doc: The number of FOVs that are included in this experiment
 
   clip_min:
     type: float?
@@ -41,6 +50,10 @@ inputs:
   register_aux_view:
     type: string?
     doc: The name of the auxillary view to be used for image registration.
+
+  register_to_primary:
+    type: boolean?
+    doc: If true, registration will be performed between the first round of register_aux_view and the primary images.
 
   channels_per_reg:
     type: int?
@@ -94,17 +107,16 @@ inputs:
     type: int?
     doc: If provided, the number of processes that will be spawned for processing. Otherwise, the maximum number of available CPUs will be used.
 
+  scatter_into_n:
+    type: int?
+    doc: If provided, the step to run decoding will be split into n batches, where each batch is (FOV count/n) FOVs big.
+
 outputs:
   processed_exp:
     type: Directory
-    outputSource: execute_processing/processed_exp
+    outputSource: restage/pool_dir
 
 steps:
-
-  tmpname:
-    run: tmpdir.cwl
-    in: []
-    out: [tmp]
 
   read_schema:
     run:
@@ -113,7 +125,11 @@ steps:
 
       requirements:
         DockerRequirement:
-          dockerPull: hubmap/starfish-custom:2.61
+          dockerPull: hubmap/starfish-custom:latest
+        ResourceRequirement:
+          ramMin: 1000
+          tmpdirMin: 1000
+          outdirMin: 1000
 
       inputs:
         schema:
@@ -135,26 +151,206 @@ steps:
     in:
       datafile: parameter_json
       schema: read_schema/data
-    out: [selected_fovs, clip_min, clip_max, level_method, rescale, register_aux_view, channels_per_reg, background_view, register_background, anchor_view, high_sigma, deconvolve_iter, deconvolve_sigma, low_sigma, rolling_radius, match_histogram, tophat_radius, channel_count, aux_tilesets_aux_names, aux_tilesets_aux_channel_count, is_volume, n_processes]
+    out: [fov_count, selected_fovs, clip_min, clip_max, level_method, rescale, register_aux_view, register_to_primary, channels_per_reg, background_view, register_background, anchor_view, high_sigma, deconvolve_iter, deconvolve_sigma, low_sigma, rolling_radius, match_histogram, tophat_radius, channel_count, aux_tilesets_aux_names, aux_tilesets_aux_channel_count, is_volume, n_processes, scatter_into_n]
     when: $(inputs.datafile != null)
 
+  scatter_generator:
+    run:
+      requirements:
+        ResourceRequirement:
+          ramMin: 1000
+          tmpdirMin: 1000
+          outdirMin: 1000
+      class: ExpressionTool
+      expression: |
+        ${ var fovs = inputs.selected_fovs;
+           if(fovs === null){
+             fovs = [];
+             for (var i=0; i<inputs.fov_count; i++) {
+               fovs.push(Number(i));
+             }
+           }
+           if(inputs.scatter_into_n === null){
+             return {"scatter_out": new Array(fovs)};
+           } else {
+             var scattered = new Array(inputs.scatter_into_n);
+             var chunkSize = Math.ceil(fovs.length / inputs.scatter_into_n);
+             var loc = 0;
+             for (var i = 0; i<fovs.length; i += chunkSize) {
+               var subs = [];
+               for (var j=i; j<i + chunkSize && j<fovs.length; j +=1) {
+                 subs.push(Number(fovs[j]));
+               }
+               scattered[loc] = subs;
+               loc += 1;
+             }
+             return {"scatter_out": scattered};
+           }; }
+      inputs:
+        scatter_into_n:
+          type: int?
+        selected_fovs:
+          type: int[]?
+        fov_count:
+          type: int
+      outputs:
+        scatter_out:
+          type:
+            type: array
+            items:
+              type: array
+              items: int
+    in:
+      scatter_into_n:
+        source: [stage_processing/scatter_into_n, scatter_into_n]
+        valueFrom: |
+          ${
+            if(self[0]){
+              return self[0];
+            } else if(self[1]) {
+              return self[1];
+            } else {
+              return null;
+            }
+          }
+      selected_fovs:
+        source: [stage_processing/selected_fovs, selected_fovs]
+        valueFrom: |
+          ${
+            if(self[0]){
+              return self[0];
+            } else if(self[1]) {
+              return self[1];
+            } else {
+              return null;
+            }
+          }
+      fov_count:
+        source: [stage_processing/fov_count, fov_count]
+        valueFrom: |
+          ${
+            if(self[0]){
+              return self[0];
+            } else if(self[1]) {
+              return self[1];
+            } else {
+              return null;
+            }
+          }
+    out: [scatter_out]
+
+  tmpname:
+    run: tmpdir.cwl
+    scatter: sc_count
+    in:
+      sc_count: scatter_generator/scatter_out
+    out: [tmp]
+
+  fileDivider:
+    scatter: scatter
+    run:
+      class: ExpressionTool
+      requirements:
+        - class: InlineJavascriptRequirement
+        - class: LoadListingRequirement
+
+      inputs:
+        experiment:
+          type: Directory
+          doc: Directory containing spaceTx-formatted experiment
+
+        scatter:
+          type:
+            type: array
+            items: int
+          doc: List describing the FOVs in this specific scatter.
+
+      outputs:
+        out: File[]
+
+      expression: |
+        ${
+          var dir_lis = [];
+          for(var i=0;i<inputs.experiment.listing.length; i++){
+            var id = inputs.experiment.listing[i].basename;
+            if(id.includes("json")){
+              dir_lis.push(inputs.experiment.listing[i])
+            } else {
+              for(var j=0;j<inputs.scatter.length; j++) {
+                if(id.includes("fov_"+String(inputs.scatter[j]).padStart(5,'0'))){
+                  dir_lis.push(inputs.experiment.listing[i])
+                }
+              }
+            }
+          }
+          return {"out": dir_lis};
+        }
+    in:
+      experiment: input_dir
+      scatter: scatter_generator/scatter_out
+    out:
+      [out]
+
   execute_processing:
+    scatter: [selected_fovs, tmp_prefix, input_files]
+    scatterMethod: dotproduct
     run:
       class: CommandLineTool
       baseCommand: /opt/imgProcessing.py
 
       requirements:
+        InitialWorkDirRequirement:
+          listing:
+            - entryname: "$('input_dir_'+inputs.tmp_prefix)"
+              writable: true
+              entry: "$({class: 'Directory', listing: inputs.input_files})"
         DockerRequirement:
-            dockerPull: hubmap/starfish-custom:2.61
+          dockerPull: hubmap/starfish-custom:latest
+        ResourceRequirement:
+          tmpdirMin: |
+            ${
+              if(inputs.dir_size === null) {
+                return null;
+              } else {
+                return inputs.dir_size;
+              }
+            }
+          outdirMin: |
+            ${
+              return 1000;
+            }
+          coresMin: |
+            ${
+              if(inputs.n_processes === null) {
+                return null;
+              } else {
+                return inputs.n_processes;
+              }
+            }
+          ramMin: |
+            ${
+              if(inputs.n_processes === null) {
+                return null;
+              } else {
+                return inputs.n_processes * 20 * 24;
+              }
+            }
 
       inputs:
+        dir_size:
+          type: long?
+
         tmp_prefix:
           type: string
           inputBinding:
             prefix: --tmp-prefix
 
+        input_files:
+          type: File[]
+          doc: Formatted input from fileDivider step.
+
         input_dir:
-          type: Directory
+          type: string
           inputBinding:
             prefix: --input-dir
           doc: Root directory containing space_tx formatted experiment
@@ -199,6 +395,11 @@ steps:
           inputBinding:
             prefix: --register-aux-view
           doc: The name of the auxillary view to be used for image registration. Registration will not be performed if not provided.
+
+        register_to_primary:
+          type: boolean?
+          inputBinding:
+            prefix: --register-to-primary
 
         channels_per_reg:
           type: int?
@@ -278,20 +479,12 @@ steps:
           outputBinding:
             glob: $("tmp/" + inputs.tmp_prefix + "/3_processed/")
     in:
+      dir_size: dir_size
       tmp_prefix: tmpname/tmp
-      input_dir: input_dir
-      selected_fovs:
-        source: [stage_processing/selected_fovs, selected_fovs]
-        valueFrom: |
-          ${
-            if(self[0]){
-              return self[0];
-            } else if(self[1]) {
-              return self[1];
-            } else {
-              return null;
-            }
-          }
+      input_files: fileDivider/out
+      input_dir:
+        valueFrom: $("input_dir_" + inputs.tmp_prefix)
+      selected_fovs: scatter_generator/scatter_out
       clip_min:
         source: [stage_processing/clip_min, clip_min]
         valueFrom: |
@@ -354,6 +547,18 @@ steps:
           }
       register_aux_view:
         source: [stage_processing/register_aux_view, register_aux_view]
+        valueFrom: |
+          ${
+            if(self[0]){
+              return self[0];
+            } else if(self[1]) {
+              return self[1];
+            } else {
+              return null;
+            }
+          }
+      register_to_primary:
+        source: [stage_processing/register_to_primary, register_to_primary]
         valueFrom: |
           ${
             if(self[0]){
@@ -520,3 +725,104 @@ steps:
           }
     out: [processed_exp]
 
+  restage:
+    run:
+      class: ExpressionTool
+      requirements:
+        InlineJavascriptRequirement: {}
+        LoadListingRequirement:
+          loadListing: deep_listing
+      expression: |
+        ${
+          var all_fovs = [];
+          for(var i=0; i<inputs.fov_count; i++){
+            var to_push = true;
+            for(var j=0; j<inputs.scatter.length; j++){
+              if(inputs.scatter[j].includes(i)){
+                to_push = false;
+              }
+            }
+            if(to_push) {
+              all_fovs.push(Number(i));
+            }
+          }
+          var listing = [];
+          for(var i=0;i<inputs.file_array.length;i++){
+            for(var j=0;j<inputs.file_array[i].listing.length;j++){
+              var item = inputs.file_array[i].listing[j];
+              if(!item.basename.includes("json")) {
+                listing.push(item);
+              } else {
+                if(item.basename.includes("fov")) {
+                  for(var k=0;k<inputs.scatter[i].length; k++){
+                    if(item.basename.includes("fov_"+String(inputs.scatter[i][k]).padStart(5,'0'))){
+                      listing.push(item);
+                    }
+                  }
+                }
+              }
+            }
+          }
+          for(var i=0; i<inputs.og_dir.listing.length;i++) {
+            var item = inputs.og_dir.listing[i];
+            if(item.basename.includes("fov")){
+              for(var j=0;j<all_fovs.length; j++){
+                if(item.basename.includes("fov_"+String(all_fovs[j]).padStart(5,'0'))) {
+                  listing.push(item);
+                  break;
+                }
+              }
+            } else if(item.basename.includes("json") && !item.basename.includes("log")) {
+              listing.push(item);
+            }
+          }
+          return {"pool_dir": {
+            "class": "Directory",
+            "basename": "3_Processed",
+            "listing": listing,
+          }};
+        }
+      inputs:
+        dir_size:
+          type: long
+
+        file_array:
+          type:
+            type: array
+            items: Directory
+
+        og_dir:
+          type: Directory
+
+        fov_count:
+          type: int
+
+        scatter:
+          type:
+            type: array
+            items:
+              type: array
+              items: int
+
+      outputs:
+        pool_dir:
+          type: Directory
+
+    in:
+      file_array: execute_processing/processed_exp
+      og_dir: input_dir
+      scatter: scatter_generator/scatter_out
+      dir_size: dir_size
+      fov_count:
+        source: [stage_processing/fov_count, fov_count]
+        valueFrom: |
+          ${
+            if(self[0]){
+              return self[0];
+            } else if(self[1]) {
+              return self[1];
+            } else {
+              return null;
+            }
+          }
+    out: [pool_dir]

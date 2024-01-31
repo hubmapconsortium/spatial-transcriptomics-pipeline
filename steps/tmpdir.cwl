@@ -3,7 +3,11 @@ class: ExpressionTool
 cwlVersion: v1.2
 
 requirements:
-   - class: InlineJavascriptRequirement
+  InlineJavascriptRequirement: {}
+  ResourceRequirement:
+    ramMin: 1000
+    tmpdirMin: 1000
+    outdirMin: 1000
 
 expression: |
   ${

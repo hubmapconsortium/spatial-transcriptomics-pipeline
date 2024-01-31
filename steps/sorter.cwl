@@ -14,6 +14,10 @@ inputs:
     type: Directory
     doc: The root directory containing all images.
 
+  dir_size:
+    type: long?
+    doc: Size of input_dir, in MiB. If provided, will be used to calculate ResourceRequirement.
+
   codebook_csv:
     type: File?
     doc: Flattened csv input, refer to record entry.
@@ -127,7 +131,11 @@ steps:
 
       requirements:
         DockerRequirement:
-          dockerPull: hubmap/starfish-custom:2.61
+          dockerPull: hubmap/starfish-custom:latest
+        ResourceRequirement:
+          ramMin: 1000
+          tmpdirMin: 1000
+          outdirMin: 1000
 
       inputs:
         schema:
@@ -156,6 +164,7 @@ steps:
       schema: read_schema/data
     out: [round_count, fov_count, round_offset, fov_offset, channel_offset, channel_slope, file_format, file_vars, cache_read_order, aux_tilesets_aux_names, aux_tilesets_aux_file_formats, aux_tilesets_aux_file_vars, aux_tilesets_aux_cache_read_order, aux_tilesets_aux_channel_count, aux_tilesets_aux_channel_slope, aux_tilesets_aux_channel_intercept]
     when: $(inputs.datafile != null)
+
   execute_sort:
     run:
       class: CommandLineTool
@@ -163,13 +172,33 @@ steps:
 
       requirements:
         DockerRequirement:
-          dockerPull: hubmap/starfish-custom:2.61
+          dockerPull: hubmap/starfish-custom:latest
+        ResourceRequirement:
+          tmpdirMin: |
+            ${
+              if(inputs.dir_size === null) {
+                return null;
+              } else {
+                return inputs.dir_size * 1.2;
+              }
+            }
+          outdirMin: |
+            ${
+              if(inputs.dir_size === null) {
+                return null;
+              } else {
+                return inputs.dir_size * 1.2;
+              }
+            }
 
       inputs:
 
+        dir_size:
+          type: long?
+
         tmp_prefix:
           type: string
-          inputBinding:
+          inputBinding: 
             prefix: --tmp-prefix
 
         input_dir:
@@ -287,6 +316,7 @@ steps:
         log:
           type: stdout
     in:
+      dir_size: dir_size
       tmp_prefix: tmpname/tmp
       input_dir: input_dir
       codebook:

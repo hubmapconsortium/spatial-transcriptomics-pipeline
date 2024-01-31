@@ -14,6 +14,10 @@ inputs:
     type: Directory
     doc: Root directory containing space_tx formatted experiment
 
+  dir_size:
+    type: long?
+    doc: Size of tiffs, in MiB. If provided, will be used to calculate ResourceRequirement.
+
   decoded_loc:
     type: Directory?
     doc: Location of directory that is output from the starfishRunner step, only needed if mRNA information is to be included.
@@ -103,7 +107,11 @@ steps:
 
       requirements:
         DockerRequirement:
-          dockerPull: hubmap/starfish-custom:2.61
+          dockerPull: hubmap/starfish-custom:latest
+        ResourceRequirement:
+          ramMin: 1000
+          tmpdirMin: 1000
+          outdirMin: 1000
 
       inputs:
         schema:
@@ -134,10 +142,31 @@ steps:
       baseCommand: /opt/cellposeStaging.py
 
       requirements:
+        InitialWorkDirRequirement:
+          listing:
+            - entryname: "$('input_dir_'+inputs.tmp_prefix)"
+              writable: true
+              entry: "$(inputs.exp_loc)"
         DockerRequirement:
-            dockerPull: hubmap/starfish-custom:2.61
+          dockerPull: hubmap/starfish-custom:latest
+        ResourceRequirement:
+          tmpdirMin: |
+            ${
+              if(inputs.dir_size === null) {
+                return null;
+              } else {
+                return inputs.dir_size;
+              }
+            }
+          outdirMin: |
+            ${
+              return 1000;
+            }
 
       inputs:
+        dir_size:
+          type: long?
+
         tmp_prefix:
           type: string
           inputBinding:
@@ -146,6 +175,9 @@ steps:
         exp_loc:
           type: Directory
           doc: Root directory containing space_tx formatted experiment
+
+        exp_loc_staged:
+          type: string
           inputBinding:
             prefix: --input-dir
 
@@ -180,8 +212,11 @@ steps:
           outputBinding:
             glob: $("tmp/" + inputs.tmp_prefix + "/5A_cellpose_input/")
     in:
+      dir_size: dir_size
       tmp_prefix: tmpname/tmp
       exp_loc: exp_loc
+      exp_loc_staged:
+        valueFrom: $("input_dir_" + inputs.tmp_prefix)
       decoded_loc:
         source: [decoded_loc, stage_cellpose/use_mrna, use_mrna]
         valueFrom: |
@@ -225,7 +260,7 @@ steps:
 
       requirements:
         DockerRequirement:
-          dockerPull: hubmap/cellpose:2.61
+          dockerPull: hubmap/cellpose:latest
         InitialWorkDirRequirement:
           listing:
             - entry: $(inputs.input_dir)
@@ -451,9 +486,29 @@ steps:
 
       requirements:
         DockerRequirement:
-            dockerPull: hubmap/starfish-custom:2.61
+            dockerPull: hubmap/starfish-custom:latest
+        ResourceRequirement:
+          tmpdirMin: |
+            ${
+              if(inputs.dir_size === null) {
+                return null;
+              } else {
+                return inputs.dir_size * 4;
+              }
+            }
+          outdirMin: |
+            ${
+              if(inputs.dir_size === null) {
+                return null;
+              } else {
+                return inputs.dir_size * 4;
+              }
+            }
 
       inputs:
+        dir_size:
+          type: long?
+
         tmp_prefix:
           type: string
           inputBinding:
@@ -509,6 +564,7 @@ steps:
             glob: $("tmp/" + inputs.tmp_prefix + "/5C_cellpose_filtered")
 
     in:
+      dir_size: dir_size
       tmp_prefix: tmpname/tmp
       input_loc: execute_cellpose/cellpose_output
       selected_fovs:

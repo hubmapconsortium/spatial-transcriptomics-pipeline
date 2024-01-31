@@ -38,7 +38,7 @@ def cellpose_format(output_dir, input_dir, aux_ch_names, mRNA_dir, selected_fovs
             for primary_json in primary_jsons
         ]
     else:
-        fovs = ["fov_{:03}".format(int(f)) for f in selected_fovs]
+        fovs = ["fov_{:05}".format(int(f)) for f in selected_fovs]
 
     # Get number of z slices by looking at the fov_000 files
     fov0_files = glob.glob(f"{input_dir}/primary-{fovs[0]}*.tiff")
@@ -135,7 +135,7 @@ def filter_cellpose(
             mask = skimage.segmentation.relabel_sequential(mask)[0]
 
         # Save result
-        tifffile.imsave(f'{output_dir}/fov_{file.split("fov_")[-1][:3]}_masks.tiff', mask)
+        tifffile.imsave(f'{output_dir}/fov_{file.split("fov_")[-1][:5]}_masks.tiff', mask)
 
 
 if __name__ == "__main__":

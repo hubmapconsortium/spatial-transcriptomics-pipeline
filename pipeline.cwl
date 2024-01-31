@@ -44,6 +44,14 @@ inputs:
     type: File?
     doc: Flattened json input, refer to record entry.
 
+  locs_json:
+    type: File?
+    doc: Flattened json input, refer to record entry.
+
+  data_org_file:
+    type: File?
+    doc: The data org file used to describe .dax formatted images.
+
   mask_roi_files:
     type: Directory?
     doc: Flattened directory input, refer to record entry "binary_mask"
@@ -137,6 +145,9 @@ inputs:
         aux_cache_read_order:
           type: string[]?
           doc: Order of non x,y dimensions within each image. One entry per aux_name, with semicolon-delimited vars.
+        aux_single_round:
+          type: string[]?
+          doc: If True, the specified aux view will only have one round.
         aux_channel_count:
           type: float[]?
           doc: Count of channels in each aux image.
@@ -150,11 +161,11 @@ inputs:
   fov_positioning:
     - 'null'
     - type: record
-      name: dummy
+      name: locs
       fields:
-        dummy:
-          type: string?
-          doc: Added to prevent cli parsing of the fov_positioning record.
+        locs:
+          type: File?
+          doc: Input locations as a json file, using the same records as below.
     - type: record
       name: fov_positioning
       fields:
@@ -216,6 +227,10 @@ inputs:
   register_aux_view:
     type: string?
     doc: The name of the auxillary view to be used for image registration.
+
+  register_to_primary:
+    type: boolean?
+    doc: If true, registration will be performed between the first round of register_aux_view and the primary view.
 
   background_view:
     type: string?
@@ -284,6 +299,10 @@ inputs:
     type: int?
     doc: If provided, the number of processes that will be spawned for processing. Otherwise, the maximum number of available CPUs will be used.
 
+  scatter_into_n:
+    type: int?
+    doc: If provided, the step to run decoding will be split into n batches, where each batch is (FOV count/n) FOVs big.
+
   decoding_blob:
     - 'null'
     - type: record
@@ -339,9 +358,9 @@ inputs:
                 min_intensity:
                   type: float
                   doc: Minimum intensity of spots.
-                metric:
-                  type: string?
-                  doc: Metric name to be used for determining distance.
+                pnorm:
+                  type: int?
+                  doc: Which Minkowski p-norm to use. 1 is the sum-of-absolute-values “Manhattan” distance 2 is the usual Euclidean distance infinity is the maximum-coordinate-difference distance A finite large p may cause a ValueError if overflow can occur.
                 norm_order:
                   type: int?
                   doc: Refer to starfish documentation for metric_distance
@@ -393,9 +412,9 @@ inputs:
     - type: record
       name: pixel
       fields:
-        metric:
-          type: string?
-          doc: The sklearn metric string to pass to NearestNeighbors. Defaults to euclidean.
+        pnorm:
+          type: int?
+          doc: Which Minkowski p-norm to use. 1 is the sum-of-absolute-values “Manhattan” distance 2 is the usual Euclidean distance infinity is the maximum-coordinate-difference distance A finite large p may cause a ValueError if overflow can occur.
         distance_threshold:
           type: float
           doc: Spots whose codewords are more than this metric distance from an expected code are filtered
@@ -414,6 +433,10 @@ inputs:
 
 
 # segmentation
+
+  skip_seg:
+    type: boolean?
+    doc: If true, segmentation (and QC) will be skipped.
 
 ## cellpose-specific vars
 
@@ -603,7 +626,11 @@ steps:
 
       requirements:
         DockerRequirement:
-          dockerPull: hubmap/starfish-custom:2.61
+          dockerPull: hubmap/starfish-custom:latest
+        ResourceRequirement:
+          ramMin: 1000
+          tmpdirMin: 1000
+          outdirMin: 1000
 
       inputs:
         schema:
@@ -625,12 +652,32 @@ steps:
     in:
       datafile: parameter_json
       schema: read_schema/data
-    out: [run_baysor, aux_views, skip_formatting, skip_processing, register_aux_view, fov_positioning_x_locs, fov_positioning_x_shape, fov_positioning_x_voxel, fov_positioning_y_locs, fov_positioning_y_shape, fov_positioning_y_voxel, fov_positioning_z_locs, fov_positioning_z_shape, fov_positioning_z_voxel, run_cellpose, add_blanks, skip_qc]
+    out: [run_baysor, aux_views, skip_formatting, skip_processing, register_aux_view, fov_positioning_x_locs, fov_positioning_x_shape, fov_positioning_x_voxel, fov_positioning_y_locs, fov_positioning_y_shape, fov_positioning_y_voxel, fov_positioning_z_locs, fov_positioning_z_shape, fov_positioning_z_voxel, run_cellpose, add_blanks, skip_seg, skip_qc]
     when: $(inputs.datafile != null)
+
+  sizer:
+    run: steps/fileSizer.cwl
+    in:
+      exp_loc: exp_loc
+      input_dir: input_dir
+      tiffs: tiffs
+      example_dir:
+        valueFrom: |
+          ${
+            if (inputs.exp_loc !== null) {
+              return inputs.exp_loc;
+            } else if(inputs.input_dir !== null) {
+              return inputs.input_dir;
+            } else {
+              return inputs.tiffs;
+            }
+          }
+    out: [dir_size]
 
   sorter:
     run: steps/sorter.cwl
     in:
+      dir_size: sizer/dir_size
       channel_yml: channel_yml
       cycle_yml: cycle_yml
       parameter_json: parameter_json
@@ -714,6 +761,7 @@ steps:
   spaceTxConversion:
     run: steps/spaceTxConversion.cwl
     in:
+      dir_size: sizer/dir_size
       tiffs:
         source: [sorter/pseudosorted_dir, tiffs]
         valueFrom: |
@@ -751,6 +799,7 @@ steps:
               return self[0];
             }
           }
+      data_org_file: data_org_file
       round_count:
         source: [stagedSorted/round_count, round_count]
         valueFrom: |
@@ -904,7 +953,7 @@ steps:
             }
           }
       fov_positioning:
-        source: [fov_positioning, stage/fov_positioning_x_locs, stage/fov_positioning_x_shape, stage/fov_positioning_x_voxel, stage/fov_positioning_y_locs, stage/fov_positioning_y_shape, stage/fov_positioning_y_voxel, stage/fov_positioning_z_locs, stage/fov_positioning_z_shape, stage/fov_positioning_z_voxel]
+        source: [fov_positioning, stage/fov_positioning_x_locs, stage/fov_positioning_x_shape, stage/fov_positioning_x_voxel, stage/fov_positioning_y_locs, stage/fov_positioning_y_shape, stage/fov_positioning_y_voxel, stage/fov_positioning_z_locs, stage/fov_positioning_z_shape, stage/fov_positioning_z_voxel, locs_json]
         valueFrom: |
           ${
             if(self[1]) {
@@ -921,6 +970,8 @@ steps:
               };
             } else if (self[0]) {
               return self[0];
+            } else if (self[10]) {
+              return {"locs": self[10]};
             } else {
               return null;
             }
@@ -953,6 +1004,7 @@ steps:
   processing:
     run: steps/processing.cwl
     in:
+      dir_size: sizer/dir_size
       skip_processing:
         source: [stage/skip_processing, skip_processing]
         valueFrom: |
@@ -977,11 +1029,13 @@ steps:
           }
       parameter_json: parameter_json
       selected_fovs: selected_fovs
+      fov_count: fov_count
       clip_min: clip_min
       clip_max: clip_max
       level_method: level_method
       is_volume: is_volume
       register_aux_view: register_aux_view
+      register_to_primary: register_to_primary
       channels_per_reg:
         source: [stagedSorted/aux_names, stagedSorted/aux_channel_count, stagedSorted/channel_count, register_aux_view, stage/register_aux_view]
         valueFrom: |
@@ -1011,6 +1065,7 @@ steps:
       match_histogram: match_histogram
       tophat_radius: tophat_radius
       n_processes: n_processes
+      scatter_into_n: scatter_into_n
     when: $(inputs.skip_processing == false)
     out:
       [processed_exp]
@@ -1018,11 +1073,13 @@ steps:
   starfishRunner:
     run: steps/starfishRunner.cwl
     in:
+      dir_size: sizer/dir_size
       exp_loc:
         source: [processing/processed_exp, spaceTxConversion/spaceTx_converted, exp_loc]
         pickValue: first_non_null
       parameter_json: parameter_json
       selected_fovs: selected_fovs
+      fov_count: fov_count
       level_method: level_method
       use_ref_img: use_ref_img
       anchor_view: anchor_view
@@ -1030,6 +1087,7 @@ steps:
       rescale: rescale
       not_filtered_results: not_filtered_results
       n_processes: n_processes
+      scatter_into_n: scatter_into_n
       decoding_blob: decoding_blob
       decoding_pixel: decoding_pixel
     out:
@@ -1038,6 +1096,7 @@ steps:
   cellpose:
     run: steps/cellpose.cwl
     in:
+      dir_size: sizer/dir_size
       exp_loc:
         source: [processing/processed_exp, spaceTxConversion/spaceTx_converted, exp_loc]
         pickValue: first_non_null
@@ -1074,6 +1133,16 @@ steps:
   segmentation:
     run: steps/segmentation.cwl
     in:
+      skip_seg:
+        source: [stage/skip_seg, skip_seg]
+        valueFrom: |
+          ${
+            if(self[0] || self[1]){
+              return true;
+            } else {
+              return false;
+            };
+          }
       decoded_loc: starfishRunner/decoded
       exp_loc:
         source: [processing/processed_exp, spaceTxConversion/spaceTx_converted, exp_loc]
@@ -1099,7 +1168,7 @@ steps:
             if(self[5]){
               return {
                 "labeled_image": self[5],
-                "file_formats_labeled": "fov_{:03d}_masks.tiff"
+                "file_formats_labeled": "fov_{:05d}_masks.tiff"
               }
             } else {
               if(self[0]){
@@ -1121,6 +1190,7 @@ steps:
           }
     out:
       [segmented]
+    when: $(inputs.skip_seg == false)
 
   baysorStaged:
     run: steps/baysorStaged.cwl
@@ -1143,6 +1213,16 @@ steps:
   qc:
     run: steps/qc.cwl
     in:
+      skip_seg:
+        source: [stage/skip_seg, skip_seg]
+        valueFrom: |
+          ${
+            if(self[0] || self[1]){
+              return true;
+            } else {
+              return false;
+            };
+          }
       skip_qc:
         source: [stage/skip_qc, skip_qc]
         valueFrom: |
@@ -1162,21 +1242,34 @@ steps:
           }
       segmentation_loc:
         source: [baysorStaged/baysor, segmentation/segmented]
-        pickValue: first_non_null
-      parameter_json: parameter_json
-      imagesize:
-        source: fov_positioning
         valueFrom: |
           ${
-            if(self &&
-               'x_shape' in self && self['x_shape'] != null &&
-               'y_shape' in self && self['y_shape'] != null &&
-               'z_shape' in self && self['z_shape'] != null){
+            if(self[0]) {
+              return self[0];
+            } else if(self[1]) {
+              return self[1];
+            } else {
+              return null;
+            }
+          }
+      parameter_json: parameter_json
+      imagesize:
+        source: [fov_positioning, locs_json]
+        valueFrom: |
+          ${
+            if(self[0] &&
+               'x_shape' in self[0] && self[0]['x_shape'] != null &&
+               'y_shape' in self[0] && self[0]['y_shape'] != null &&
+               'z_shape' in self[0] && self[0]['z_shape'] != null){
               return {
-                "x_size": self['x_shape'],
-                "y_size": self['y_shape'],
-                "z_size": self['z_shape']
+                "x_size": self[0]['x_shape'],
+                "y_size": self[0]['y_shape'],
+                "z_size": self[0]['z_shape']
               };
+            } else if(self[0] && "locs" in self[0]){
+              return self[0];
+            } else if(self[1]){
+              return {"locs": self[1]};
             } else {
               return null;
             }
@@ -1214,6 +1307,6 @@ steps:
               "exp": self
             };
           }
-    when: $(inputs.skip_qc == false)
+    when: $(inputs.skip_qc == false && inputs.skip_seg == false)
     out:
       [qc_metrics]

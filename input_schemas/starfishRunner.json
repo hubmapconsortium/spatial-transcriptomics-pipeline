@@ -1,4 +1,5 @@
 [
+	"fov_count",
 	"selected_fovs?",
 	"level_method?",
 	"use_ref_img?",
@@ -7,6 +8,7 @@
 	"anchor_view?",
 	"not_filtered_results?",
 	"n_processes?",
+	"scatter_into_n?",
 	{
 		"decoding":[
 			[
@@ -16,7 +18,7 @@
 				"threshold?",
 				"overlap?",
 				"decode_method?",
-				"metric?",
+				"pnorm?",
 				"distance_threshold?",
 				"magnitude_threshold?",
 				"min_area?",
@@ -34,7 +36,7 @@
 							"trace_building_strategy",
 							"max_distance",
 							"min_intensity",
-							"metric?",
+							"pnorm?",
 							"norm_order?",
 							"anchor_round?",
 							"search_radius?",

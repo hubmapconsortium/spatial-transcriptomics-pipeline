@@ -195,10 +195,7 @@ def init_scale(img: ImageStack):
     pixel_histos = {}
     for r in range(img.num_rounds):
         for ch in range(img.num_chs):
-            data = deepcopy(img.xarray.data[r, ch])
-            data = np.rint(data * (2**16))
-            data[data == 2**16] = (2**16) - 1
-            hist = np.histogram(data, bins=range((2**16)))
+            hist = np.histogram(img.xarray.data[r, ch], bins=range((2**16)))
             pixel_histos[(r, ch)] = hist[0]
 
     # Estimate scaling factors using cumulative distribution of each images intensities
@@ -251,33 +248,37 @@ def optimize_scale(
     decoded_targets, prop_results = pixelDriver(img, codebook, **pixelRunnerKwargs)
     decoded_targets = decoded_targets.loc[decoded_targets[Features.PASSES_THRESHOLDS]]
 
-    # Calculate on-bit scaling factors for each bit
-    local_pixel_vector = []
-    for barcode in range(1, len(codebook) + 1):
-        idx = np.where(prop_results.decoded_image == barcode)
-        coords = [(idx[0][i], idx[1][i], idx[2][i]) for i in range(len(idx[0]))]
-        if len(coords) > 0:
-            local_traces = np.array([img.xarray.data[:, :, c[0], c[1], c[2]] for c in coords])
-            local_mean = np.mean(local_traces, axis=0)
-            local_pixel_vector.append(local_mean / np.linalg.norm(local_mean))
-            local_pixel_vector[-1] /= len(coords)
-    pixel_traces = np.array(local_pixel_vector)
+    # Only calculate scaling factors if more than 10 transcripts, else return None
+    if len(decoded_targets) >= 10:
+        # Calculate on-bit scaling factors for each bit
+        local_pixel_vector = []
+        for barcode in range(1, len(codebook) + 1):
+            idx = np.where(prop_results.decoded_image == barcode)
+            coords = [(idx[0][i], idx[1][i], idx[2][i]) for i in range(len(idx[0]))]
+            if len(coords) > 0:
+                local_traces = np.array([img.xarray.data[:, :, c[0], c[1], c[2]] for c in coords])
+                local_mean = np.mean(local_traces, axis=0)
+                local_pixel_vector.append(local_mean / np.linalg.norm(local_mean))
+                local_pixel_vector[-1] /= len(coords)
+        pixel_traces = np.array(local_pixel_vector)
 
-    # Normalize pixel traces by l2 norm
-    norms = np.linalg.norm(np.asarray(pixel_traces), axis=(1, 2))
-    for i in range(len(norms)):
-        pixel_traces[i] = pixel_traces[i] / norms[i]
+        # Normalize pixel traces by l2 norm
+        norms = np.linalg.norm(np.asarray(pixel_traces), axis=(1, 2))
+        for i in range(len(norms)):
+            pixel_traces[i] = pixel_traces[i] / norms[i]
 
-    # Calculate average pixel trace for each barcode and normalize
-    one_bit_int = np.mean(pixel_traces, axis=0)
-    one_bit_int = one_bit_int / np.mean(one_bit_int)
+        # Calculate average pixel trace for each barcode and normalize
+        one_bit_int = np.mean(pixel_traces, axis=0)
+        one_bit_int = one_bit_int / np.mean(one_bit_int)
 
-    # Convert into dictionary with same keys as scaling_factors
-    scaling_mods = {}
-    for i in range(one_bit_int.shape[0]):
-        for j in range(one_bit_int.shape[1]):
-            scaling_mods[(i, j)] = one_bit_int[i, j]
-    return scaling_mods
+        # Convert into dictionary with same keys as scaling_factors
+        scaling_mods = {}
+        for i in range(one_bit_int.shape[0]):
+            for j in range(one_bit_int.shape[1]):
+                scaling_mods[(i, j)] = one_bit_int[i, j]
+        return scaling_mods
+    else:
+        return None
 
 
 def scale_img(
@@ -309,23 +310,31 @@ def scale_img(
             cropped_img, scaling_factors, codebook, pixelRunnerKwargs, is_volume
         )
 
-        # Apply modifications to scaling_factors
-        for key in sorted(scaling_factors):
-            scaling_factors[key] = scaling_factors[key] * scaling_mods[key]
-
-        # Replace image with unscaled version
-        cropped_img = deepcopy(og_img)
-
-        # Update mod_mean and add to iteration number. If iters reaches 20 return current scaling factors
-        # and print message
-        mod_mean = np.mean(abs(np.array([x for x in scaling_mods.values()]) - 1))
-        iters += 1
-        if iters >= 20:
+        # If scaling_mods == None, less than 10 transcripts were decodable and scaling_factors are all set to 1
+        if scaling_mods is None:
+            scaling_factors = {key: 1 for key in scaling_factors}
             print(
-                "Scaling factors did not converge after 20 iterations. Returning initial estimate."
+                "Need at least 10 decodable transcripts to perform scaling. Try adjusting processing parameters"
             )
-            scaling_factors = deepcopy(local_scale)
             break
+        else:
+            # Apply modifications to scaling_factors
+            for key in sorted(scaling_factors):
+                scaling_factors[key] = scaling_factors[key] * scaling_mods[key]
+
+            # Replace image with unscaled version
+            cropped_img = deepcopy(og_img)
+
+            # Update mod_mean and add to iteration number. If iters reaches 20 return current scaling factors
+            # and print message
+            mod_mean = np.mean(abs(np.array([x for x in scaling_mods.values()]) - 1))
+            iters += 1
+            if iters >= 20:
+                print(
+                    "Scaling factors did not converge after 20 iterations. Returning initial estimate."
+                )
+                scaling_factors = deepcopy(local_scale)
+                break
 
     # Scale with final factors
     for r in range(img.num_rounds):
@@ -341,7 +350,8 @@ def scale_img(
     )
     clip.run(img, in_place=True)
 
-    print(f"Rescaled image in {iters} iterations, final mod_mean: {mod_mean}")
+    if scaling_mods is not None:
+        print(f"Rescaled image in {iters} iterations, final mod_mean: {mod_mean}")
 
     return img
 
@@ -351,10 +361,11 @@ def pixelDriver(
     codebook: Codebook,
     distance_threshold: float,
     magnitude_threshold: float,
-    metric: str = "euclidean",
+    pnorm: int = 2,
     min_area: int = 2,
     max_area: int = np.inf,
     norm_order: int = 2,
+    n_processes: int = 1,
 ) -> DecodedIntensityTable:
     """
     Method to run Starfish's PixelSpotDecoder on the provided ImageStack
@@ -374,11 +385,12 @@ def pixelDriver(
     pixelRunner = starfish.spots.DetectPixels.PixelSpotDecoder(
         codebook=codebook,
         distance_threshold=distance_threshold,
+        pnorm=pnorm,
         magnitude_threshold=magnitude_threshold,
-        metric=metric,
         min_area=min_area,
         max_area=max_area,
         norm_order=norm_order,
+        n_workers=n_processes,
     )
     return pixelRunner.run(img)
 
@@ -446,14 +458,22 @@ def add_corrected_rounds(codebook, decoded, ham_dist):
     return decoded.assign_coords(corrected_rounds=("features", corrected_rounds))
 
 
-def getCoords(exploc: str):
+def getCoords(exploc: str, selected_fovs: List[int]):
     """
     Extracts physical coordinates of each FOV from the primary-fov_*.json files. Used in creating composite images.
     """
 
-    # Get json file names and set fov_count
+    # Get json file names
     img_jsons = sorted(glob.glob(f"{str(exploc)[:-15]}/primary-fov_*.json"))
-    fov_count = len(img_jsons)
+
+    # Filter by selcted_fovs (if set)
+    if selected_fovs is not None:
+        fovs = ["fov_{:05}".format(int(f)) for f in selected_fovs]
+        img_jsons = [
+            img_json
+            for img_json in img_jsons
+            if img_json.split("/")[-1].split("-")[-1].split(".")[0] in fovs
+        ]
 
     # Get x_min, x_max, y_min, and y_max values for all FOVs and keep track of the absolute x_min and y_min
     composite_coords = defaultdict(dict)
@@ -462,8 +482,9 @@ def getCoords(exploc: str):
     x_max_all = 0
     y_min_all = np.inf
     y_max_all = 0
-    for pos in range(fov_count):
-        with open(img_jsons[pos], "r") as file:
+    for img_json in img_jsons:
+        pos = img_json.split("/")[-1].split("_")[-1].split(".")[0]
+        with open(img_json, "r") as file:
             metadata = json.load(file)
 
         # Convert physical coordinates to pixel coordinates to find each FOVs place in the composite image
@@ -510,7 +531,8 @@ def getCoords(exploc: str):
         )
 
     # Subtract minimum coord values from xs and ys (ensures (0,0) is the top left corner)
-    for pos in range(fov_count):
+    for img_json in img_jsons:
+        pos = img_json.split("/")[-1].split("_")[-1].split(".")[0]
         composite_coords[pos]["x_min"] = composite_coords[pos]["x_min"] - x_min_all
         composite_coords[pos]["x_max"] = composite_coords[pos]["x_max"] - x_min_all
         composite_coords[pos]["y_min"] = composite_coords[pos]["y_min"] - y_min_all
@@ -530,6 +552,7 @@ def createComposite(
     anchor_name: str,
     is_volume: bool,
     level_method: Levels,
+    selected_fovs: List[int],
     composite_pmin: float = 0.0,
     composite_pmax: float = 100.0,
 ):
@@ -539,8 +562,9 @@ def createComposite(
     """
 
     # Get physical coordinates
-    composite_coords, physical_coords, y_max_all, x_max_all, shape = getCoords(exploc)
-    fov_count = len(composite_coords)
+    composite_coords, physical_coords, y_max_all, x_max_all, shape = getCoords(
+        exploc, selected_fovs
+    )
 
     # Create empty combined images
     combined_img = np.zeros(
@@ -551,11 +575,23 @@ def createComposite(
         (shape["r"], 1, shape["z"], int(y_max_all) + 1, int(x_max_all) + 1), dtype="float32"
     )
 
-    # Fill in image
-    for pos in range(fov_count):
-        print(pos)
+    # Get json file names
+    img_jsons = sorted(glob.glob(f"{str(exploc)[:-15]}/primary-fov_*.json"))
 
-        fov = "fov_" + "0" * (3 - len(str(pos))) + str(pos)
+    # Filter by selcted_fovs (if set)
+    if selected_fovs is not None:
+        fovs = ["fov_{:05}".format(int(f)) for f in selected_fovs]
+        img_jsons = [
+            img_json
+            for img_json in img_jsons
+            if img_json.split("/")[-1].split("-")[-1].split(".")[0] in fovs
+        ]
+
+    # Fill in image
+    for img_json in img_jsons:
+        pos = img_json.split("/")[-1].split("_")[-1].split(".")[0]
+
+        fov = "fov_" + "0" * (5 - len(str(pos))) + str(pos)
         img = experiment[fov].get_image("primary")
 
         x_min = composite_coords[pos]["x_min"]
@@ -598,17 +634,32 @@ def createComposite(
     return combined_starfish_img, combined_starfish_anchor
 
 
-def saveCompositeResults(spots, decoded, exploc, output_name):
+def saveCompositeResults(spots, decoded, exploc, selected_fovs, output_name):
     # Splits large spots object into lots of smaller ones
     spot_items = dict(spots.items())
     for rch in spot_items:
         spot_items[rch] = spot_items[rch].spot_attrs.data
 
-    composite_coords, physical_coords, y_max_all, x_max_all, shape = getCoords(exploc)
+    composite_coords, physical_coords, y_max_all, x_max_all, shape = getCoords(
+        exploc, selected_fovs
+    )
+
+    # Get json file names
+    img_jsons = sorted(glob.glob(f"{str(exploc)[:-15]}/primary-fov_*.json"))
+
+    # Filter by selcted_fovs (if set)
+    if selected_fovs is not None:
+        fovs = ["fov_{:05}".format(int(f)) for f in selected_fovs]
+        img_jsons = [
+            img_json
+            for img_json in img_jsons
+            if img_json.split("/")[-1].split("-")[-1].split(".")[0] in fovs
+        ]
 
     # Create a new SpotFindingResults object with only spots from each position and save separately
-    for pos in range(len(composite_coords)):
-        fov = "fov_{:03}".format(pos)
+    for img_json in img_jsons:
+        pos = img_json.split("/")[-1].split("_")[-1].split(".")[0]
+        fov = "fov_{:0>5}".format(pos)
         spot_attrs = {}
         x_min = composite_coords[pos]["x_min"]
         x_max = composite_coords[pos]["x_max"]
@@ -684,7 +735,7 @@ def saveCompositeResults(spots, decoded, exploc, output_name):
 
     # Save decoded transcripts
     for pos in composite_coords:
-        fov = "fov_" + "0" * (3 - len(str(pos))) + str(pos)
+        fov = "fov_" + "0" * (5 - len(str(pos))) + str(pos)
 
         # Subset transcripts for this FOV based on the FOV's composite coordinates
         x_min = composite_coords[pos]["x_min"]
@@ -793,7 +844,7 @@ def run(
         makedirs(output_dir + "spots")
 
     reporter = open(
-        path.join(output_dir, datetime.now().strftime("%Y%m%d_%H%M_starfish_runner.log")), "w"
+        path.join(output_dir, datetime.now().strftime("%Y%m%d_%H%M%S.%f_starfish_runner.log")), "w"
     )
     sys.stdout = reporter
     sys.stderr = reporter
@@ -818,7 +869,13 @@ def run(
 
         # Creates the big images. If not given an anchor_name then it takes the max projection of the primary image
         composite_img, composite_anchor = createComposite(
-            experiment, input_dir, anchor_name, is_volume, level_method, **compositeKwargs
+            experiment,
+            input_dir,
+            anchor_name,
+            is_volume,
+            level_method,
+            selected_fovs,
+            **compositeKwargs,
         )
 
         # Find spots and decode the composite image
@@ -841,12 +898,12 @@ def run(
             print("No transcripts found for composite! Not saving a DecodedIntensityTable file.")
 
         # Saves per FOV spots and decoded results
-        saveCompositeResults(blobs, decoded, input_dir, output_name=f"{output_dir}")
+        saveCompositeResults(blobs, decoded, input_dir, selected_fovs, output_name=f"{output_dir}")
 
     # Otherwise run on a per FOV basis
     else:
         if selected_fovs is not None:
-            fovs = ["fov_{:03}".format(int(f)) for f in selected_fovs]
+            fovs = ["fov_{:05}".format(int(f)) for f in selected_fovs]
         else:
             fovs = experiment.keys()
 
@@ -961,7 +1018,7 @@ if __name__ == "__main__":
     # == MetricDistance
     p.add_argument("--max-distance", type=float, nargs="?")
     p.add_argument("--min-intensity", type=float, nargs="?")
-    p.add_argument("--metric", type=str, nargs="?")  # NOTE also used in pixelRunner
+    p.add_argument("--metric", type=str, nargs="?")
     p.add_argument("--norm-order", type=int, nargs="?")  # NOTE also used in pixelRunner
     p.add_argument("--anchor-round", type=int, nargs="?")  # also used in PerRoundMaxChannel
     p.add_argument(
@@ -973,7 +1030,7 @@ if __name__ == "__main__":
     p.add_argument("--error-rounds", type=int, nargs="?")
     p.add_argument("--mode", type=str, nargs="?")
     p.add_argument("--physical-coords", dest="physical_coords", action="store_true")
-    p.add_argument("--n-processes", type=int, nargs="?")
+    p.add_argument("--n-processes", type=int, nargs="?")  # also used in PixelDecoder
 
     # == postcodeDecode
     p.add_argument("--composite-decode", dest="composite_decode", action="store_true")
@@ -983,6 +1040,7 @@ if __name__ == "__main__":
     # pixelRunner kwargs
     p.add_argument("--distance-threshold", type=float, nargs="?")
     p.add_argument("--magnitude-threshold", type=float, nargs="?")
+    p.add_argument("--pnorm", type=int, nargs="?")
     p.add_argument("--min-area", type=int, nargs="?")
     p.add_argument("--max-area", type=int, nargs="?")
 
@@ -991,7 +1049,7 @@ if __name__ == "__main__":
     # for item in vars(args):
     #    print(item, ':', vars(args)[item])
 
-    output_dir = f"tmp/{args.tmp_prefix}/4_Decoded/"
+    output_dir = f"tmp/{args.tmp_prefix}/4_Decoded_{args.tmp_prefix}/"
 
     exploc = args.exp_loc / "experiment.json"
     experiment = starfish.core.experiment.experiment.Experiment.from_json(str(exploc))
@@ -1019,9 +1077,14 @@ if __name__ == "__main__":
     addKwarg(args, pixelRunnerKwargs, "metric")
     addKwarg(args, pixelRunnerKwargs, "distance_threshold")
     addKwarg(args, pixelRunnerKwargs, "magnitude_threshold")
+    addKwarg(args, pixelRunnerKwargs, "pnorm")
     addKwarg(args, pixelRunnerKwargs, "min_area")
     addKwarg(args, pixelRunnerKwargs, "max_area")
     addKwarg(args, pixelRunnerKwargs, "norm_order")
+    addKwarg(args, pixelRunnerKwargs, "n_processes")
+    if "magnitude_threshold" in pixelRunnerKwargs.keys():
+        if pixelRunnerKwargs["magnitude_threshold"] < 1:
+            pixelRunnerKwargs["magnitude_threshold"] *= 2**16
 
     decodeKwargs = {}
 
@@ -1055,6 +1118,17 @@ if __name__ == "__main__":
             method = starfish.spots.DecodeSpots.CheckAll
         elif method == "postcodeDecode":
             method = starfish.spots.DecodeSpots.postcodeDecode
+            # Check that codebook is compatible with postcode
+            codebook = experiment.codebook
+            codebook_no_blanks = codebook[
+                ["blank" not in target.lower() for target in codebook["target"].data]
+            ]
+            if len(codebook_no_blanks) >= len(codebook["c"]) ** len(codebook["r"]):
+                raise Exception(
+                    "PoSTcode decoder requires some unused barcode space or some blank codes in \
+                                 the codebook. If you have used 100% of the barcode space for real codes, \
+                                 then PoSTcode is not a valid decoding option."
+                )
         else:
             raise Exception("DecodeSpots method " + str(method) + " is not a valid method.")
 
