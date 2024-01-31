@@ -1047,9 +1047,7 @@ def blank_codebook(real_codebook, num_blanks):
     roundsN = len(real_codebook["r"])
     channelsN = len(real_codebook["c"])
     allCombo = xr.zeros_like(
-        xr.DataArray(
-            np.zeros((channelsN**roundsN, roundsN, channelsN)), dims=["target", "r", "c"]
-        )
+        xr.DataArray(np.zeros((channelsN**roundsN, roundsN, channelsN)), dims=["target", "r", "c"])
     )
 
     # Calculate hamming distance rule in codebook
