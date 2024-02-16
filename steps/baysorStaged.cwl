@@ -42,7 +42,7 @@ steps:
     in:
       segDir: segmented
     out: [csvs, priors]
-  baysor:
+  baysor_run:
     run: baysor.cwl
     in:
       csv: stage/csvs
@@ -75,5 +75,5 @@ steps:
              "listing": dir}
            }; }
     in:
-      file_array: baysor/segmented
+      file_array: baysor_run/segmented
     out: [pool_dir]
