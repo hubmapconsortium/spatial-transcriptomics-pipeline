@@ -783,9 +783,6 @@ steps:
           }};
         }
       inputs:
-        dir_size:
-          type: long
-
         file_array:
           type:
             type: array
@@ -812,7 +809,6 @@ steps:
       file_array: execute_processing/processed_exp
       og_dir: input_dir
       scatter: scatter_generator/scatter_out
-      dir_size: dir_size
       fov_count:
         source: [stage_processing/fov_count, fov_count]
         valueFrom: |
