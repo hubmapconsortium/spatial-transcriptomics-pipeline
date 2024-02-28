@@ -125,7 +125,7 @@ steps:
 
       requirements:
         DockerRequirement:
-          dockerPull: hubmap/starfish-custom:latest
+          dockerPull: hubmap/starfish-custom:3.1
         ResourceRequirement:
           ramMin: 1000
           tmpdirMin: 1000
@@ -305,7 +305,7 @@ steps:
               writable: true
               entry: "$({class: 'Directory', listing: inputs.input_files})"
         DockerRequirement:
-          dockerPull: hubmap/starfish-custom:latest
+          dockerPull: hubmap/starfish-custom:3.1
         ResourceRequirement:
           tmpdirMin: |
             ${
