@@ -20,7 +20,7 @@ steps:
       class: CommandLineTool
       requirements:
         DockerRequirement:
-          dockerPull: hubmap/starfish-custom:3.0
+          dockerPull: hubmap/starfish-custom:latest
         InitialWorkDirRequirement:
           listing:
             - $(inputs.example_dir)

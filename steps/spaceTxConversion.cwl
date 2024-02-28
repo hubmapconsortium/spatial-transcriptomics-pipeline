@@ -195,7 +195,7 @@ steps:
 
       requirements:
         DockerRequirement:
-          dockerPull: hubmap/starfish-custom:3.0
+          dockerPull: hubmap/starfish-custom:latest
         ResourceRequirement:
           ramMin: 1000
           tmpdirMin: 1000
@@ -231,7 +231,7 @@ steps:
 
       requirements:
         DockerRequirement:
-            dockerPull: hubmap/starfish-custom:3.0
+            dockerPull: hubmap/starfish-custom:latest
         ResourceRequirement:
           tmpdirMin: |
             ${
@@ -374,7 +374,7 @@ steps:
                 inputBinding:
                   prefix: --aux-channel-intercept
 
-        fov_positioning:
+        fov_positioning_json:
           - 'null'
           - type: record
             name: locs
@@ -383,6 +383,9 @@ steps:
                 type: File?
                 inputBinding:
                   prefix: --loc-json
+
+        fov_positioning_inline:
+          - 'null'
           - type: record
             name: fov_positioning
             fields:
@@ -503,15 +506,25 @@ steps:
               };
             };
           }
-      fov_positioning:
-        source: [fov_positioning, stage_conversion/fov_positioning_x_locs, stage_conversion/fov_positioning_x_shape, stage_conversion/fov_positioning_x_voxel, stage_conversion/fov_positioning_y_locs, stage_conversion/fov_positioning_y_shape, stage_conversion/fov_positioning_y_voxel, stage_conversion/fov_positioning_z_locs, stage_conversion/fov_positioning_z_shape, stage_conversion/fov_positioning_z_voxel, locs_json]
+      fov_positioning_json:
+        source: [fov_positioning, locs_json]
+        valueFrom: |
+          ${
+            if(self[0] !== null && self[0].locs !== null) {
+              return self[0];
+            } else if(self[1] !== null) {
+              return {"locs": self[1]};
+            } else {
+              return null;
+            }
+          }
+      fov_positioning_inline:
+        source: [fov_positioning, stage_conversion/fov_positioning_x_locs, stage_conversion/fov_positioning_x_shape, stage_conversion/fov_positioning_x_voxel, stage_conversion/fov_positioning_y_locs, stage_conversion/fov_positioning_y_shape, stage_conversion/fov_positioning_y_voxel, stage_conversion/fov_positioning_z_locs, stage_conversion/fov_positioning_z_shape, stage_conversion/fov_positioning_z_voxel]
         valueFrom: |
           ${
             if(self[1] === null){
-              if(self[0] !== null && ((self[0].x_locs !== null && self[0].x_shape !== null && self[0].x_voxel !== null) || self[0].locs !== null)){
+              if(self[0] !== null && (self[0].x_locs !== null && self[0].x_shape !== null && self[0].x_voxel !== null) && self[0].locs === null){
                 return self[0];
-              } else if(self[10]){
-                return {"locs": self[10]};
               } else {
                 return null;
               }

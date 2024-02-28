@@ -125,7 +125,7 @@ steps:
 
       requirements:
         DockerRequirement:
-          dockerPull: hubmap/starfish-custom:3.0
+          dockerPull: hubmap/starfish-custom:latest
         ResourceRequirement:
           ramMin: 1000
           tmpdirMin: 1000
@@ -305,7 +305,7 @@ steps:
               writable: true
               entry: "$({class: 'Directory', listing: inputs.input_files})"
         DockerRequirement:
-          dockerPull: hubmap/starfish-custom:3.0
+          dockerPull: hubmap/starfish-custom:latest
         ResourceRequirement:
           tmpdirMin: |
             ${
@@ -783,9 +783,6 @@ steps:
           }};
         }
       inputs:
-        dir_size:
-          type: long
-
         file_array:
           type:
             type: array
@@ -812,7 +809,6 @@ steps:
       file_array: execute_processing/processed_exp
       og_dir: input_dir
       scatter: scatter_generator/scatter_out
-      dir_size: dir_size
       fov_count:
         source: [stage_processing/fov_count, fov_count]
         valueFrom: |
