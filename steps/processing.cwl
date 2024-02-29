@@ -227,16 +227,7 @@ steps:
           }
       fov_count:
         source: [stage_processing/fov_count, fov_count]
-        valueFrom: |
-          ${
-            if(self[0]){
-              return self[0];
-            } else if(self[1]) {
-              return self[1];
-            } else {
-              return null;
-            }
-          }
+        pickValue: first_non_null
     out: [scatter_out]
 
   tmpname:
@@ -778,7 +769,7 @@ steps:
           }
           return {"pool_dir": {
             "class": "Directory",
-            "basename": "3_Processed",
+            "basename": "3_processed",
             "listing": listing,
           }};
         }
@@ -811,14 +802,5 @@ steps:
       scatter: scatter_generator/scatter_out
       fov_count:
         source: [stage_processing/fov_count, fov_count]
-        valueFrom: |
-          ${
-            if(self[0]){
-              return self[0];
-            } else if(self[1]) {
-              return self[1];
-            } else {
-              return null;
-            }
-          }
+        pickValue: first_non_null
     out: [pool_dir]
