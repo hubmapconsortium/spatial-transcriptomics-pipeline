@@ -4,6 +4,7 @@ import glob
 import json
 import operator as op
 import os
+import random
 import sys
 import time
 from argparse import ArgumentParser
@@ -281,79 +282,95 @@ def optimize_scale(
         return None
 
 
-def scale_img(
-    img, codebook, pixelRunnerKwargs: dict, level_method: Levels, is_volume: bool = False
-):
+def scale_img(fovs, experiment, pixelRunnerKwargs: dict, is_volume: bool = False):
     """
-    Main method for image rescaling. Takes a set of images and rescales them to get the best
-    pixel-based estimate.  Returns an ImageStack.
+    Main method for image rescaling. Takes a list of fovs and randomly rescales them
+    until 30 converge. Returns the average scaling factors across those 30 FOVs.
     """
+    print("Intensity Rescaling...")
+    scale_start = time.time()
 
-    # Crop edges
-    crop = 40
-    cropped_img = deepcopy(
-        img.sel(
-            {Axes.Y: (crop, img.shape[Axes.Y] - crop), Axes.X: (crop, img.shape[Axes.X] - crop)}
-        )
-    )
+    n = 30
+    codebook = experiment.codebook
+    rescale_fovs = random.sample(fovs, len(fovs))
 
-    # Initialize scaling factors
-    local_scale = init_scale(cropped_img)
+    # Calculate scaling factors for shuffled FOVs until n FOVs converge
+    num_converged = 0
+    scaling_factors_set = []
+    for fov in rescale_fovs:
+        print(fov)
+        img = experiment[fov].get_image("primary")
 
-    # Optimize scaling factors until convergence
-    scaling_factors = deepcopy(local_scale)
-    og_img = deepcopy(cropped_img)
-    mod_mean = 1
-    iters = 0
-    while mod_mean > 0.01:
-        scaling_mods = optimize_scale(
-            cropped_img, scaling_factors, codebook, pixelRunnerKwargs, is_volume
-        )
-
-        # If scaling_mods == None, less than 10 transcripts were decodable and scaling_factors are all set to 1
-        if scaling_mods is None:
-            scaling_factors = {key: 1 for key in scaling_factors}
-            print(
-                "Need at least 10 decodable transcripts to perform scaling. Try adjusting processing parameters"
+        # Crop edges
+        crop = 40
+        cropped_img = deepcopy(
+            img.sel(
+                {
+                    Axes.Y: (crop, img.shape[Axes.Y] - crop),
+                    Axes.X: (crop, img.shape[Axes.X] - crop),
+                }
             )
-            break
-        else:
-            # Apply modifications to scaling_factors
-            for key in sorted(scaling_factors):
-                scaling_factors[key] = scaling_factors[key] * scaling_mods[key]
+        )
 
-            # Replace image with unscaled version
-            cropped_img = deepcopy(og_img)
+        # Initialize scaling factors
+        local_scale = init_scale(cropped_img)
 
-            # Update mod_mean and add to iteration number. If iters reaches 20 return current scaling factors
-            # and print message
-            mod_mean = np.mean(abs(np.array([x for x in scaling_mods.values()]) - 1))
-            iters += 1
-            if iters >= 20:
-                print(
-                    "Scaling factors did not converge after 20 iterations. Returning initial estimate."
-                )
-                scaling_factors = deepcopy(local_scale)
+        # Optimize scaling factors until convergence
+        scaling_factors = deepcopy(local_scale)
+        og_img = deepcopy(cropped_img)
+        mod_mean = 1
+        iters = 0
+        while mod_mean > 0.01:
+            scaling_mods = optimize_scale(
+                cropped_img, scaling_factors, codebook, pixelRunnerKwargs, is_volume
+            )
+
+            # If scaling_mods == None, less than 10 transcripts were decodable and scaling_factors are all set to 1
+            if scaling_mods is not None:
+                # Apply modifications to scaling_factors
+                for key in sorted(scaling_factors):
+                    scaling_factors[key] = scaling_factors[key] * scaling_mods[key]
+
+                # Replace image with unscaled version
+                cropped_img = deepcopy(og_img)
+
+                # Update mod_mean and add to iteration number. If iters reaches 20 return current scaling factors
+                # and print message
+                mod_mean = np.mean(abs(np.array([x for x in scaling_mods.values()]) - 1))
+                iters += 1
+                if iters >= 20:
+                    break
+        # Check for convergence, save scaling factors and break out of loop if num_converged reaches n
+        if iters < 20 and scaling_mods is not None:
+            scaling_factors_set.append(scaling_factors)
+            num_converged += 1
+            if num_converged == n:
                 break
 
-    # Scale with final factors
-    for r in range(img.num_rounds):
-        for ch in range(img.num_chs):
-            print(f"({r},{ch}): {scaling_factors[(r,ch)]}")
-            img.xarray.data[r, ch] = img.xarray.data[r, ch] / scaling_factors[(r, ch)]
+    print(f"Scale factors calculated in: {time.time()-scale_start}")
 
-    # Scale image
-    pmin = 0
-    pmax = 100
-    clip = starfish.image.Filter.ClipPercentileToZero(
-        p_min=pmin, p_max=pmax, is_volume=is_volume, level_method=Levels.SCALE_BY_IMAGE
-    )
-    clip.run(img, in_place=True)
+    # If at least 1 FOV converged, calculate the average scaling factors and return them
+    if num_converged > 1:
+        if num_converged < n:
+            print(
+                f"WARNING: Fewer than {n} FOVs converged during intensity rescaling. {num_converged}/{len(fovs)} did converge. Rescaling may not be accurate. Try adjusting processing parameters"
+            )
+        scaling_factors_list = defaultdict(list)
+        for scaling_factors in scaling_factors_set:
+            for rch in scaling_factors:
+                scaling_factors_list[rch].append(scaling_factors[rch])
 
-    if scaling_mods is not None:
-        print(f"Rescaled image in {iters} iterations, final mod_mean: {mod_mean}")
+        scaling_factors_avg = {}
+        for rch in scaling_factors_list:
+            scaling_factors_avg[rch] = np.mean(scaling_factors_list[rch])
 
-    return img
+        return scaling_factors_avg
+    # Returns None if no FOVs converged
+    else:
+        print(
+            "WARNING: ZERO FOVs converged during intensity rescaling. Images will not be rescaled. Try adjusting processing parameters"
+        )
+        return None
 
 
 def pixelDriver(
@@ -907,6 +924,10 @@ def run(
         else:
             fovs = experiment.keys()
 
+        # Calculate scaling factors for rescaling
+        if rescale:
+            scaling_factors = scale_img(fovs, experiment, pixelRunnerKwargs, is_volume)
+
         for fov in fovs:
             start0 = time.time()
             print("fov", fov)
@@ -926,10 +947,24 @@ def run(
                     .reduce({Axes.CH, Axes.ROUND}, func="max")
                 )
 
+            # Apply scaling factors for rescaling
             if rescale:
-                img = scale_img(
-                    img, experiment.codebook, pixelRunnerKwargs, level_method, is_volume
+
+                # Scale with final factors (if not None)
+                if scaling_factors is not None:
+                    for r in range(img.num_rounds):
+                        for ch in range(img.num_chs):
+                            img.xarray.data[r, ch] = (
+                                img.xarray.data[r, ch] / scaling_factors[(r, ch)]
+                            )
+
+                # Scale image
+                pmin = 0
+                pmax = 100
+                clip = starfish.image.Filter.ClipPercentileToZero(
+                    p_min=pmin, p_max=pmax, is_volume=is_volume, level_method=Levels.SCALE_BY_IMAGE
                 )
+                clip.run(img, in_place=True)
 
             if blob_based:
                 output_name = f"{output_dir}spots/{fov}_"
