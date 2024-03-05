@@ -9,6 +9,7 @@ import re
 import sys
 from argparse import ArgumentParser
 from datetime import datetime
+from glob import glob
 from pathlib import Path
 from time import time
 from typing import List, Mapping, Union
@@ -593,9 +594,17 @@ class PrimaryTileFetcher(TileFetcher):
             "zplane": zplane_label,
             "offset_zplane": zplane_label + self.zplane_offset,
         }
-        file_path = os.path.join(
+        file_glob = os.path.join(
             self.input_dir, self.file_format.format(*[varTable[arg] for arg in self.file_vars])
         )
+
+        paths = glob(file_glob)
+        if len(paths) == 0:
+            raise Exception(f"File glob string {file_glob} has 0 matching files.")
+        elif len(paths) > 1:
+            raise Exception(f"File glob string {file_glob} has too many matches: {paths}")
+
+        file_path = paths[0]
 
         if self.locs:
             return FISHTile(
