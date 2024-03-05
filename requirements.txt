@@ -2,7 +2,7 @@ numpy
 scikit-image==0.18.3
 tqdm
 anndata
-astropy==3.2.3
+astropy
 tifffile
 matplotlib
 opencv-python-headless==4.6.0.66

@@ -131,7 +131,7 @@ steps:
 
       requirements:
         DockerRequirement:
-          dockerPull: hubmap/starfish-custom:3.1
+          dockerPull: hubmap/starfish-custom:latest
         ResourceRequirement:
           ramMin: 1000
           tmpdirMin: 1000
@@ -166,7 +166,7 @@ steps:
 
       requirements:
         DockerRequirement:
-          dockerPull: hubmap/starfish-custom:3.1
+          dockerPull: hubmap/starfish-custom:latest
         InitialWorkDirRequirement:
           listing:
             - entryname: "$('input_dir_'+inputs.tmp_prefix)"

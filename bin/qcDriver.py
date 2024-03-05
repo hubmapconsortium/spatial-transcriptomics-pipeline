@@ -576,11 +576,11 @@ def getFPR(segmentation=None, results=None, pdf=False):
         empty_cells = pd.Series(
             {cell: 0 for cell in all_cells if cell not in real_per_cell_all.index}
         )
-        real_per_cell_all = real_per_cell_all.append(empty_cells)
+        real_per_cell_all = pd.concat([real_per_cell_all, empty_cells])
         empty_cells = pd.Series(
             {cell: 0 for cell in all_cells if cell not in blank_per_cell_all.index}
         )
-        blank_per_cell_all = blank_per_cell_all.append(empty_cells)
+        blank_per_cell_all = pd.concat([blank_per_cell_all, empty_cells])
     else:
         real_per_cell_all = pd.Series(results["reals_all"])
         blank_per_cell_all = pd.Series(results["blanks_all"])
@@ -623,11 +623,11 @@ def getFPR(segmentation=None, results=None, pdf=False):
             empty_cells = pd.Series(
                 {cell: 0 for cell in all_cells if cell not in real_per_cell_full.index}
             )
-            real_per_cell_full = real_per_cell_full.append(empty_cells)
+            real_per_cell_full = pd.concat([real_per_cell_all, empty_cells])
             empty_cells = pd.Series(
                 {cell: 0 for cell in all_cells if cell not in blank_per_cell_full.index}
             )
-            blank_per_cell_full = blank_per_cell_full.append(empty_cells)
+            blank_per_cell_full = pd.concat([blank_per_cell_full, empty_cells])
         else:
             real_per_cell_full = pd.Series(results["reals_full"])
             blank_per_cell_full = pd.Series(results["blanks_full"])
