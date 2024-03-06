@@ -8,7 +8,7 @@ import random
 import sys
 import time
 from argparse import ArgumentParser
-from collections import defaultdict, Counter
+from collections import defaultdict
 from copy import deepcopy
 from datetime import datetime
 from functools import partialmethod, reduce
@@ -250,7 +250,6 @@ def optimize_scale(
     # Decode image
     decoded_targets, prop_results = pixelDriver(img, codebook, **pixelRunnerKwargs)
     decoded_targets = decoded_targets.loc[decoded_targets[Features.PASSES_THRESHOLDS]]
-    print(Counter(["Blank" in target for target in decoded_targets["target"].data]))
 
     # Only calculate scaling factors if more than 10 transcripts, else return None
     if len(decoded_targets) >= 10:
