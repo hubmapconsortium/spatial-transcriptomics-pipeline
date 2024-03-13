@@ -107,14 +107,10 @@ inputs:
     type: int?
     doc: If provided, the number of processes that will be spawned for processing. Otherwise, the maximum number of available CPUs will be used.
 
-  scatter_into_n:
-    type: int?
-    doc: If provided, the step to run decoding will be split into n batches, where each batch is (FOV count/n) FOVs big.
-
 outputs:
   processed_exp:
     type: Directory
-    outputSource: restage/pool_dir
+    outputSource: execute_processing/processed_exp
 
 steps:
 
@@ -151,140 +147,15 @@ steps:
     in:
       datafile: parameter_json
       schema: read_schema/data
-    out: [fov_count, selected_fovs, clip_min, clip_max, level_method, rescale, register_aux_view, register_to_primary, channels_per_reg, background_view, register_background, anchor_view, high_sigma, deconvolve_iter, deconvolve_sigma, low_sigma, rolling_radius, match_histogram, tophat_radius, channel_count, aux_tilesets_aux_names, aux_tilesets_aux_channel_count, is_volume, n_processes, scatter_into_n]
+    out: [fov_count, selected_fovs, clip_min, clip_max, level_method, rescale, register_aux_view, register_to_primary, channels_per_reg, background_view, register_background, anchor_view, high_sigma, deconvolve_iter, deconvolve_sigma, low_sigma, rolling_radius, match_histogram, tophat_radius, channel_count, aux_tilesets_aux_names, aux_tilesets_aux_channel_count, is_volume, n_processes]
     when: $(inputs.datafile != null)
-
-  scatter_generator:
-    run:
-      requirements:
-        ResourceRequirement:
-          ramMin: 1000
-          tmpdirMin: 1000
-          outdirMin: 1000
-      class: ExpressionTool
-      expression: |
-        ${ var fovs = inputs.selected_fovs;
-           if(fovs === null){
-             fovs = [];
-             for (var i=0; i<inputs.fov_count; i++) {
-               fovs.push(Number(i));
-             }
-           }
-           if(inputs.scatter_into_n === null){
-             return {"scatter_out": new Array(fovs)};
-           } else {
-             var scattered = new Array(inputs.scatter_into_n);
-             var chunkSize = Math.ceil(fovs.length / inputs.scatter_into_n);
-             var loc = 0;
-             for (var i = 0; i<fovs.length; i += chunkSize) {
-               var subs = [];
-               for (var j=i; j<i + chunkSize && j<fovs.length; j +=1) {
-                 subs.push(Number(fovs[j]));
-               }
-               scattered[loc] = subs;
-               loc += 1;
-             }
-             return {"scatter_out": scattered};
-           }; }
-      inputs:
-        scatter_into_n:
-          type: int?
-        selected_fovs:
-          type: int[]?
-        fov_count:
-          type: int
-      outputs:
-        scatter_out:
-          type:
-            type: array
-            items:
-              type: array
-              items: int
-    in:
-      scatter_into_n:
-        source: [stage_processing/scatter_into_n, scatter_into_n]
-        valueFrom: |
-          ${
-            if(self[0]){
-              return self[0];
-            } else if(self[1]) {
-              return self[1];
-            } else {
-              return null;
-            }
-          }
-      selected_fovs:
-        source: [stage_processing/selected_fovs, selected_fovs]
-        valueFrom: |
-          ${
-            if(self[0]){
-              return self[0];
-            } else if(self[1]) {
-              return self[1];
-            } else {
-              return null;
-            }
-          }
-      fov_count:
-        source: [stage_processing/fov_count, fov_count]
-        pickValue: first_non_null
-    out: [scatter_out]
 
   tmpname:
     run: tmpdir.cwl
-    scatter: sc_count
-    in:
-      sc_count: scatter_generator/scatter_out
+    in: []
     out: [tmp]
 
-  fileDivider:
-    scatter: scatter
-    run:
-      class: ExpressionTool
-      requirements:
-        - class: InlineJavascriptRequirement
-        - class: LoadListingRequirement
-
-      inputs:
-        experiment:
-          type: Directory
-          doc: Directory containing spaceTx-formatted experiment
-
-        scatter:
-          type:
-            type: array
-            items: int
-          doc: List describing the FOVs in this specific scatter.
-
-      outputs:
-        out: File[]
-
-      expression: |
-        ${
-          var dir_lis = [];
-          for(var i=0;i<inputs.experiment.listing.length; i++){
-            var id = inputs.experiment.listing[i].basename;
-            if(id.includes("json")){
-              dir_lis.push(inputs.experiment.listing[i])
-            } else {
-              for(var j=0;j<inputs.scatter.length; j++) {
-                if(id.includes("fov_"+String(inputs.scatter[j]).padStart(5,'0'))){
-                  dir_lis.push(inputs.experiment.listing[i])
-                }
-              }
-            }
-          }
-          return {"out": dir_lis};
-        }
-    in:
-      experiment: input_dir
-      scatter: scatter_generator/scatter_out
-    out:
-      [out]
-
   execute_processing:
-    scatter: [selected_fovs, tmp_prefix, input_files]
-    scatterMethod: dotproduct
     run:
       class: CommandLineTool
       baseCommand: /opt/imgProcessing.py
@@ -294,7 +165,7 @@ steps:
           listing:
             - entryname: "$('input_dir_'+inputs.tmp_prefix)"
               writable: true
-              entry: "$({class: 'Directory', listing: inputs.input_files})"
+              entry: "$(inputs.input_files)"
         DockerRequirement:
           dockerPull: hubmap/starfish-custom:latest
         ResourceRequirement:
@@ -337,8 +208,8 @@ steps:
             prefix: --tmp-prefix
 
         input_files:
-          type: File[]
-          doc: Formatted input from fileDivider step.
+          type: Directory
+          doc: Raw input folder, possibly with ugly docker string.
 
         input_dir:
           type: string
@@ -472,10 +343,10 @@ steps:
     in:
       dir_size: dir_size
       tmp_prefix: tmpname/tmp
-      input_files: fileDivider/out
+      input_files: input_dir
       input_dir:
         valueFrom: $("input_dir_" + inputs.tmp_prefix)
-      selected_fovs: scatter_generator/scatter_out
+      selected_fovs: selected_fovs
       clip_min:
         source: [stage_processing/clip_min, clip_min]
         valueFrom: |
@@ -715,92 +586,3 @@ steps:
             }
           }
     out: [processed_exp]
-
-  restage:
-    run:
-      class: ExpressionTool
-      requirements:
-        InlineJavascriptRequirement: {}
-        LoadListingRequirement:
-          loadListing: deep_listing
-      expression: |
-        ${
-          var all_fovs = [];
-          for(var i=0; i<inputs.fov_count; i++){
-            var to_push = true;
-            for(var j=0; j<inputs.scatter.length; j++){
-              if(inputs.scatter[j].includes(i)){
-                to_push = false;
-              }
-            }
-            if(to_push) {
-              all_fovs.push(Number(i));
-            }
-          }
-          var listing = [];
-          for(var i=0;i<inputs.file_array.length;i++){
-            for(var j=0;j<inputs.file_array[i].listing.length;j++){
-              var item = inputs.file_array[i].listing[j];
-              if(!item.basename.includes("json")) {
-                listing.push(item);
-              } else {
-                if(item.basename.includes("fov")) {
-                  for(var k=0;k<inputs.scatter[i].length; k++){
-                    if(item.basename.includes("fov_"+String(inputs.scatter[i][k]).padStart(5,'0'))){
-                      listing.push(item);
-                    }
-                  }
-                }
-              }
-            }
-          }
-          for(var i=0; i<inputs.og_dir.listing.length;i++) {
-            var item = inputs.og_dir.listing[i];
-            if(item.basename.includes("fov")){
-              for(var j=0;j<all_fovs.length; j++){
-                if(item.basename.includes("fov_"+String(all_fovs[j]).padStart(5,'0'))) {
-                  listing.push(item);
-                  break;
-                }
-              }
-            } else if(item.basename.includes("json") && !item.basename.includes("log")) {
-              listing.push(item);
-            }
-          }
-          return {"pool_dir": {
-            "class": "Directory",
-            "basename": "3_processed",
-            "listing": listing,
-          }};
-        }
-      inputs:
-        file_array:
-          type:
-            type: array
-            items: Directory
-
-        og_dir:
-          type: Directory
-
-        fov_count:
-          type: int
-
-        scatter:
-          type:
-            type: array
-            items:
-              type: array
-              items: int
-
-      outputs:
-        pool_dir:
-          type: Directory
-
-    in:
-      file_array: execute_processing/processed_exp
-      og_dir: input_dir
-      scatter: scatter_generator/scatter_out
-      fov_count:
-        source: [stage_processing/fov_count, fov_count]
-        pickValue: first_non_null
-    out: [pool_dir]

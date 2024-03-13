@@ -21,7 +21,6 @@
 	"tophat_radius?",
 	"channel_count",
 	"n_processes?",
-	"scatter_into_n?",
 	{
 		"aux_tilesets":[
 			[
