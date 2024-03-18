@@ -132,41 +132,101 @@ def register_primary_aux(img, reg_img, chs_per_reg):
     return img
 
 
-def register_primary_primary(img, reg_img):
+def calc_reg_shift(images, reg_img):
+    """
+    Helper function for calculating registration shifts in parallel
+    """
+
+    # Calculate shifts from each primary image to the registration image
+    shifts = []
+    for image in images:
+        shift, error, diffphase = phase_cross_correlation(reg_img, image, upsample_factor=100)
+        shifts.append(shift)
+    return shifts
+
+
+def apply_reg_shift(image_tforms, shape):
+    """
+    Helper function for applying registration shifts in parallel
+    """
+
+    align_imgs = []
+    for i in range(len(image_tforms[0])):
+        image = image_tforms[0][i]
+        tform = image_tforms[1][i]
+        align_img = ndimage.affine_transform(
+            image,
+            np.linalg.inv(tform),
+            output_shape=shape[2:],
+        )
+        align_imgs.append(align_img)
+    return align_imgs
+
+
+def register_primary_primary_parallel(img, reg_img, num_threads):
     """
     Register primary images using provided registration images.
 
     Calculates shifts between primary images and the single auxillary image
     and then applies shifts to primary images.
     """
+    # Chunk round/channel combinations for parallel run
+    rchs = [(r, ch) for r in range(img.num_rounds) for ch in range(img.num_chs)]
 
-    # Calculate shifts from each primary image to the registration image
-    shifts = {}
-    for r in range(img.num_rounds):
-        for ch in range(img.num_chs):
-            shift, error, diffphase = phase_cross_correlation(
-                reg_img.xarray.data[0, 0], img.xarray.data[r, ch], upsample_factor=100
-            )
-            shifts[(r, ch)] = shift
+    # Calculates index ranges to chunk data by
+    ranges = [0]
+    for i in range(1, num_threads + 1):
+        ranges.append(int((len(rchs) / num_threads) * i))
+    chunked_rchs = [rchs[ranges[i] : ranges[i + 1]] for i in range(len(ranges[:-1]))]
+
+    # Create list of lists of images corresponding to the above chunking
+    chunked_imgs = []
+    for rch_chunk in chunked_rchs:
+        chunk = []
+        for rch in rch_chunk:
+            chunk.append(img.xarray.data[rch[0], rch[1]])
+        chunked_imgs.append(chunk)
+
+    # Calculate registration shifts in parallel
+    part = partial(calc_reg_shift, reg_img=reg_img.xarray.data[0, 0])
+    with ProcessPoolExecutor() as pool:
+        poolMap = pool.map(part, [img_chunk for img_chunk in chunked_imgs])
+        results = [x for x in poolMap]
 
     # Create transformation matrices
-    shape = img.raw_shape
     tforms = {}
-    for r, ch in shifts:
-        tform = np.diag([1.0] * 4)
-        # Start from 1 because we don't want to shift in the z direction (if there is one)
-        for i in range(1, 3):
-            tform[i, 3] = shifts[(r, ch)][i]
-        tforms[(r, ch)] = tform
+    for i in range(len(chunked_rchs)):
+        for j in range(len(chunked_rchs[i])):
+            r, ch = chunked_rchs[i][j]
+            tform = np.diag([1.0] * 4)
+            # Start from 1 because we don't want to shift in the z direction (if there is one)
+            for k in range(1, 3):
+                tform[k, 3] = results[i][j][k]
+            tforms[(r, ch)] = tform
 
-    # Register primary images
-    for r in range(img.num_rounds):
-        for ch in range(img.num_chs):
-            img.xarray.data[r, ch] = ndimage.affine_transform(
-                img.xarray.data[r, ch],
-                np.linalg.inv(tforms[(r, ch)]),
-                output_shape=shape[2:],
-            )
+    # Create list of lists of tforms corresponding to the above chunking
+    chunked_tforms = []
+    for rch_chunk in chunked_rchs:
+        chunk = []
+        for rch in rch_chunk:
+            chunk.append(tforms[(rch[0], rch[1])])
+        chunked_tforms.append(chunk)
+
+    # Apply registration shifts in parallel
+    shape = img.raw_shape
+    part = partial(apply_reg_shift, shape=shape)
+    with ProcessPoolExecutor() as pool:
+        poolMap = pool.map(
+            part, [img_tform_chunk for img_tform_chunk in zip(chunked_imgs, chunked_tforms)]
+        )
+        results = [x for x in poolMap]
+
+    # Compile results
+    for i in range(len(chunked_rchs)):
+        for j in range(len(chunked_rchs[i])):
+            r, ch = chunked_rchs[i][j]
+            img.xarray.data[r, ch] = deepcopy(results[i][j])
+
     return img
 
 
@@ -482,7 +542,7 @@ def cli(
                 )
             else:
                 print("\taligning to " + register_aux_view)
-                img = register_primary_primary(img, register)
+                img = register_primary_primary_parallel(img, register, n_processes)
         elif register_aux_view:
             # If not register_to_primary but still registering, calculate registration shifts between specified aux images and apply to primary images
             register = exp[fov].get_image(register_aux_view)
