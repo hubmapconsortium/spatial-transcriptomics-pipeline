@@ -96,7 +96,7 @@ steps:
 
       requirements:
         DockerRequirement:
-          dockerPull: hubmap/starfish-custom:3.2
+          dockerPull: hubmap/starfish-custom:latest
         ResourceRequirement:
           ramMin: 1000
           tmpdirMin: 1000

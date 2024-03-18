@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-
 import functools
 import hashlib
 import json
@@ -9,6 +8,7 @@ import re
 import sys
 from argparse import ArgumentParser
 from datetime import datetime
+from glob import glob
 from pathlib import Path
 from time import time
 from typing import List, Mapping, Union
@@ -161,6 +161,7 @@ class DaxReader(Reader):
         dirname = os.path.dirname(filename)
         if len(dirname) > 0:
             dirname = dirname + "/"
+
         self.inf_filename = dirname + os.path.splitext(os.path.basename(filename))[0] + ".inf"
 
         # defaults
@@ -256,6 +257,7 @@ class FISHTile(FetchedTile):
         zplane: int,
         ch: int,
         rnd: int,
+        fov_string: str,
         cache_read_order: list,
         locs: Mapping[Axes, float] = None,
         shape: Mapping[Axes, int] = None,
@@ -297,6 +299,7 @@ class FISHTile(FetchedTile):
         self._zplane = zplane
         self._ch = ch
         self._rnd = rnd
+        self._fov = fov_string
         self.cache_read_order = cache_read_order
         if locs:
             self.locs = locs
@@ -373,70 +376,86 @@ class FISHTile(FetchedTile):
         """
         # print(cached_read_fn(self._file_path).shape)
         try:
-            if ".dax" in self._file_path and not self.aux:
+            if ".dax" in self._file_path:
                 if self.data_org is None:
                     raise Exception("If images are of type .dax, a data_org_file is required.")
 
-                color_count = len(
-                    set(
-                        self.data_org[["bit" in name for name in self.data_org["channelName"]]][
-                            "color"
-                        ]
-                    )
-                )
                 prefix = "/".join(self._file_path.split("/")[:-1])
-                suffix = self._file_path.split("/")[-1]
-                dax = DaxReader(
-                    prefix
-                    + "/"
-                    + suffix.split("_")[0]
-                    + f"_{self._rnd // color_count}_"
-                    + suffix.split("_")[-1]
-                )
+                if not self.aux:
+                    data_org_row = self.data_org[self.data_org["bitNumber"] == self._rnd + 1].iloc[
+                        0
+                    ]
+                else:
+                    data_org_row = self.data_org[
+                        self.data_org["channelName"] == self.aux_name
+                    ].iloc[0]
+
+                # Get filename variables from regex expression
+                regex = data_org_row["imageRegExp"]
+                inds = np.where(np.isin(list(regex), ["<", ">"]))[0]
+                ind_pairs = [inds[i : i + 2] for i in range(0, len(inds), 2)]
+                file_vars = [regex[ind_pair[0] + 1 : ind_pair[1]] for ind_pair in ind_pairs]
+
+                # Create image file name
+                suffix = ""
+                for var in file_vars:
+                    if var == "imageType":
+                        suffix += data_org_row["imageType"] + "_"
+                    elif var == "fov":
+                        suffix += self._fov + "_"
+                    elif var == "imagingRound":
+                        imagingRound = data_org_row["imagingRound"]
+                        suffix += str(imagingRound) if imagingRound != -1 else ""
+
+                if suffix[-1] == "_":
+                    suffix = suffix[:-1]
+
+                # Crate DaxReader object
+                dax = DaxReader(prefix + "/" + suffix + ".dax")
+
+                # Figure out which frame we need
+                delim = "," if "," in data_org_row["zPos"] else " "
                 zs = sorted(
                     [
-                        float(z)
-                        for z in self.data_org["zPos"][0]
-                        .replace("[", "")
-                        .replace("]", "")
-                        .split(",")
+                        float(x)
+                        for x in [
+                            z
+                            for z in data_org_row["zPos"]
+                            .replace("[", "")
+                            .replace("]", "")
+                            .split(delim)
+                        ]
+                        if x != ""
                     ]
                 )
                 z_map = {z: z_ind for z_ind, z in enumerate(zs)}
-                row = self.data_org[self.data_org["round"] == self._rnd]
                 this_zs = [
-                    z_map[float(z)]
-                    for z in list(row["zPos"])[0].replace("[", "").replace("]", "").split(",")
-                ]
-                frames = [
-                    int(frame)
-                    for frame in list(row["frame"])[0].replace("[", "").replace("]", "").split(",")
-                ]
-                this_frame = frames[np.where(np.array(this_zs) == self._zplane)[0][0]]
-                img = dax.loadAFrame(this_frame)
-            elif ".dax" in self._file_path and self.aux:
-                dax = DaxReader(self._file_path)
-                zs = sorted(
-                    [
-                        float(z)
-                        for z in self.data_org["zPos"][0]
+                    z_map[float(x)]
+                    for x in [
+                        z
+                        for z in data_org_row["zPos"]
                         .replace("[", "")
                         .replace("]", "")
-                        .split(",")
+                        .split(delim)
+                        if z != ""
                     ]
-                )
-                z_map = {z: z_ind for z_ind, z in enumerate(zs)}
-                row = self.data_org[self.data_org["channelName"] == self.aux_name]
-                this_zs = [
-                    z_map[float(z)]
-                    for z in list(row["zPos"])[0].replace("[", "").replace("]", "").split(",")
                 ]
                 frames = [
-                    int(frame)
-                    for frame in list(row["frame"])[0].replace("[", "").replace("]", "").split(",")
+                    int(f)
+                    for f in [
+                        frame
+                        for frame in data_org_row["frame"]
+                        .replace("[", "")
+                        .replace("]", "")
+                        .split(delim)
+                        if frame != ""
+                    ]
                 ]
                 this_frame = frames[np.where(np.array(this_zs) == self._zplane)[0][0]]
+
+                # Load image
                 img = dax.loadAFrame(this_frame)
+
             else:
                 img = cached_read_fn(self._file_path)
 
@@ -464,6 +483,7 @@ class FISHTile(FetchedTile):
             img = img[slices]
             img = np.squeeze(img)
             return img
+
         except IndexError as e:
             print(
                 "\t{}\nshape: {}\tcache read: {}\nzpl: {} ch: {} rnd: {}\nwith error {}".format(
@@ -593,9 +613,27 @@ class PrimaryTileFetcher(TileFetcher):
             "zplane": zplane_label,
             "offset_zplane": zplane_label + self.zplane_offset,
         }
-        file_path = os.path.join(
+        file_glob = os.path.join(
             self.input_dir, self.file_format.format(*[varTable[arg] for arg in self.file_vars])
         )
+
+        paths = glob(file_glob)
+        if len(paths) == 0:
+            raise Exception(f"File glob string {file_glob} has 0 matching files.")
+        elif len(paths) > 1:
+            raise Exception(f"File glob string {file_glob} has too many matches: {paths}")
+
+        file_path = paths[0]
+
+        # Extract FOV string
+        inds = np.where(np.isin(list(self.file_format), ["{", "}"]))[0]
+        ind_pairs = [inds[i : i + 2] for i in range(0, len(inds), 2)]
+        file_var_formats = [
+            self.file_format[ind_pair[0] : ind_pair[1] + 1] for ind_pair in ind_pairs
+        ]
+        for v, var in enumerate(self.file_vars):
+            if var in ["fov", "offset_fov"]:
+                fov_string = file_var_formats[v].format(varTable["offset_fov"])
 
         if self.locs:
             return FISHTile(
@@ -603,6 +641,7 @@ class PrimaryTileFetcher(TileFetcher):
                 zplane_label,
                 ch_label,
                 round_label,
+                fov_string,
                 self.cache_read_order,
                 self.locs[fov_id],
                 self.img_shape,
@@ -616,6 +655,7 @@ class PrimaryTileFetcher(TileFetcher):
                 zplane_label,
                 ch_label,
                 round_label,
+                fov_string,
                 self.cache_read_order,
                 data_org=self.data_org,
                 aux=False,
@@ -749,9 +789,18 @@ class AuxTileFetcher(TileFetcher):
             "zplane": zplane_label,
             "offset_zplane": zplane_label + self.zplane_offset,
         }
-        file_path = os.path.join(
+
+        file_glob = os.path.join(
             self.input_dir, self.file_format.format(*[varTable[arg] for arg in self.file_vars])
         )
+
+        paths = glob(file_glob)
+        if len(paths) == 0:
+            raise Exception(f"File glob string {file_glob} has 0 matching files.")
+        elif len(paths) > 1:
+            raise Exception(f"File glob string {file_glob} has too many matches: {paths}")
+
+        file_path = paths[0]
 
         print(
             "fov: {} round: {} channel: {} zplane: {}".format(
@@ -762,12 +811,23 @@ class AuxTileFetcher(TileFetcher):
         print("aux view channel: int({} * {}) + {}".format(self.slope, ch_label, self.intercept))
         ch_label_adj = int(self.slope * int(ch_label)) + self.intercept
 
+        # Extract FOV string
+        inds = np.where(np.isin(list(self.file_format), ["{", "}"]))[0]
+        ind_pairs = [inds[i : i + 2] for i in range(0, len(inds), 2)]
+        file_var_formats = [
+            self.file_format[ind_pair[0] : ind_pair[1] + 1] for ind_pair in ind_pairs
+        ]
+        for v, var in enumerate(self.file_vars):
+            if var in ["fov", "offset_fov"]:
+                fov_string = file_var_formats[v].format(varTable["offset_fov"])
+
         if self.locs:
             return FISHTile(
                 file_path,
                 zplane_label,
                 ch_label_adj,
                 round_label,
+                fov_string,
                 self.cache_read_order,
                 self.locs[fov_id],
                 self.img_shape,
@@ -782,6 +842,7 @@ class AuxTileFetcher(TileFetcher):
                 zplane_label,
                 ch_label_adj,
                 round_label,
+                fov_string,
                 self.cache_read_order,
                 data_org=self.data_org,
                 aux=True,
@@ -805,6 +866,8 @@ def parse_codebook(codebook_csv: str) -> Codebook:
         Codebook object in SpaceTx format.
     """
     csv: pd.DataFrame = pd.read_csv(codebook_csv, index_col=0)
+    if "id" in csv.columns:
+        csv = csv[[col for col in csv.columns if col != "id"]]
 
     # Drop extra columns from vizgen codebook if they are there
     if "barcodeType" in csv.columns:

@@ -207,6 +207,8 @@ def init_scale(img: ImageStack):
             cumsum = cumsum / cumsum[-1]
             diffs = np.abs(cumsum - 0.9)
             local_scale[(r, ch)] = np.where(diffs == np.min(diffs))[0][0] + 1
+            if local_scale[(r, ch)] == 1:
+                local_scale[(r, ch)] = 0
 
     # Normalize
     scale_mean = np.mean([x for x in local_scale.values()])
@@ -314,13 +316,13 @@ def scale_img(fovs, experiment, pixelRunnerKwargs: dict, is_volume: bool = False
 
         # Initialize scaling factors
         local_scale = init_scale(cropped_img)
-
         # Optimize scaling factors until convergence
         scaling_factors = deepcopy(local_scale)
         og_img = deepcopy(cropped_img)
         mod_mean = 1
+        mod_means = [5, 1]
         iters = 0
-        while mod_mean > 0.01:
+        while mod_mean > 0.01 and mod_means[-2] - mod_means[-1] > 0.01:
             scaling_mods = optimize_scale(
                 cropped_img, scaling_factors, codebook, pixelRunnerKwargs, is_volume
             )
@@ -337,9 +339,11 @@ def scale_img(fovs, experiment, pixelRunnerKwargs: dict, is_volume: bool = False
                 # Update mod_mean and add to iteration number. If iters reaches 20 return current scaling factors
                 # and print message
                 mod_mean = np.mean(abs(np.array([x for x in scaling_mods.values()]) - 1))
+                mod_means.append(mod_mean)
                 iters += 1
                 if iters >= 20:
                     break
+
         # Check for convergence, save scaling factors and break out of loop if num_converged reaches n
         if iters < 20 and scaling_mods is not None:
             scaling_factors_set.append(scaling_factors)
@@ -350,7 +354,7 @@ def scale_img(fovs, experiment, pixelRunnerKwargs: dict, is_volume: bool = False
     print(f"Scale factors calculated in: {time.time()-scale_start}")
 
     # If at least 1 FOV converged, calculate the average scaling factors and return them
-    if num_converged > 1:
+    if num_converged >= 1:
         if num_converged < n:
             print(
                 f"WARNING: Fewer than {n} FOVs converged during intensity rescaling. {num_converged}/{len(fovs)} did converge. Rescaling may not be accurate. Try adjusting processing parameters"
@@ -922,7 +926,7 @@ def run(
         if selected_fovs is not None:
             fovs = ["fov_{:05}".format(int(f)) for f in selected_fovs]
         else:
-            fovs = experiment.keys()
+            fovs = [*experiment.keys()]
 
         # Calculate scaling factors for rescaling
         if rescale:
