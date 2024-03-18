@@ -26,7 +26,6 @@ from skimage.registration import phase_cross_correlation
 from starfish import Experiment, ImageStack
 from starfish.types import Levels
 from tqdm import tqdm
-import pdb
 
 
 def saveImg(loc: str, prefix: str, img: ImageStack):
