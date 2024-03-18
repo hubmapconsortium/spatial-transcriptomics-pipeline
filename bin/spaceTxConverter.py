@@ -382,7 +382,9 @@ class FISHTile(FetchedTile):
 
                 prefix = "/".join(self._file_path.split("/")[:-1])
                 if not self.aux:
-                    data_org_row = self.data_org[self.data_org['bitNumber'] == self._rnd + 1].iloc[0]
+                    data_org_row = self.data_org[self.data_org["bitNumber"] == self._rnd + 1].iloc[
+                        0
+                    ]
                 else:
                     data_org_row = self.data_org[
                         self.data_org["channelName"] == self.aux_name
