@@ -1,7 +1,9 @@
 #!/usr/bin/env python
 
+import json
 import sys
 from argparse import ArgumentParser
+from collections import defaultdict
 from copy import deepcopy
 from datetime import datetime
 from functools import partialmethod
@@ -12,6 +14,7 @@ from typing import List
 
 import cv2
 import numpy as np
+import pandas as pd
 import skimage
 import starfish
 import starfish.data
@@ -546,10 +549,156 @@ def segmentByDensity(
             return all_nuclei
 
 
+def combineFOVs(loc: str, fovs: List[int], coords: dict):
+    cxg_all = pd.read_csv("{}fov_{:05}/exp_segmented.csv".format(loc, fovs[0]), index_col=0)
+    cxg_all = cxg_all[0:0]
+    tr_all = pd.read_csv("{}fov_{:05}/segmentation.csv".format(loc, fovs[0]), index_col=0)
+    tr_all = tr_all[0:0]
+    dims = {"x": 0, "y": 0, "z": 0, "xc": 1, "yc": 1, "zc": 1}
+    cell_offset = 0
+    for f in fovs:
+        # load in both formats
+        cxg = pd.read_csv("{}fov_{:05}/exp_segmented.csv".format(loc, f), index_col=0)
+        tr = pd.read_csv("{}fov_{:05}/segmentation.csv".format(loc, fovs[f]), index_col=0)
+
+        # add _global positions for transcript table
+        for d, c_dim in dims.items():
+            if c_dim == 0:
+                tr[f"{d}_global"] = tr[d] + (coords[c_dim][f][f"{d}_min"] if d != "z" else 0)
+            else:
+                tr[f"{d}_global"] = tr[d] + coords[c_dim][f][d][0]
+
+        # adjust the cell id's according to the appropriate offset
+        new_inds = cxg.index[:-1].astype("uint64") + int(cell_offset)
+        new_inds = new_inds.astype("object")
+        new_inds = new_inds.append(pd.Index(["unassigned"]))
+        cxg = cxg.set_index(new_inds, drop=True)
+        tr["cell_id"] = tr["cell_id"] + cell_offset
+
+        # find the correct cell offset for the next fov,
+        # provide a warning in the log if they don't line up
+
+        # highest index is second to last row
+        # (last row is unassigned)
+        cxg_offset = int(cxg.index[-2])
+        tr_offset = int(tr["cell_id"].max())
+
+        if cxg_offset != tr_offset:
+            print(
+                f"Warning! fov_{f:05} doesn't have the same "
+                f"max cell id in both output tables. "
+                f"\n\tcell x gene maximum: {cxg_offset}"
+                f"\n\ttranscript maximum: {tr_offset}"
+            )
+        cell_offset = max(cxg_offset, tr_offset)
+
+        # add fov to transcript table
+        tr["fov"] = f"{f:05}"
+
+        # concat to master table, delete temp table
+        tr_all = pd.concat([tr_all, tr])
+        cxg_all = pd.concat([cxg_all, cxg])
+
+        del tr
+        del cxg
+    # merging all unassigned cells in cxg mat
+    new_unass = cxg_all[cxg_all.index.str.find("unassigned") == 0].sum()
+    cxg_all = cxg_all[~cxg_all.index.duplicated(keep=False)]
+    cxg_all.loc["unassigned"] = new_unass
+
+    # cleaning up
+    cxg_all = cxg_all.fillna(0)
+    tr_all.reset_index(drop=True, inplace=True)
+
+    cxg_all.to_csv(loc + "/exp_combined.csv")
+    tr_all.to_csv(loc + "/df_combined.csv")
+
+    print("Saved combined fovs.")
+
+
+def getCoords(exploc: str, fov_count=None):
+    """
+    Extracts physical coordinates of each FOV from the primary-fov_*.json files. Used in creating composite images.
+    """
+
+    # Get json file names and set fov_count
+    img_jsons = sorted(glob(f"{str(exploc)}/primary-fov_*.json"))
+    if fov_count is None:
+        fov_count = len(img_jsons)
+
+    # Get x_min, x_max, y_min, and y_max values for all FOVs and keep track of the absolute x_min and y_min
+    composite_coords = defaultdict(dict)
+    physical_coords = defaultdict(dict)
+    x_min_all = np.inf
+    x_max_all = 0
+    y_min_all = np.inf
+    y_max_all = 0
+    for pos in range(fov_count):
+        with open(img_jsons[pos], "r") as file:
+            metadata = json.load(file)
+
+        # Convert physical coordinates to pixel coordinates to find each FOVs place in the composite image
+        xc = metadata["tiles"][0]["coordinates"]["xc"]
+        yc = metadata["tiles"][0]["coordinates"]["yc"]
+        zc = metadata["tiles"][0]["coordinates"]["zc"]
+        tile_shape = metadata["tiles"][0]["tile_shape"]
+        x_size = (xc[1] - xc[0] + 1) / tile_shape["x"]
+        y_size = (yc[1] - yc[0] + 1) / tile_shape["y"]
+        z_size = (zc[1] - zc[0]) / metadata["shape"]["z"]
+
+        # Save physical distance values for later use
+        physical_coords[pos]["xc"] = xc
+        physical_coords[pos]["yc"] = yc
+        physical_coords[pos]["zc"] = zc
+        physical_coords["x_size"] = x_size
+        physical_coords["y_size"] = y_size
+        physical_coords["z_size"] = z_size
+
+        # Save min and max values for x and y for each FOV and track the min/max values across all FOVs
+        composite_coords[pos]["x_min"] = int(xc[0] / x_size)
+        x_min_all = (
+            x_min_all
+            if x_min_all < composite_coords[pos]["x_min"]
+            else composite_coords[pos]["x_min"]
+        )
+        composite_coords[pos]["x_max"] = int(xc[1] / x_size)
+        x_max_all = (
+            x_max_all
+            if x_max_all > composite_coords[pos]["x_max"]
+            else composite_coords[pos]["x_max"]
+        )
+        composite_coords[pos]["y_min"] = int(yc[0] / y_size)
+        y_min_all = (
+            y_min_all
+            if y_min_all < composite_coords[pos]["y_min"]
+            else composite_coords[pos]["y_min"]
+        )
+        composite_coords[pos]["y_max"] = int(yc[1] / y_size)
+        y_max_all = (
+            y_max_all
+            if y_max_all > composite_coords[pos]["y_max"]
+            else composite_coords[pos]["y_max"]
+        )
+
+    # Subtract minimum coord values from xs and ys (ensures (0,0) is the top left corner)
+    for pos in range(fov_count):
+        composite_coords[pos]["x_min"] = composite_coords[pos]["x_min"] - x_min_all
+        composite_coords[pos]["x_max"] = composite_coords[pos]["x_max"] - x_min_all
+        composite_coords[pos]["y_min"] = composite_coords[pos]["y_min"] - y_min_all
+        composite_coords[pos]["y_max"] = composite_coords[pos]["y_max"] - y_min_all
+
+    y_max_all -= y_min_all
+    x_max_all -= x_min_all
+    physical_coords["y_offset"] = y_min_all
+    physical_coords["x_offset"] = x_min_all
+
+    return composite_coords, physical_coords, y_max_all, x_max_all, metadata["shape"]
+
+
 def run(
     input_loc: Path,
     exp_loc: Path,
-    output_loc: str,
+    output_dir: str,
     aux_name: str,
     selected_fovs: List[int],
     roiKwargs: dict,
@@ -687,6 +836,13 @@ def run(
 
     if len(results) == 0:
         print("No FOVs found! Did the decoding step complete correctly?")
+
+    print("Extracting FOV coordinates...")
+    coords = getCoords(exp_loc)
+
+    print("Generating combined results...")
+    fov_nums = [int(f.split("_")[1]) for f in fovs]
+    combineFOVs(output_dir, fov_nums, coords)
 
     sys.stdout = sys.__stdout__
 
