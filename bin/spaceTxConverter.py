@@ -382,7 +382,9 @@ class FISHTile(FetchedTile):
 
                 prefix = "/".join(self._file_path.split("/")[:-1])
                 if not self.aux:
-                    data_org_row = self.data_org.iloc[self._rnd]
+                    data_org_row = self.data_org[self.data_org["bitNumber"] == self._rnd + 1].iloc[
+                        0
+                    ]
                 else:
                     data_org_row = self.data_org[
                         self.data_org["channelName"] == self.aux_name
@@ -848,7 +850,7 @@ class AuxTileFetcher(TileFetcher):
             )
 
 
-def parse_codebook(codebook_csv: str, data_org_file: str) -> Codebook:
+def parse_codebook(codebook_csv: str) -> Codebook:
     """Parses a codebook csv file provided by SeqFISH developers.
 
     Parameters
@@ -866,20 +868,6 @@ def parse_codebook(codebook_csv: str, data_org_file: str) -> Codebook:
     csv: pd.DataFrame = pd.read_csv(codebook_csv, index_col=0)
     if "id" in csv.columns:
         csv = csv[[col for col in csv.columns if col != "id"]]
-
-    # Check for unused bits and add back to codebook if there are any
-    if data_org_file:
-        data_org_csv = pd.read_csv(data_org_file)
-        insert_cols = []
-        for i in range(len(data_org_csv)):
-            if (
-                "bit" not in data_org_csv.iloc[i]["channelName"]
-                and data_org_csv.iloc[i]["readoutName"] == data_org_csv.iloc[i]["readoutName"]
-            ):
-                insert_cols.append(data_org_csv.iloc[i]["readoutName"])
-        for col in insert_cols:
-            csv[col] = [0 for _ in range(len(csv))]
-        csv = csv[sorted(csv.columns)]
 
     # Drop extra columns from vizgen codebook if they are there
     if "barcodeType" in csv.columns:
@@ -1409,7 +1397,7 @@ if __name__ == "__main__":
     # If adding blanks, check that codebook is compatible before beginning conversion (otherwise it will
     # cause an error after wasting time converting images)
     if args.codebook_csv:
-        codebook = parse_codebook(args.codebook_csv, args.data_org_file)
+        codebook = parse_codebook(args.codebook_csv)
     if args.codebook_json:
         codebook = Codebook.open_json(str(args.codebook_json))
     if args.add_blanks:
@@ -1459,7 +1447,7 @@ if __name__ == "__main__":
     # Note: this must trigger AFTER write_experiment_json, as it will clobber the codebook with
     # a placeholder.
     if args.codebook_csv:
-        codebook = parse_codebook(args.codebook_csv, args.data_org_file)
+        codebook = parse_codebook(args.codebook_csv)
     if args.codebook_json:
         codebook = Codebook.open_json(str(args.codebook_json))
     if args.add_blanks:
