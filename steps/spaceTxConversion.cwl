@@ -195,7 +195,7 @@ steps:
 
       requirements:
         DockerRequirement:
-          dockerPull: hubmap/starfish-custom:latest
+          dockerPull: hubmap/starfish-custom:3.3
         ResourceRequirement:
           ramMin: 1000
           tmpdirMin: 1000
@@ -231,7 +231,7 @@ steps:
 
       requirements:
         DockerRequirement:
-            dockerPull: hubmap/starfish-custom:latest
+            dockerPull: hubmap/starfish-custom:3.3
         ResourceRequirement:
           tmpdirMin: |
             ${
