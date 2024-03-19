@@ -452,15 +452,15 @@ def add_corrected_rounds(codebook, decoded, ham_dist):
     decoded_data = decoded.data.reshape(decoded.shape[0], decoded.shape[1] * decoded.shape[2])
 
     # Calculate distance of each decoded vector with the barcode it was assigned
-    target_id_map = {target: target_id for target_id, target in enumerate(codebook['target'].data)}
-    decoded_ids = [target_id_map[target] for target in decoded['target'].data]
+    target_id_map = {target: target_id for target_id, target in enumerate(codebook["target"].data)}
+    decoded_ids = [target_id_map[target] for target in decoded["target"].data]
     perfect_words = codebook_data_norm[np.array(decoded_ids)]
     on_distances = np.linalg.norm(decoded_data - perfect_words, axis=1)
 
     # Create dictionary of hamming distance ham_dist codes from each of the barcodes in the codebook
     neighbor_codes = {}
     for c, codeword in enumerate(codebook_data):
-        target = codebook['target'].data[c]
+        target = codebook["target"].data[c]
         codeword = codeword.flatten()
         C = [nck(x, ham_dist) for x in range(len(codeword))]
         codewords = np.tile(codeword, (len(C), 1))
@@ -474,7 +474,7 @@ def add_corrected_rounds(codebook, decoded, ham_dist):
     neighbor_codes_mtx = []
     for i in range(codebook.shape[1]):
         this_neighbor_codes_mtx = []
-        for target in decoded['target'].data:
+        for target in decoded["target"].data:
             this_neighbor_codes_mtx.append(neighbor_codes[target][i])
         neighbor_codes_mtx.append(this_neighbor_codes_mtx)
     neighbor_codes_mtx = np.array(neighbor_codes_mtx)
@@ -488,7 +488,7 @@ def add_corrected_rounds(codebook, decoded, ham_dist):
     min_off_distances = np.min(off_distances, axis=0)
 
     # Find decoded vectors where the difference between the on target barcode distance and minimum off-target distance
-    # is positive, indicating that the off-target distance was smaller. Those vectors used error correction and are 
+    # is positive, indicating that the off-target distance was smaller. Those vectors used error correction and are
     # assigned 1 in the new column
     diff = on_distances - min_off_distances
     diff = diff > 0
