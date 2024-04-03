@@ -405,7 +405,7 @@ class FISHTile(FetchedTile):
                         suffix += self._fov + "_"
                     elif var == "imagingRound":
                         imagingRound = data_org_row["imagingRound"]
-                        suffix += str(imagingRound) if imagingRound != -1 else ""
+                        suffix += str(imagingRound) + "_" if imagingRound != -1 else ""
 
                 if suffix[-1] == "_":
                     suffix = suffix[:-1]
