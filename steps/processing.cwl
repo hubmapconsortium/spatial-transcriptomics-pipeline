@@ -194,7 +194,7 @@ steps:
               if(inputs.n_processes === null) {
                 return null;
               } else {
-                return inputs.n_processes * 20 * 24;
+                return Math.max(inputs.n_processes * 20 * 24, inputs.dir_size / 75);
               }
             }
 
