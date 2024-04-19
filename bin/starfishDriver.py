@@ -472,7 +472,7 @@ def add_corrected_rounds(codebook, decoded, ham_dist):
     # to the rounds*channels different possible hamming distance ham_dist barcodes from each codebook word, dimension 1
     # corresponds to each decoded vector, and dimension 3 is the rounds*channels flattened barcoded
     neighbor_codes_mtx = []
-    for i in range(codebook.shape[1]):
+    for i in range(codebook_data.shape[1]):
         this_neighbor_codes_mtx = []
         for target in decoded["target"].data:
             this_neighbor_codes_mtx.append(neighbor_codes[target][i])
@@ -1132,7 +1132,7 @@ if __name__ == "__main__":
     addKwarg(args, blobRunnerKwargs, "detector_method")
 
     pixelRunnerKwargs = {}
-    addKwarg(args, pixelRunnerKwargs, "metric")
+    # addKwarg(args, pixelRunnerKwargs, "metric")
     addKwarg(args, pixelRunnerKwargs, "distance_threshold")
     addKwarg(args, pixelRunnerKwargs, "magnitude_threshold")
     addKwarg(args, pixelRunnerKwargs, "pnorm")
