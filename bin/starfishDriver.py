@@ -1132,7 +1132,7 @@ if __name__ == "__main__":
     addKwarg(args, blobRunnerKwargs, "detector_method")
 
     pixelRunnerKwargs = {}
-    #addKwarg(args, pixelRunnerKwargs, "metric")
+    # addKwarg(args, pixelRunnerKwargs, "metric")
     addKwarg(args, pixelRunnerKwargs, "distance_threshold")
     addKwarg(args, pixelRunnerKwargs, "magnitude_threshold")
     addKwarg(args, pixelRunnerKwargs, "pnorm")
