@@ -71,6 +71,9 @@ This method is not recommended due to creating additional computational overhead
 
 The two provided input text files for the pipeline, `pipeline.yml` and `*metadata.json`, can be used as a template for user-defined datasets.
 
+### Example MERSCOPE data
+We have generated [an input template](https://github.com/hubmapconsortium/spatial-transcriptomics-pipeline/issues/54#issuecomment-2010937928) from a publicly available MERSCOPE dataset. The instructions at the link explain both how to run PIPEFISH with the provided dataset and what would need to be done to run PIPEFISH on another MERSCOPE dataset.
+
 ## Overall Program Flow
 
 ![A flowchart describing the inputs and outputs of each pipeline stage.](flowchart.svg)

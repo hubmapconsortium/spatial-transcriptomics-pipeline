@@ -444,36 +444,55 @@ def add_corrected_rounds(codebook, decoded, ham_dist):
     that were corrected for in the experiment
     """
 
-    # Make two dictionaries, both have target names as keys, neighbor_codes contains all neighboring codes to that
-    # targets code within the hamming distance while perfect_words contains only the correct codeword for that target
+    # Flateen rounds and channels dimensions and normalize codebook
+    codebook_data = codebook.data.reshape(codebook.shape[0], codebook.shape[1] * codebook.shape[2])
+    codebook_data_norm = codebook_data / np.linalg.norm(codebook_data, axis=1)[:, None]
+
+    # Flatten rounds and channels dimensions of decoded vectors (already normalized)
+    decoded_data = decoded.data.reshape(decoded.shape[0], decoded.shape[1] * decoded.shape[2])
+
+    # Calculate distance of each decoded vector with the barcode it was assigned
+    target_id_map = {target: target_id for target_id, target in enumerate(codebook["target"].data)}
+    decoded_ids = [target_id_map[target] for target in decoded["target"].data]
+    perfect_words = codebook_data_norm[np.array(decoded_ids)]
+    on_distances = np.linalg.norm(decoded_data - perfect_words, axis=1)
+
+    # Create dictionary of hamming distance ham_dist codes from each of the barcodes in the codebook
     neighbor_codes = {}
-    perfect_words = {}
-    for code in codebook:
-        target = str(code["target"].data)
-        codeword = code.data
+    for c, codeword in enumerate(codebook_data):
+        target = codebook["target"].data[c]
         codeword = codeword.flatten()
         C = [nck(x, ham_dist) for x in range(len(codeword))]
         codewords = np.tile(codeword, (len(C), 1))
         for i in range(len(C)):
             codewords[i, C[i]] = int(~np.array(codewords[i, C[i]], dtype=bool))
         neighbor_codes[target] = np.array([word / np.linalg.norm(word) for word in codewords])
-        perfect_words[target] = codeword / np.linalg.norm(codeword)
 
-    # For every transcript, check whether it's pixel vector is closer in distance to the true code or one of the
-    # neighbor codes. If it is closer to a neighbor code, there was an error correction.
-    corrected_rounds = []
-    for i, transcript in enumerate(decoded):
-        on_distance = np.linalg.norm(
-            transcript.data.flatten() - perfect_words[str(transcript["target"].data)]
-        )
-        off_distances = distance.cdist(
-            transcript.data.flatten().reshape((1, -1)),
-            neighbor_codes[str(transcript["target"].data)],
-        )
-        if on_distance < np.min(off_distances):
-            corrected_rounds.append(0)
-        else:
-            corrected_rounds.append(1)
+    # Create matrix of shape (rounds*channels, decoded transcript count, rounds*channels) where dimension 0 corresponds
+    # to the rounds*channels different possible hamming distance ham_dist barcodes from each codebook word, dimension 1
+    # corresponds to each decoded vector, and dimension 3 is the rounds*channels flattened barcoded
+    neighbor_codes_mtx = []
+    for i in range(codebook_data.shape[1]):
+        this_neighbor_codes_mtx = []
+        for target in decoded["target"].data:
+            this_neighbor_codes_mtx.append(neighbor_codes[target][i])
+        neighbor_codes_mtx.append(this_neighbor_codes_mtx)
+    neighbor_codes_mtx = np.array(neighbor_codes_mtx)
+
+    # Calculate distance of each decoded vector with the hamming distance ham_dist codes. Loops thround each of the
+    # rounds*channels sets of error codes and calculates distances to decoded vectors and then takes the min
+    off_distances = []
+    for i in range(codebook.shape[1] * codebook.shape[2]):
+        off_distances.append(np.linalg.norm(decoded_data - neighbor_codes_mtx[i], axis=1))
+    off_distances = np.array(off_distances)
+    min_off_distances = np.min(off_distances, axis=0)
+
+    # Find decoded vectors where the difference between the on target barcode distance and minimum off-target distance
+    # is positive, indicating that the off-target distance was smaller. Those vectors used error correction and are
+    # assigned 1 in the new column
+    diff = on_distances - min_off_distances
+    diff = diff > 0
+    corrected_rounds = diff.astype(int)
 
     # Add corrected_rounds field to table and return
     return decoded.assign_coords(corrected_rounds=("features", corrected_rounds))
@@ -1113,7 +1132,7 @@ if __name__ == "__main__":
     addKwarg(args, blobRunnerKwargs, "detector_method")
 
     pixelRunnerKwargs = {}
-    addKwarg(args, pixelRunnerKwargs, "metric")
+    # addKwarg(args, pixelRunnerKwargs, "metric")
     addKwarg(args, pixelRunnerKwargs, "distance_threshold")
     addKwarg(args, pixelRunnerKwargs, "magnitude_threshold")
     addKwarg(args, pixelRunnerKwargs, "pnorm")

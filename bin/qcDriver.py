@@ -623,7 +623,7 @@ def getFPR(segmentation=None, results=None, pdf=False):
             empty_cells = pd.Series(
                 {cell: 0 for cell in all_cells if cell not in real_per_cell_full.index}
             )
-            real_per_cell_full = pd.concat([real_per_cell_all, empty_cells])
+            real_per_cell_full = pd.concat([real_per_cell_full, empty_cells])
             empty_cells = pd.Series(
                 {cell: 0 for cell in all_cells if cell not in blank_per_cell_full.index}
             )
