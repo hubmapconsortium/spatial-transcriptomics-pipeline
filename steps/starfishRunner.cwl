@@ -161,7 +161,7 @@ inputs:
                   doc: Accuracy mode to run in.  Can be 'high', 'med', or 'low'.
                 physical_coords:
                   type: boolean?
-                  doc: Whether to use physical coordinates or pixel coordinates 
+                  doc: Whether to use physical coordinates or pixel coordinates
 
 
   decoding_pixel:
@@ -208,7 +208,7 @@ steps:
 
       requirements:
         DockerRequirement:
-          dockerPull: hubmap/starfish-custom:latest
+          dockerPull: hubmap/starfish-custom:3.4
         ResourceRequirement:
           ramMin: 1000
           tmpdirMin: 1000
@@ -383,7 +383,7 @@ steps:
               writable: true
               entry: "$({class: 'Directory', listing: inputs.exp_files})"
         DockerRequirement:
-          dockerPull: hubmap/starfish-custom:latest
+          dockerPull: hubmap/starfish-custom:3.4
         ResourceRequirement:
           tmpdirMin: |
             ${
